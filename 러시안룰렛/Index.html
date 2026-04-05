@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>러시안 룰렛</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:       #0a0806;
+            --surface:  #111009;
+            --panel:    #181510;
+            --border:   #2a2318;
+            --border-hi:#4a3f2e;
+            --text:     #d4c5a9;
+            --muted:    #5c5040;
+            --accent:   #c8922a;
+            --accent-lo:rgba(200,146,42,0.10);
+            --accent-hi:#e8b050;
+            --red:      #c0392b;
+            --red-hi:   #e74c3c;
+            --green:    #27ae60;
+            --blue:     #2980b9;
+            --font-head:'Bebas Neue', sans-serif;
+            --font-body:'Noto Sans KR', sans-serif;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--bg);
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% 0%, rgba(200,146,42,0.06) 0%, transparent 60%),
+                repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.015) 40px),
+                repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.015) 40px);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        /* ── START OVERLAY ── */
+        .start-overlay {
+            position: fixed; inset: 0;
+            background: rgba(5,4,3,0.92);
+            backdrop-filter: blur(8px);
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 1000; cursor: pointer;
+            gap: 16px;
+        }
+        .start-overlay h2 {
+            font-family: var(--font-head);
+            font-size: clamp(3rem, 10vw, 5.5rem);
+            color: var(--accent);
+            letter-spacing: 0.12em;
+            text-shadow: 0 0 40px rgba(200,146,42,0.5), 0 0 80px rgba(200,146,42,0.2);
+            animation: pulse 2.4s ease-in-out infinite;
+        }
+        .start-overlay p {
+            font-size: 0.85rem; color: var(--muted);
+            letter-spacing: 0.25em; text-transform: uppercase;
+        }
+
+        /* ── MUSIC CONTROL ── */
+        .music-control {
+            position: fixed; top: 20px; right: 20px;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 14px; border-radius: 40px;
+            display: flex; align-items: center; gap: 10px;
+            z-index: 100; border: 1px solid var(--border);
+        }
+        .music-icon { font-size: 16px; }
+        .music-toggle {
+            width: 44px; height: 22px;
+            background: var(--border); border-radius: 22px;
+            position: relative; cursor: pointer;
+            transition: background 0.3s;
+        }
+        .music-toggle.active { background: var(--accent); }
+        .toggle-switch {
+            width: 18px; height: 18px; background: #fff;
+            border-radius: 50%; position: absolute;
+            top: 2px; left: 2px; transition: transform 0.3s;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        }
+        .music-toggle.active .toggle-switch { transform: translateX(22px); }
+
+        /* ── CARD ── */
+        .game-container {
+            width: 100%; max-width: 520px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 36px 32px 32px;
+            position: relative; overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03) inset;
+        }
+        /* top accent bar */
+        .game-container::before {
+            content: ''; position: absolute;
+            top: 0; left: 0; right: 0; height: 3px;
+            background: linear-gradient(90deg, transparent, var(--accent), var(--red), transparent);
+        }
+        /* corner ornament */
+        .game-container::after {
+            content: '✦'; position: absolute;
+            top: 12px; left: 16px;
+            color: var(--accent); font-size: 10px; opacity: 0.4;
+        }
+
+        /* ── TITLE ── */
+        h1 {
+            font-family: var(--font-head);
+            font-size: clamp(2.2rem, 8vw, 3.2rem);
+            letter-spacing: 0.08em;
+            text-align: center;
+            color: var(--text);
+            margin-bottom: 28px;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+        }
+        h1 span { color: var(--accent); }
+
+        /* ── GAME INFO / STATUS ── */
+        .game-info {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 14px 18px;
+            margin-bottom: 24px;
+            display: flex; justify-content: center;
+        }
+        .status-container { text-align: center; }
+        #status {
+            font-family: var(--font-head);
+            font-size: 1.5rem;
+            letter-spacing: 0.06em;
+            color: var(--accent-hi);
+        }
+        #debug-status {
+            font-size: 0.75rem; color: var(--muted); margin-top: 4px;
+        }
+
+        /* ── CYLINDER ── */
+        .revolver {
+            width: 200px; height: 160px;
+            margin: 4px auto 28px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .cylinder {
+            width: 130px; height: 130px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #3a3228, #1a1410);
+            border: 6px solid #2a2218;
+            box-shadow:
+                0 0 0 1px rgba(255,255,255,0.04) inset,
+                0 0 20px rgba(0,0,0,0.8),
+                inset 0 2px 4px rgba(255,255,255,0.06);
+            position: relative;
+        }
+        .chamber-indicator {
+            position: absolute; width: 18px; height: 18px;
+            background: radial-gradient(circle at 35% 35%, var(--accent-hi), var(--accent));
+            border-radius: 50%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2;
+            box-shadow: 0 0 8px rgba(200,146,42,0.6);
+        }
+        .chamber-position {
+            position: absolute; top: 50%; left: 50%;
+            width: 26px; height: 26px;
+            margin: -13px 0 0 -13px;
+            background: #222018;
+            border-radius: 50%;
+            border: 2px solid #353020;
+            color: var(--muted);
+            font-size: 11px; font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            transform-origin: 0 0;
+            transition: background 0.3s, border-color 0.3s, color 0.3s;
+        }
+        .chamber-position.active {
+            background: var(--red);
+            border-color: var(--red-hi);
+            color: #fff;
+            box-shadow: 0 0 8px rgba(192,57,43,0.7);
+        }
+
+        /* ── MESSAGES ── */
+        #messages {
+            min-height: 52px; padding: 14px 16px;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            margin: 0 0 20px;
+            text-align: center;
+            font-size: 0.95rem; line-height: 1.5;
+            color: var(--text);
+            transition: color 0.3s, border-color 0.3s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #messages.danger { color: var(--red-hi); border-color: rgba(231,76,60,0.35); }
+        #messages.safe   { color: var(--green); border-color: rgba(39,174,96,0.35); }
+
+        /* ── SCORES ── */
+        .death-scores {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 10px; margin-bottom: 22px;
+        }
+        .score {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            padding: 12px 10px;
+            text-align: center;
+        }
+        .score label {
+            font-size: 0.7rem; letter-spacing: 0.15em;
+            text-transform: uppercase; color: var(--muted);
+            display: block; margin-bottom: 6px;
+        }
+        .score-value {
+            font-family: var(--font-head);
+            font-size: 2.4rem; line-height: 1;
+            letter-spacing: 0.04em;
+        }
+        .player-score .score-value { color: var(--green); }
+        .computer-score .score-value { color: var(--red-hi); }
+
+        /* ── BUTTONS ── */
+        .button-container {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        button {
+            padding: 12px 8px;
+            font-family: var(--font-head);
+            font-size: 1.05rem;
+            letter-spacing: 0.08em;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            cursor: pointer;
+            background: var(--panel);
+            color: var(--text);
+            transition: all 0.18s ease;
+            position: relative; overflow: hidden;
+        }
+        button::before {
+            content: ''; position: absolute;
+            inset: 0; opacity: 0;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.06), transparent);
+            transition: opacity 0.18s;
+        }
+        button:hover:not(:disabled)::before { opacity: 1; }
+        button:hover:not(:disabled) {
+            border-color: var(--border-hi);
+            color: #fff;
+            transform: translateY(-2px);
+        }
+        button:active:not(:disabled) { transform: translateY(0); }
+        button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        #fire-button {
+            background: linear-gradient(135deg, #8a1a1a, #5a0e0e);
+            border-color: var(--red);
+            color: #ffcccc;
+        }
+        #fire-button:hover:not(:disabled) { background: linear-gradient(135deg, #c0392b, #8a1a1a); }
+
+        #spin-button {
+            background: linear-gradient(135deg, #1a3a5a, #0e2238);
+            border-color: #2980b9;
+            color: #aaccee;
+        }
+        #spin-button:hover:not(:disabled) { background: linear-gradient(135deg, #2980b9, #1a3a5a); }
+
+        #reset-death-counts {
+            width: 100%; margin-top: 10px;
+            background: transparent;
+            border-color: var(--border);
+            color: var(--muted);
+            font-size: 0.8rem; letter-spacing: 0.12em;
+            display: none;
+        }
+        #reset-death-counts:hover:not(:disabled) { color: var(--text); }
+
+        /* ── DIVIDER ── */
+        .divider {
+            border: none;
+            border-top: 1px solid var(--border);
+            margin: 22px 0;
+        }
+
+        /* ── ANIMATIONS ── */
+        @keyframes pulse {
+            0%, 100% { opacity: 0.75; transform: scale(1); }
+            50%       { opacity: 1;    transform: scale(1.03); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0) rotate(0deg); }
+            15%       { transform: translateX(-6px) rotate(-1deg); }
+            30%       { transform: translateX(6px) rotate(1deg); }
+            45%       { transform: translateX(-5px) rotate(-0.5deg); }
+            60%       { transform: translateX(5px) rotate(0.5deg); }
+            75%       { transform: translateX(-3px); }
+            90%       { transform: translateX(3px); }
+        }
+        @keyframes spin {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(540deg); }
+        }
+        .shake   { animation: shake 0.45s cubic-bezier(.36,.07,.19,.97) both; }
+        .spinning{ animation: spin 0.55s cubic-bezier(.4,0,.2,1) both; }
+
+        @media (max-width: 480px) {
+            .game-container { padding: 24px 18px; }
+            .button-container { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="music-control">
+    <span class="music-icon">♪</span>
+    <div class="music-toggle active" id="musicToggle">
+        <div class="toggle-switch"></div>
+    </div>
+</div>
+
+<div class="start-overlay" id="startOverlay">
+    <h2>RUSSIAN ROULETTE</h2>
+    <p>화면을 클릭하여 시작</p>
+</div>
+
+<div class="game-container">
+    <h1>러시안 <span>룰렛</span></h1>
+
+    <div class="game-info">
+        <div class="status-container">
+            <div id="status">게임 준비</div>
+            <div id="debug-status"></div>
+        </div>
+    </div>
+
+    <div class="revolver">
+        <div class="cylinder" id="cylinder">
+            <div class="chamber-indicator"></div>
+            <div class="chamber-position" style="transform:rotate(0deg) translate(52px) rotate(0deg);">1</div>
+            <div class="chamber-position" style="transform:rotate(60deg) translate(52px) rotate(-60deg);">2</div>
+            <div class="chamber-position" style="transform:rotate(120deg) translate(52px) rotate(-120deg);">3</div>
+            <div class="chamber-position" style="transform:rotate(180deg) translate(52px) rotate(-180deg);">4</div>
+            <div class="chamber-position" style="transform:rotate(240deg) translate(52px) rotate(-240deg);">5</div>
+            <div class="chamber-position" style="transform:rotate(300deg) translate(52px) rotate(-300deg);">6</div>
+        </div>
+    </div>
+
+    <div id="messages">GAME START 버튼을 눌러주세요</div>
+
+    <div class="death-scores">
+        <div class="score player-score">
+            <label>플레이어 사망 횟수</label>
+            <div class="score-value" id="player-death-score">0</div>
+        </div>
+        <div class="score computer-score">
+            <label>컴퓨터 사망 횟수</label>
+            <div class="score-value" id="opponent-death-score">0</div>
+        </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="button-container">
+        <button id="fire-button">FIRE</button>
+        <button id="spin-button">SPIN</button>
+    </div>
+
+    <button id="reset-death-counts">Reset Scores</button>
+</div>
+
+
+
+<script>
+    // ── DOM 참조
+    const $ = id => document.getElementById(id);
+    const statusDiv    = $('status'),      debugStatusDiv = $('debug-status');
+    const messagesDiv  = $('messages'),    cylinder       = $('cylinder');
+    const fireButton   = $('fire-button'), spinButton     = $('spin-button');
+    const musicToggle  = $('musicToggle'), startOverlay   = $('startOverlay');
+    const resetBtn     = $('reset-death-counts');
+    const scoreEls     = { 플레이어: $('player-death-score'), 컴퓨터: $('opponent-death-score') };
+
+    // ── 상수
+    const RESTART_DELAY  = 3000, AI_THINK_MAX  = 3000;
+    const AI_SPIN_CHANCE = 0.4,  AI_FIRE_DELAY = 1000;
+    const SPIN_RANGES = [3, 3, 4, 5, 6, 6];
+
+    // ── Web Audio (로컬 사운드 생성)
+    let audioCtx = null, bgNodes = null, bgPlaying = false;
+
+    function getCtx() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        return audioCtx;
+    }
+
+    function playGunshot() {
+        const ctx = getCtx(), sr = ctx.sampleRate;
+        const now = ctx.currentTime;
+
+        // --- 초기 충격: 넓은 스펙트럼 노이즈 퍽 ---
+        const punchLen = sr * 0.018;
+        const punchBuf = ctx.createBuffer(1, punchLen, sr);
+        const punchD = punchBuf.getChannelData(0);
+        for (let i = 0; i < punchLen; i++)
+            punchD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / punchLen, 0.2);
+        const punchSrc = ctx.createBufferSource(); punchSrc.buffer = punchBuf;
+        const punchG = ctx.createGain();
+        punchG.gain.setValueAtTime(4.0, now);
+        punchG.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
+        punchSrc.connect(punchG); punchG.connect(ctx.destination);
+        punchSrc.start(now);
+
+        // --- 메인 바디: 저역 강조 노이즈 (총성의 핵심) ---
+        const bodyLen = sr * 0.55;
+        const bodyBuf = ctx.createBuffer(1, bodyLen, sr);
+        const bodyD = bodyBuf.getChannelData(0);
+        for (let i = 0; i < bodyLen; i++) {
+            const t = i / bodyLen;
+            bodyD[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 1.2) * 2.2;
+        }
+        const bodySrc = ctx.createBufferSource(); bodySrc.buffer = bodyBuf;
+        const bodyLP = ctx.createBiquadFilter(); bodyLP.type = 'lowpass'; bodyLP.frequency.value = 1400;
+        const bodyLP2 = ctx.createBiquadFilter(); bodyLP2.type = 'lowpass'; bodyLP2.frequency.value = 700;
+        const bodyG = ctx.createGain();
+        bodyG.gain.setValueAtTime(2.2, now);
+        bodyG.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        bodySrc.connect(bodyLP); bodyLP.connect(bodyLP2); bodyLP2.connect(bodyG); bodyG.connect(ctx.destination);
+        bodySrc.start(now);
+
+        // --- 고역 크랙: 빠르게 사라지는 고주파 노이즈 ---
+        const crackLen = sr * 0.12;
+        const crackBuf = ctx.createBuffer(1, crackLen, sr);
+        const crackD = crackBuf.getChannelData(0);
+        for (let i = 0; i < crackLen; i++)
+            crackD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackLen, 0.7);
+        const crackSrc = ctx.createBufferSource(); crackSrc.buffer = crackBuf;
+        const crackHP = ctx.createBiquadFilter(); crackHP.type = 'highpass'; crackHP.frequency.value = 2800;
+        const crackG = ctx.createGain();
+        crackG.gain.setValueAtTime(1.6, now);
+        crackG.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        crackSrc.connect(crackHP); crackHP.connect(crackG); crackG.connect(ctx.destination);
+        crackSrc.start(now);
+
+        // --- 잔향 꼬리: 공간감 ---
+        const tailLen = sr * 1.0;
+        const tailBuf = ctx.createBuffer(1, tailLen, sr);
+        const tailD = tailBuf.getChannelData(0);
+        for (let i = 0; i < tailLen; i++)
+            tailD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / tailLen, 0.9) * 0.35;
+        const tailSrc = ctx.createBufferSource(); tailSrc.buffer = tailBuf;
+        const tailLP = ctx.createBiquadFilter(); tailLP.type = 'lowpass'; tailLP.frequency.value = 500;
+        const tailG = ctx.createGain();
+        tailG.gain.setValueAtTime(0.6, now + 0.015);
+        tailG.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+        tailSrc.connect(tailLP); tailLP.connect(tailG); tailG.connect(ctx.destination);
+        tailSrc.start(now + 0.015);
+    }
+
+    function playClick() {
+        const ctx = getCtx(), sr = ctx.sampleRate;
+        const now = ctx.currentTime;
+
+        // --- 해머 타격: 날카로운 금속 클릭 ---
+        const clickLen = sr * 0.045;
+        const clickBuf = ctx.createBuffer(1, clickLen, sr);
+        const clickD = clickBuf.getChannelData(0);
+        for (let i = 0; i < clickLen; i++)
+            clickD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / clickLen, 3.5) * 1.5;
+        const clickSrc = ctx.createBufferSource(); clickSrc.buffer = clickBuf;
+        const clickHP = ctx.createBiquadFilter(); clickHP.type = 'highpass'; clickHP.frequency.value = 2200;
+        const clickG = ctx.createGain(); clickG.gain.value = 2.8;
+        clickSrc.connect(clickHP); clickHP.connect(clickG); clickG.connect(ctx.destination);
+        clickSrc.start(now);
+
+        // --- 금속 울림 (짧은 공명) ---
+        const ringOsc = ctx.createOscillator();
+        const ringG = ctx.createGain();
+        ringOsc.type = 'triangle';
+        ringOsc.frequency.value = 3400;
+        ringG.gain.setValueAtTime(0.35, now);
+        ringG.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        ringOsc.connect(ringG); ringG.connect(ctx.destination);
+        ringOsc.start(now); ringOsc.stop(now + 0.09);
+
+        // --- 저음 덩크 (약실이 비어 있는 둔탁한 울림) ---
+        const thunkOsc = ctx.createOscillator();
+        const thunkG = ctx.createGain();
+        thunkOsc.type = 'sine';
+        thunkOsc.frequency.setValueAtTime(220, now);
+        thunkOsc.frequency.exponentialRampToValueAtTime(55, now + 0.09);
+        thunkG.gain.setValueAtTime(0.7, now);
+        thunkG.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+        thunkOsc.connect(thunkG); thunkG.connect(ctx.destination);
+        thunkOsc.start(now); thunkOsc.stop(now + 0.13);
+    }
+
+    function playSpin() {
+        const ctx = getCtx(), sr = ctx.sampleRate;
+        const now = ctx.currentTime;
+
+        // --- 래칫 클릭들: 점점 느려지는 실린더 회전 ---
+        // 빠르게 시작해서 점차 감속하며 마지막엔 탁 멈춤
+        const clickTimes = [0, 0.055, 0.115, 0.185, 0.265, 0.36, 0.47, 0.595, 0.73, 0.85];
+        clickTimes.forEach((ct, idx) => {
+            const isLast = idx === clickTimes.length - 1;
+            const vol = isLast ? 1.6 : 0.9;          // 마지막 클릭이 가장 크고 묵직
+            const hpFreq = isLast ? 1800 : 3200;      // 마지막은 더 낮고 묵직한 소리
+            const cLen = sr * (isLast ? 0.05 : 0.028);
+            const cBuf = ctx.createBuffer(1, cLen, sr);
+            const cD = cBuf.getChannelData(0);
+            for (let i = 0; i < cLen; i++)
+                cD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / cLen, isLast ? 2.5 : 4) * vol;
+            const cSrc = ctx.createBufferSource(); cSrc.buffer = cBuf;
+            const cHP = ctx.createBiquadFilter(); cHP.type = 'highpass'; cHP.frequency.value = hpFreq;
+            const cG = ctx.createGain(); cG.gain.value = 1.0;
+            cSrc.connect(cHP); cHP.connect(cG); cG.connect(ctx.destination);
+            cSrc.start(now + ct);
+
+            // 마지막 클릭은 더 묵직한 노이즈로 (오실레이터 없이)
+            if (isLast) {
+                const stopLen = sr * 0.06;
+                const stopBuf = ctx.createBuffer(1, stopLen, sr);
+                const stopD = stopBuf.getChannelData(0);
+                for (let i = 0; i < stopLen; i++)
+                    stopD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / stopLen, 3.0) * 1.4;
+                const stopSrc = ctx.createBufferSource(); stopSrc.buffer = stopBuf;
+                const stopBP = ctx.createBiquadFilter(); stopBP.type = 'bandpass'; stopBP.frequency.value = 1400; stopBP.Q.value = 1.2;
+                const stopG2 = ctx.createGain(); stopG2.gain.value = 1.2;
+                stopSrc.connect(stopBP); stopBP.connect(stopG2); stopG2.connect(ctx.destination);
+                stopSrc.start(now + ct);
+            }
+        });
+
+        // --- 금속 마찰 쉭 소리 (회전 내내) ---
+        const hissLen = sr * 0.82;
+        const hissBuf = ctx.createBuffer(1, hissLen, sr);
+        const hissD = hissBuf.getChannelData(0);
+        for (let i = 0; i < hissLen; i++) {
+            const t = i / hissLen;
+            // 처음엔 강하게, 끝쪽에 감소
+            hissD[i] = (Math.random() * 2 - 1) * Math.pow(Math.sin(t * Math.PI), 0.6) * 0.18;
+        }
+        const hissSrc = ctx.createBufferSource(); hissSrc.buffer = hissBuf;
+        const hissHP = ctx.createBiquadFilter(); hissHP.type = 'highpass'; hissHP.frequency.value = 5500;
+        const hissG = ctx.createGain(); hissG.gain.value = 0.7;
+        hissSrc.connect(hissHP); hissHP.connect(hissG); hissG.connect(ctx.destination);
+        hissSrc.start(now);
+    }
+
+    let bgTimerID = null;
+
+    function makeReverb(ctx) {
+        const conv = ctx.createConvolver();
+        const len  = ctx.sampleRate * 2.2;
+        const buf  = ctx.createBuffer(2, len, ctx.sampleRate);
+        for (let c = 0; c < 2; c++) {
+            const d = buf.getChannelData(c);
+            for (let i = 0; i < len; i++)
+                d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.5);
+        }
+        conv.buffer = buf;
+        return conv;
+    }
+
+    function startBgMusic() {
+        if (bgPlaying) return;
+        const ctx = getCtx();
+        bgPlaying = true;
+
+        // ── 마스터 체인
+        const master = ctx.createGain();
+        master.gain.setValueAtTime(0, ctx.currentTime);
+        master.gain.linearRampToValueAtTime(0.72, ctx.currentTime + 3);
+        master.connect(ctx.destination);
+
+        const reverb    = makeReverb(ctx);
+        const reverbSend = ctx.createGain(); reverbSend.gain.value = 0.28;
+        reverb.connect(reverbSend); reverbSend.connect(master);
+
+        bgNodes = { master, reverb, reverbSend };
+
+        // ── 음표 주파수 (A minor 확장)
+        const N = {
+            A1:55, E2:82.4, A2:110, B2:123.5, C3:130.8, D3:146.8,
+            E3:164.8, F3:174.6, G3:196, A3:220, B3:246.9,
+            C4:261.6, D4:293.7, E4:329.6, F4:349.2, G4:392, A4:440,
+        };
+
+        const BPM  = 82;
+        const beat = 60 / BPM;   // 한 박자(초)
+        const BAR  = beat * 8;   // 2마디 = 1루프
+
+        // ── 악기 헬퍼
+        function note(freq, t, dur, type, vol, dry = true) {
+            const osc = ctx.createOscillator();
+            const g   = ctx.createGain();
+            osc.type = type; osc.frequency.value = freq;
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(vol, t + 0.012);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+            osc.connect(g);
+            if (dry) g.connect(master);
+            g.connect(reverb);
+            osc.start(t); osc.stop(t + dur + 0.05);
+        }
+
+        function kick(t) {
+            const osc = ctx.createOscillator(), g = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(180, t);
+            osc.frequency.exponentialRampToValueAtTime(38, t + 0.18);
+            g.gain.setValueAtTime(1.1, t);
+            g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+            osc.connect(g); g.connect(master);
+            osc.start(t); osc.stop(t + 0.38);
+        }
+
+        function rim(t) {                       // 스네어 대신 림샷
+            const sr = ctx.sampleRate;
+            const buf = ctx.createBuffer(1, sr * 0.08, sr);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/d.length, 6);
+            const src = ctx.createBufferSource(); src.buffer = buf;
+            const hp  = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=3500;
+            const g   = ctx.createGain(); g.gain.value = 0.45;
+            src.connect(hp); hp.connect(g); g.connect(master); g.connect(reverb);
+            src.start(t); src.stop(t + 0.1);
+        }
+
+        function hat(t, open=false) {
+            const sr = ctx.sampleRate, dur = open ? 0.14 : 0.035;
+            const buf = ctx.createBuffer(1, sr * dur, sr);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * Math.pow(1-i/d.length, open?1.5:4);
+            const src = ctx.createBufferSource(); src.buffer = buf;
+            const hp  = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=9000;
+            const g   = ctx.createGain(); g.gain.value = 0.18;
+            src.connect(hp); hp.connect(g); g.connect(master);
+            src.start(t); src.stop(t + dur + 0.02);
+        }
+
+        // ── 8섹션 배열 (각 2마디 = ~5.85초, 전체 ~46.8초 루프)
+        // K=킥 R=림 H=하이햇(클로즈) O=하이햇(오픈) _=쉬기
+        const sections = [
+
+            // ── Sec 0: Verse A (원곡 느낌 — Am 그루브)
+            {
+                drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'],
+                bass: [
+                    [0,   N.A1, beat*0.9,'sawtooth',0.30],[0.5, N.A1, beat*0.4,'sawtooth',0.18],
+                    [1,   N.E2, beat*0.8,'sawtooth',0.26],[1.5, N.D3, beat*0.3,'sawtooth',0.14],
+                    [2,   N.A1, beat*0.9,'sawtooth',0.30],[2.5, N.C3, beat*0.4,'sawtooth',0.16],
+                    [3,   N.E2, beat*0.7,'sawtooth',0.24],[3.5, N.G3, beat*0.3,'sawtooth',0.14],
+                    [4,   N.A1, beat*0.9,'sawtooth',0.30],[4.5, N.A2, beat*0.4,'sawtooth',0.16],
+                    [5,   N.E2, beat*0.8,'sawtooth',0.26],[5.5, N.D3, beat*0.3,'sawtooth',0.13],
+                    [6,   N.A1, beat*1.2,'sawtooth',0.28],[7,   N.E2, beat*0.6,'sawtooth',0.22],
+                    [7.5, N.A2, beat*0.3,'sawtooth',0.16],
+                ],
+                lead: [
+                    [0,   N.E4, beat*0.45,'triangle',0.16],[0.5, N.C4, beat*0.40,'triangle',0.13],
+                    [1,   N.A3, beat*0.45,'triangle',0.14],[1.5, N.G3, beat*0.35,'triangle',0.11],
+                    [2,   N.E3, beat*0.55,'triangle',0.14],[2.5, N.D3, beat*0.35,'triangle',0.10],
+                    [3,   N.C3, beat*0.90,'triangle',0.13],
+                    [4,   N.G3, beat*0.35,'triangle',0.12],[4.5, N.A3, beat*0.35,'triangle',0.13],
+                    [5,   N.C4, beat*0.45,'triangle',0.14],[5.5, N.E4, beat*0.40,'triangle',0.15],
+                    [6,   N.D4, beat*0.35,'triangle',0.13],[6.5, N.C4, beat*0.35,'triangle',0.12],
+                    [7,   N.B3, beat*0.80,'triangle',0.14],[7.5, N.G3, beat*0.35,'triangle',0.10],
+                ],
+            },
+
+            // ── Sec 1: Sparse (여백, 리드 숨고르기)
+            {
+                drum: ['K','H','_','R','K','H','H','_','K','H','_','R','K','H','H','_'],
+                bass: [
+                    [0,   N.A1, beat*0.9,'sawtooth',0.28],[0.5, N.A1, beat*0.4,'sawtooth',0.16],
+                    [1,   N.E2, beat*0.8,'sawtooth',0.24],[1.5, N.D3, beat*0.3,'sawtooth',0.12],
+                    [2,   N.A1, beat*0.9,'sawtooth',0.28],[2.5, N.C3, beat*0.4,'sawtooth',0.14],
+                    [3,   N.E2, beat*0.7,'sawtooth',0.22],[3.5, N.G3, beat*0.3,'sawtooth',0.12],
+                    [4,   N.A1, beat*0.9,'sawtooth',0.28],[4.5, N.A2, beat*0.4,'sawtooth',0.14],
+                    [5,   N.E2, beat*0.8,'sawtooth',0.24],[5.5, N.D3, beat*0.3,'sawtooth',0.11],
+                    [6,   N.A1, beat*1.4,'sawtooth',0.26],[7.5, N.E2, beat*0.5,'sawtooth',0.18],
+                ],
+                lead: [
+                    [0,   N.E4, beat*1.2,'triangle',0.14],
+                    [2,   N.A3, beat*0.8,'triangle',0.12],
+                    [3,   N.E3, beat*1.0,'triangle',0.11],
+                    [4.5, N.C4, beat*0.7,'triangle',0.13],
+                    [6,   N.G3, beat*0.6,'triangle',0.10],
+                    [7,   N.A3, beat*1.0,'triangle',0.12],
+                ],
+            },
+
+            // ── Sec 2: Dm 컬러 (코드 변화 — 어두운 느낌 강화)
+            {
+                drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'],
+                bass: [
+                    [0,   N.D3, beat*0.9,'sawtooth',0.28],[0.5, N.A2, beat*0.4,'sawtooth',0.18],
+                    [1,   N.F3, beat*0.8,'sawtooth',0.24],[1.5, N.A2, beat*0.3,'sawtooth',0.14],
+                    [2,   N.D3, beat*0.9,'sawtooth',0.28],[2.5, N.C3, beat*0.4,'sawtooth',0.16],
+                    [3,   N.G3, beat*0.7,'sawtooth',0.22],[3.5, N.E3, beat*0.3,'sawtooth',0.14],
+                    [4,   N.A2, beat*0.9,'sawtooth',0.26],[4.5, N.A1, beat*0.4,'sawtooth',0.20],
+                    [5,   N.E2, beat*0.8,'sawtooth',0.24],[5.5, N.C3, beat*0.3,'sawtooth',0.14],
+                    [6,   N.A1, beat*1.2,'sawtooth',0.28],[7,   N.E2, beat*0.6,'sawtooth',0.22],
+                    [7.5, N.G3, beat*0.3,'sawtooth',0.14],
+                ],
+                lead: [
+                    [0,   N.F4, beat*0.45,'triangle',0.15],[0.5, N.D4, beat*0.40,'triangle',0.13],
+                    [1,   N.C4, beat*0.45,'triangle',0.14],[1.5, N.A3, beat*0.35,'triangle',0.12],
+                    [2,   N.G3, beat*0.55,'triangle',0.13],[2.5, N.F3, beat*0.35,'triangle',0.11],
+                    [3,   N.E3, beat*0.90,'triangle',0.14],
+                    [4,   N.D3, beat*0.35,'triangle',0.12],[4.5, N.E3, beat*0.35,'triangle',0.13],
+                    [5,   N.G3, beat*0.45,'triangle',0.14],[5.5, N.A3, beat*0.40,'triangle',0.15],
+                    [6,   N.C4, beat*0.35,'triangle',0.14],[6.5, N.E4, beat*0.35,'triangle',0.15],
+                    [7,   N.D4, beat*0.80,'triangle',0.14],[7.5, N.B3, beat*0.35,'triangle',0.11],
+                ],
+            },
+
+            // ── Sec 3: Tension Build (긴장감 고조 — 반음 상행)
+            {
+                drum: ['K','H','R','R','K','H','O','H','K','H','R','R','K','H','O','R'],
+                bass: [
+                    [0,   N.A1, beat*0.5,'sawtooth',0.32],[0.5, N.A2, beat*0.3,'sawtooth',0.20],
+                    [1,   N.E2, beat*0.5,'sawtooth',0.26],[1.5, N.E2, beat*0.3,'sawtooth',0.18],
+                    [2,   N.A1, beat*0.5,'sawtooth',0.32],[2.5, N.C3, beat*0.3,'sawtooth',0.20],
+                    [3,   N.D3, beat*0.5,'sawtooth',0.24],[3.5, N.E3, beat*0.3,'sawtooth',0.18],
+                    [4,   N.A1, beat*0.5,'sawtooth',0.32],[4.5, N.A2, beat*0.3,'sawtooth',0.20],
+                    [5,   N.E2, beat*0.5,'sawtooth',0.26],[5.5, N.G3, beat*0.3,'sawtooth',0.18],
+                    [6,   N.A1, beat*0.5,'sawtooth',0.30],[6.5, N.A1, beat*0.3,'sawtooth',0.22],
+                    [7,   N.E2, beat*0.5,'sawtooth',0.28],[7.5, N.B2, beat*0.3,'sawtooth',0.18],
+                ],
+                lead: [
+                    [0,   N.E3, beat*0.40,'triangle',0.13],
+                    [1,   N.G3, beat*0.40,'triangle',0.13],
+                    [2,   N.A3, beat*0.40,'triangle',0.14],
+                    [3,   N.B3, beat*0.40,'triangle',0.14],
+                    [4,   N.C4, beat*0.40,'triangle',0.15],
+                    [5,   N.D4, beat*0.40,'triangle',0.16],
+                    [6,   N.E4, beat*0.80,'triangle',0.18],
+                    [7,   N.E4, beat*0.40,'triangle',0.16],
+                    [7.5, N.D4, beat*0.30,'triangle',0.14],
+                ],
+            },
+
+            // ── Sec 4: Peak / Chorus (최고조 — 고음 멜로디)
+            {
+                drum: ['K','H','H','R','K','H','H','R','K','H','H','R','K','H','O','R'],
+                bass: [
+                    [0,   N.A1, beat*0.7,'sawtooth',0.34],[0.5, N.A1, beat*0.3,'sawtooth',0.22],
+                    [1,   N.C3, beat*0.7,'sawtooth',0.28],[1.5, N.E2, beat*0.3,'sawtooth',0.20],
+                    [2,   N.A1, beat*0.7,'sawtooth',0.34],[2.5, N.A2, beat*0.3,'sawtooth',0.22],
+                    [3,   N.G3, beat*0.7,'sawtooth',0.26],[3.5, N.E2, beat*0.3,'sawtooth',0.18],
+                    [4,   N.A1, beat*0.7,'sawtooth',0.34],[4.5, N.D3, beat*0.3,'sawtooth',0.22],
+                    [5,   N.E2, beat*0.7,'sawtooth',0.28],[5.5, N.A2, beat*0.3,'sawtooth',0.20],
+                    [6,   N.A1, beat*0.7,'sawtooth',0.32],[6.5, N.A1, beat*0.3,'sawtooth',0.24],
+                    [7,   N.E2, beat*0.7,'sawtooth',0.28],[7.5, N.D3, beat*0.3,'sawtooth',0.18],
+                ],
+                lead: [
+                    [0,   N.A4, beat*0.45,'triangle',0.17],[0.5, N.G4, beat*0.35,'triangle',0.14],
+                    [1,   N.E4, beat*0.45,'triangle',0.15],[1.5, N.D4, beat*0.35,'triangle',0.13],
+                    [2,   N.C4, beat*0.55,'triangle',0.15],[2.5, N.B3, beat*0.35,'triangle',0.13],
+                    [3,   N.A3, beat*0.90,'triangle',0.16],
+                    [4,   N.E4, beat*0.45,'triangle',0.16],[4.5, N.G4, beat*0.35,'triangle',0.14],
+                    [5,   N.A4, beat*0.45,'triangle',0.17],[5.5, N.G4, beat*0.40,'triangle',0.15],
+                    [6,   N.E4, beat*0.45,'triangle',0.16],[6.5, N.D4, beat*0.35,'triangle',0.14],
+                    [7,   N.C4, beat*0.80,'triangle',0.15],[7.5, N.E4, beat*0.35,'triangle',0.13],
+                ],
+            },
+
+            // ── Sec 5: Breakdown (극도로 절제 — 킥만 남음)
+            {
+                drum: ['K','_','_','_','K','_','_','_','K','_','_','_','K','_','_','_'],
+                bass: [
+                    [0,   N.A1, beat*3.8,'sawtooth',0.26],
+                    [4,   N.E2, beat*1.8,'sawtooth',0.22],
+                    [6,   N.A1, beat*2.0,'sawtooth',0.24],
+                ],
+                lead: [
+                    [1,   N.C4, beat*1.5,'triangle',0.10],
+                    [4,   N.E3, beat*1.2,'triangle',0.09],
+                    [6.5, N.A3, beat*1.5,'triangle',0.11],
+                ],
+            },
+
+            // ── Sec 6: Return A' (귀환 — 원곡 + 3도 화음 레이어)
+            {
+                drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'],
+                bass: [
+                    [0,   N.A1, beat*0.9,'sawtooth',0.30],[0.5, N.A1, beat*0.4,'sawtooth',0.18],
+                    [1,   N.E2, beat*0.8,'sawtooth',0.26],[1.5, N.D3, beat*0.3,'sawtooth',0.14],
+                    [2,   N.A1, beat*0.9,'sawtooth',0.30],[2.5, N.C3, beat*0.4,'sawtooth',0.16],
+                    [3,   N.E2, beat*0.7,'sawtooth',0.24],[3.5, N.G3, beat*0.3,'sawtooth',0.14],
+                    [4,   N.A1, beat*0.9,'sawtooth',0.30],[4.5, N.A2, beat*0.4,'sawtooth',0.16],
+                    [5,   N.E2, beat*0.8,'sawtooth',0.26],[5.5, N.D3, beat*0.3,'sawtooth',0.13],
+                    [6,   N.A1, beat*1.2,'sawtooth',0.28],[7,   N.E2, beat*0.6,'sawtooth',0.22],
+                    [7.5, N.A2, beat*0.3,'sawtooth',0.16],
+                ],
+                lead: [
+                    // 원곡 리드 + 3도 아래 화음
+                    [0,   N.E4, beat*0.45,'triangle',0.16],[0,   N.C4, beat*0.45,'triangle',0.08],
+                    [0.5, N.C4, beat*0.40,'triangle',0.13],[0.5, N.A3, beat*0.40,'triangle',0.07],
+                    [1,   N.A3, beat*0.45,'triangle',0.14],[1,   N.E3, beat*0.45,'triangle',0.08],
+                    [1.5, N.G3, beat*0.35,'triangle',0.11],
+                    [2,   N.E3, beat*0.55,'triangle',0.14],[2.5, N.D3, beat*0.35,'triangle',0.10],
+                    [3,   N.C3, beat*0.90,'triangle',0.13],
+                    [4,   N.G3, beat*0.35,'triangle',0.12],[4.5, N.A3, beat*0.35,'triangle',0.13],
+                    [5,   N.C4, beat*0.45,'triangle',0.14],[5,   N.A3, beat*0.45,'triangle',0.08],
+                    [5.5, N.E4, beat*0.40,'triangle',0.15],[5.5, N.C4, beat*0.40,'triangle',0.08],
+                    [6,   N.D4, beat*0.35,'triangle',0.13],[6.5, N.C4, beat*0.35,'triangle',0.12],
+                    [7,   N.B3, beat*0.80,'triangle',0.14],[7.5, N.G3, beat*0.35,'triangle',0.10],
+                ],
+            },
+
+            // ── Sec 7: Outro / Transition (루프 직전 마무리 필)
+            {
+                drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','R','O','R'],
+                bass: [
+                    [0,   N.A1, beat*0.9,'sawtooth',0.30],[0.5, N.A1, beat*0.4,'sawtooth',0.18],
+                    [1,   N.E2, beat*0.8,'sawtooth',0.26],[1.5, N.D3, beat*0.3,'sawtooth',0.14],
+                    [2,   N.A1, beat*0.9,'sawtooth',0.30],[2.5, N.C3, beat*0.4,'sawtooth',0.16],
+                    [3,   N.E2, beat*0.7,'sawtooth',0.24],[3.5, N.G3, beat*0.3,'sawtooth',0.14],
+                    [4,   N.A2, beat*0.9,'sawtooth',0.28],[4.5, N.E2, beat*0.4,'sawtooth',0.20],
+                    [5,   N.A1, beat*0.8,'sawtooth',0.30],[5.5, N.C3, beat*0.3,'sawtooth',0.16],
+                    [6,   N.E2, beat*0.6,'sawtooth',0.26],[6.5, N.A1, beat*0.4,'sawtooth',0.22],
+                    [7,   N.E2, beat*0.5,'sawtooth',0.24],[7.5, N.A2, beat*0.3,'sawtooth',0.18],
+                ],
+                lead: [
+                    [0,   N.E4, beat*0.45,'triangle',0.16],[0.5, N.D4, beat*0.40,'triangle',0.14],
+                    [1,   N.C4, beat*0.45,'triangle',0.14],[1.5, N.B3, beat*0.35,'triangle',0.12],
+                    [2,   N.A3, beat*0.55,'triangle',0.15],[3,   N.G3, beat*0.90,'triangle',0.13],
+                    [4,   N.A3, beat*0.35,'triangle',0.13],[4.5, N.C4, beat*0.35,'triangle',0.14],
+                    [5,   N.E4, beat*0.45,'triangle',0.16],[5.5, N.G4, beat*0.40,'triangle',0.15],
+                    [6,   N.E4, beat*0.45,'triangle',0.15],[6.5, N.D4, beat*0.35,'triangle',0.14],
+                    [7,   N.C4, beat*0.35,'triangle',0.15],[7.5, N.A3, beat*0.80,'triangle',0.14],
+                ],
+            },
+        ];
+
+        let loopStart = ctx.currentTime + 0.05;
+        let sectionIdx = 0;
+
+        function scheduleBar() {
+            if (!bgPlaying) return;
+
+            const sec = sections[sectionIdx % sections.length];
+            sectionIdx++;
+
+            // 드럼 (_ = 쉼표)
+            sec.drum.forEach((type, i) => {
+                const t = loopStart + i * (beat / 2);
+                if (type === 'K') kick(t);
+                else if (type === 'R') rim(t);
+                else if (type === 'H') hat(t, false);
+                else if (type === 'O') hat(t, true);
+            });
+
+            // 베이스 + 리드
+            sec.bass.forEach(([b, f, d, tp, v]) => note(f, loopStart + b*(beat/2), d, tp, v));
+            sec.lead.forEach(([b, f, d, tp, v]) => note(f, loopStart + b*(beat/2), d, tp, v));
+
+            loopStart += BAR;
+            bgTimerID = setTimeout(scheduleBar, (BAR - 0.3) * 1000);
+        }
+
+        scheduleBar();
+    }
+
+    function stopBgMusic() {
+        if (!bgPlaying) return;
+        bgPlaying = false;
+        clearTimeout(bgTimerID);
+        if (bgNodes?.master) {
+            const ctx = getCtx();
+            bgNodes.master.gain.setValueAtTime(bgNodes.master.gain.value, ctx.currentTime);
+            bgNodes.master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.0);
+        }
+        bgNodes = null;
+    }
+
+    // ── 게임 상태 localStorage 영속화
+    const LS = {
+        save(s) {
+            localStorage.setItem('rr_game', JSON.stringify({
+                bullet:   s.bullet,
+                shot:     s.shot,
+                turn:     s.turn,
+                spinUsed: s.spinUsed,
+            }));
+        },
+        load() {
+            try { return JSON.parse(localStorage.getItem('rr_game')); } catch { return null; }
+        },
+        clear() { localStorage.removeItem('rr_game'); },
+    };
+
+    // ── 상태
+    const state = {
+        bullet: 0, shot: 0,
+        turn: '플레이어',
+        spinUsed: { 플레이어: false, 컴퓨터: false },
+        scores: {
+            플레이어: parseInt(localStorage.getItem('playerDeathCount'))   || 0,
+            컴퓨터:   parseInt(localStorage.getItem('opponentDeathCount')) || 0,
+        },
+        debug: false, audioReady: false,
+    };
+
+    // ── 유틸
+    const rand  = n => Math.floor(Math.random() * n);
+    const other = p => p === '플레이어' ? '컴퓨터' : '플레이어';
+    function setMsg(text, cls = '') { messagesDiv.textContent = text; messagesDiv.className = cls; }
+
+    // ── 렌더
+    function render() {
+        const { bullet, shot, turn, spinUsed, debug } = state;
+        const isPlayer = turn === '플레이어';
+        statusDiv.textContent      = `챔버 ${shot + 1}  ·  ${turn}`;
+        debugStatusDiv.textContent = debug ? `DEBUG  탄환:${bullet}  현재:${shot + 1}` : '';
+        resetBtn.style.display     = debug ? 'block' : 'none';
+        fireButton.disabled = !isPlayer;
+        spinButton.disabled = !isPlayer || spinUsed[turn] || shot >= 5;
+        document.querySelectorAll('.chamber-position').forEach(el => el.classList.remove('active'));
+        if (isPlayer) setMsg('당신의 차례입니다');
+    }
+
+    function renderScores() {
+        ['플레이어', '컴퓨터'].forEach(p => scoreEls[p].textContent = state.scores[p]);
+    }
+
+    // ── 게임 흐름
+    function initGame() {
+        state.bullet   = rand(6) + 1;
+        state.shot     = 0;
+        state.turn     = Math.random() < 0.5 ? '플레이어' : '컴퓨터';
+        state.spinUsed = { 플레이어: false, 컴퓨터: false };
+        LS.save(state);
+        setMsg('');
+        render();
+        if (state.turn === '컴퓨터') aiTurn();
+    }
+
+    function resumeGame(saved) {
+        state.bullet   = saved.bullet;
+        state.shot     = saved.shot;
+        state.turn     = saved.turn;
+        state.spinUsed = saved.spinUsed;
+        setMsg('');
+        render();
+        if (state.turn === '컴퓨터') aiTurn();
+    }
+
+    function recordDeath(who) {
+        const key = who === '플레이어' ? 'playerDeathCount' : 'opponentDeathCount';
+        state.scores[who]++;
+        localStorage.setItem(key, state.scores[who]);
+        renderScores();
+    }
+
+    function fire() {
+        state.shot++;
+        cylinder.classList.add('shake');
+        setTimeout(() => cylinder.classList.remove('shake'), 500);
+
+        const hit      = state.shot === state.bullet;
+        const survived = state.shot >= 6;
+
+        if (hit) {
+            playGunshot();
+            LS.clear(); // 라운드 종료 — 저장 데이터 삭제
+            document.querySelectorAll('.chamber-position').forEach((el, i) =>
+                el.classList.toggle('active', i + 1 === state.bullet)
+            );
+            recordDeath(state.turn);
+            fireButton.disabled = spinButton.disabled = true;
+            setMsg(`💀 ${state.turn} 사망! ${RESTART_DELAY / 1000}초 후 새 게임`,
+                   state.turn === '플레이어' ? 'danger' : 'safe');
+            setTimeout(initGame, RESTART_DELAY);
+        } else if (survived) {
+            playClick();
+            LS.clear();
+            fireButton.disabled = spinButton.disabled = true;
+            setMsg(`✓ ${state.turn} 생존! ${RESTART_DELAY / 1000}초 후 새 게임`, 'safe');
+            setTimeout(initGame, RESTART_DELAY);
+        } else {
+            playClick();
+            state.turn = other(state.turn);
+            LS.save(state); // 진행 중 상태 저장
+            render();
+            if (state.turn === '컴퓨터') aiTurn();
+        }
+    }
+
+    function spin() {
+        if (state.spinUsed[state.turn]) {
+            if (state.turn === '플레이어') setMsg('이미 스핀을 사용했습니다.');
+            return;
+        }
+        const range = SPIN_RANGES[state.shot] ?? 0;
+        if (!range) { setMsg('스핀을 할 수 없습니다.'); return; }
+
+        state.bullet = Math.max(state.shot + 1, rand(range) + (7 - range));
+        state.spinUsed[state.turn] = true;
+        LS.save(state); // 스핀 후 저장
+
+        cylinder.classList.add('spinning');
+        setTimeout(() => cylinder.classList.remove('spinning'), 600);
+        playSpin();
+        setMsg(`${state.turn}가 실린더를 돌렸습니다.`);
+        render();
+        if (state.turn === '컴퓨터') setTimeout(fire, AI_FIRE_DELAY);
+    }
+
+    function aiTurn() {
+        setMsg('컴퓨터가 생각 중…');
+        setTimeout(() => {
+            const canSpin = !state.spinUsed['컴퓨터'] && state.shot < 5;
+            canSpin && Math.random() < AI_SPIN_CHANCE ? spin() : fire();
+        }, rand(AI_THINK_MAX));
+    }
+
+    // ── 이벤트
+    startOverlay.addEventListener('click', () => {
+        startOverlay.style.display = 'none';
+        if (!state.audioReady) {
+            startBgMusic();
+            state.audioReady = true;
+        }
+        // 진행 중인 게임이 있으면 이어서, 없으면 새 게임
+        const saved = LS.load();
+        saved ? resumeGame(saved) : initGame();
+    });
+    fireButton.addEventListener('click', () =>
+        state.turn === '플레이어' ? fire() : setMsg('상대 턴입니다. 기다려 주세요.')
+    );
+    spinButton.addEventListener('click', () =>
+        state.turn === '플레이어' ? spin() : setMsg('상대 턴입니다. 기다려 주세요.')
+    );
+    musicToggle.addEventListener('click', function () {
+        this.classList.toggle('active');
+        this.classList.contains('active') ? startBgMusic() : stopBgMusic();
+    });
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Pause' && state.bullet) { state.debug = !state.debug; render(); }
+    });
+    resetBtn.addEventListener('click', () => {
+        state.scores = { 플레이어: 0, 컴퓨터: 0 };
+        localStorage.setItem('playerDeathCount',   0);
+        localStorage.setItem('opponentDeathCount', 0);
+        renderScores();
+    });
+
+    // ── 초기 점수 표시
+    renderScores();
+</script>
+</body>
+</html>
