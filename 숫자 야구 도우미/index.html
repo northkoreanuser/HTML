@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>숫자 야구 도우미</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:         #0d0d0d;
+    --surface:    #161616;
+    --surface2:   #1e1e1e;
+    --border:     #2a2a2a;
+    --border-h:   #444;
+    --text:       #e8e8e8;
+    --muted:      #555;
+    --muted2:     #777;
+    --accent:     #00ff88;
+    --accent-dim: rgba(0,255,136,0.08);
+    --accent-mid: rgba(0,255,136,0.2);
+    --red:        #ff4d4d;
+    --red-dim:    rgba(255,77,77,0.08);
+    --blue:       #4d9fff;
+    --font:       'IBM Plex Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  /* ── 헤더 ── */
+  .header {
+    padding: 20px 24px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .header-left h1 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .header-left p {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  /* 자릿수 컨트롤 */
+  .digit-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .digit-label {
+    font-size: 10px;
+    color: var(--muted2);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .digit-input {
+    width: 46px;
+    padding: 5px 8px;
+    font-family: var(--font);
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    background: var(--bg);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    outline: none;
+    transition: border-color 0.15s;
+    -moz-appearance: textfield;
+  }
+  .digit-input::-webkit-inner-spin-button,
+  .digit-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .digit-input:focus { border-color: var(--accent); }
+  .digit-input:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── 제안 박스 ── */
+  .suggest-area {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .suggest-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .suggest-number {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+  }
+  .s-digit {
+    width: 52px;
+    height: 56px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--accent);
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .s-digit.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .suggest-meta {
+    margin-top: 10px;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    font-size: 10px;
+    color: var(--muted2);
+    letter-spacing: 0.04em;
+  }
+  .meta-val { color: var(--accent); font-weight: 600; }
+
+  /* ── 입력 영역 ── */
+  .input-area {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .feedback-wrap {
+    flex: 1;
+    position: relative;
+  }
+  .feedback-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .feedback-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-family: var(--font);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 8px;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .feedback-input:focus { border-color: var(--accent); }
+  .feedback-input:disabled { opacity: 0.3; cursor: not-allowed; }
+  .feedback-hint {
+    margin-top: 5px;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+  }
+  .feedback-hint span { color: var(--muted2); }
+
+  /* ── 버튼 ── */
+  .btn-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 19px; /* align with input */
+  }
+  .btn {
+    padding: 0 16px;
+    height: 38px;
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.12s;
+    background: transparent;
+    color: var(--muted2);
+    white-space: nowrap;
+  }
+  .btn:hover:not(:disabled) { border-color: var(--border-h); color: var(--text); }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .btn.primary {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .btn.primary:hover:not(:disabled) { background: #00e67a; border-color: #00e67a; }
+  .btn.danger { color: rgba(255,77,77,0.6); border-color: rgba(255,77,77,0.2); }
+  .btn.danger:hover:not(:disabled) { color: var(--red); border-color: rgba(255,77,77,0.5); background: var(--red-dim); }
+
+  /* ── 하단 액션 바 ── */
+  .action-bar {
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 6px;
+  }
+  .action-bar .btn { flex: 1; }
+
+  /* ── 로그 ── */
+  .log-area {
+    padding: 16px 24px 20px;
+  }
+  .log-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .log-box {
+    height: 200px;
+    overflow-y: auto;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 12px;
+    font-size: 11px;
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .log-box::-webkit-scrollbar { width: 4px; }
+  .log-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .log-empty { color: var(--muted); font-size: 11px; }
+
+  .log-line { display: block; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .log-line:last-child { border-bottom: none; }
+  .log-sep { color: var(--border-h); }
+  .log-guess { color: var(--muted2); }
+  .log-arrow { color: var(--accent); font-weight: 600; }
+  .log-win { color: var(--accent); font-weight: 600; }
+  .log-err { color: var(--red); }
+  .log-info { color: var(--blue); }
+
+  /* ── 상태 뱃지 ── */
+  .status-badge {
+    display: inline-block;
+    font-size: 9px;
+    padding: 1px 7px;
+    border-radius: 2px;
+    letter-spacing: 0.06em;
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge-on  { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-mid); }
+  .badge-off { background: rgba(85,85,85,0.15); color: var(--muted2); border: 1px solid var(--border); }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="header-left">
+      <h1>숫자 야구 도우미<span class="status-badge badge-off" id="statusBadge">대기</span></h1>
+      <p>AI가 최적의 숫자를 제안합니다</p>
+    </div>
+    <div class="digit-control">
+      <span class="digit-label">자릿수</span>
+      <input type="number" class="digit-input" id="digitInput" value="4" min="2" max="9"/>
+    </div>
+  </div>
+
+  <!-- 제안 숫자 -->
+  <div class="suggest-area">
+    <div class="suggest-label">제안 숫자</div>
+    <div class="suggest-number" id="suggestSlots"></div>
+    <div class="suggest-meta" id="suggestMeta">
+      <span>후보 <span class="meta-val" id="candidateCount">—</span>개</span>
+      <span>시도 <span class="meta-val" id="attemptCount">0</span>회</span>
+    </div>
+  </div>
+
+  <!-- 피드백 입력 -->
+  <div class="input-area">
+    <div class="feedback-label">결과 입력</div>
+    <div class="input-row">
+      <div class="feedback-wrap">
+        <input type="text" class="feedback-input" id="feedbackInput"
+               placeholder="—" maxlength="2" disabled/>
+        <div class="feedback-hint">
+          스트라이크<span>+</span>볼 순서로 두 자리 입력 &nbsp;/&nbsp; 예: 2S 1B → <span>21</span>
+        </div>
+      </div>
+      <div class="btn-col">
+        <button class="btn primary" id="submitBtn" disabled>입력</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 액션 바 -->
+  <div class="action-bar">
+    <button class="btn primary" id="startBtn">시작</button>
+    <button class="btn" id="newGameBtn" disabled>새 게임</button>
+    <button class="btn danger" id="resetBtn">리셋</button>
+  </div>
+
+  <!-- 로그 -->
+  <div class="log-area">
+    <div class="log-label">기록</div>
+    <div class="log-box" id="logBox">
+      <span class="log-empty">게임을 시작하면 기록이 표시됩니다.</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let candidates   = [];
+  let currentGuess = null;
+  let digitCount   = 4;
+  let isStarted    = false;
+  let attempts     = 0;
+
+  const digitInput     = document.getElementById('digitInput');
+  const feedbackInput  = document.getElementById('feedbackInput');
+  const startBtn       = document.getElementById('startBtn');
+  const submitBtn      = document.getElementById('submitBtn');
+  const newGameBtn     = document.getElementById('newGameBtn');
+  const resetBtn       = document.getElementById('resetBtn');
+  const logBox         = document.getElementById('logBox');
+  const candidateCount = document.getElementById('candidateCount');
+  const attemptCount   = document.getElementById('attemptCount');
+  const statusBadge    = document.getElementById('statusBadge');
+  const suggestSlots   = document.getElementById('suggestSlots');
+
+  // ── 슬롯 렌더 ──
+  function renderSlots(count) {
+    suggestSlots.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+      const d = document.createElement('div');
+      d.className = 's-digit';
+      d.id = 'slot' + i;
+      suggestSlots.appendChild(d);
+    }
+  }
+
+  function updateSlots(num) {
+    const digits = num ? num.split('') : [];
+    for (let i = 0; i < digitCount; i++) {
+      const el = document.getElementById('slot' + i);
+      if (!el) continue;
+      el.textContent = digits[i] || '';
+      el.classList.toggle('active', !!digits[i]);
+    }
+  }
+
+  // ── 후보 생성 ──
+  function generateCandidates() {
+    candidates = [];
+    function gen(cur, used) {
+      if (cur.length === digitCount) { candidates.push(cur); return; }
+      for (let i = 0; i < 10; i++) {
+        const c = String(i);
+        if (!used.has(c)) { used.add(c); gen(cur + c, used); used.delete(c); }
+      }
+    }
+    gen('', new Set());
+  }
+
+  function randomChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  function nextGuess() {
+    if (candidates.length === 0) {
+      setGuessBox(null);
+      return false;
+    }
+    currentGuess = randomChoice(candidates);
+    setGuessBox(currentGuess);
+    return true;
+  }
+
+  function setGuessBox(num) {
+    updateSlots(num);
+    candidateCount.textContent = candidates.length;
+    attemptCount.textContent   = attempts;
+  }
+
+  // ── 피드백 파싱 ──
+  function parseFeedback(str) {
+    if (!/^\d\d$/.test(str)) return null;
+    const S = parseInt(str[0]), B = parseInt(str[1]);
+    if (S > digitCount || B > digitCount || S + B > digitCount) return null;
+    return [S, B];
+  }
+
+  function filterCandidates(guess, S, B) {
+    candidates = candidates.filter(c => {
+      let s = 0, b = 0;
+      for (let i = 0; i < digitCount; i++) {
+        if (c[i] === guess[i])         s++;
+        else if (guess.includes(c[i])) b++;
+      }
+      return s === S && b === B;
+    });
+  }
+
+  // ── 로그 ──
+  function log(text, cls) {
+    if (logBox.querySelector('.log-empty')) logBox.innerHTML = '';
+    const span = document.createElement('span');
+    span.className = 'log-line ' + (cls || 'log-guess');
+    span.textContent = text;
+    logBox.appendChild(span);
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+  function logSep() { log('──────────────────────────────────', 'log-line log-sep'); }
+
+  // ── UI 상태 ──
+  function setActive(active) {
+    isStarted = active;
+    digitInput.disabled    = active;
+    startBtn.disabled      = active;
+    newGameBtn.disabled    = !active;
+    submitBtn.disabled     = !active;
+    feedbackInput.disabled = !active;
+    statusBadge.textContent = active ? '진행중' : '대기';
+    statusBadge.className   = 'status-badge ' + (active ? 'badge-on' : 'badge-off');
+    if (active) {
+      feedbackInput.placeholder = `예: ${digitCount - 1}1`;
+      feedbackInput.focus();
+    } else {
+      feedbackInput.placeholder = '—';
+    }
+  }
+
+  // ── 시작 ──
+  function startGame() {
+    const n = parseInt(digitInput.value);
+    if (n < 2 || n > 9) { alert('자릿수는 2~9 사이로 설정해주세요.'); return; }
+    digitCount = n;
+    attempts   = 0;
+    renderSlots(digitCount);
+    generateCandidates();
+    setActive(true);
+    logSep();
+    log(`${digitCount}자리 게임 시작 — 후보 ${candidates.length}개`, 'log-line log-info');
+    logSep();
+    nextGuess();
+  }
+
+  // ── 새 게임 ──
+  function newGame() {
+    attempts = 0;
+    generateCandidates();
+    feedbackInput.value = '';
+    logSep();
+    log('새 게임 시작', 'log-line log-info');
+    logSep();
+    nextGuess();
+    feedbackInput.focus();
+  }
+
+  // ── 리셋 ──
+  function fullReset() {
+    candidates   = [];
+    currentGuess = null;
+    digitCount   = 4;
+    attempts     = 0;
+    digitInput.value = 4;
+    feedbackInput.value = '';
+    logBox.innerHTML = '<span class="log-empty">게임을 시작하면 기록이 표시됩니다.</span>';
+    renderSlots(4);
+    updateSlots(null);
+    candidateCount.textContent = '—';
+    attemptCount.textContent   = '0';
+    setActive(false);
+  }
+
+  // ── 피드백 제출 ──
+  function submitFeedback() {
+    if (!isStarted) return;
+    const val = feedbackInput.value.trim();
+    const fb  = parseFeedback(val);
+    if (!fb) {
+      log(`⚠ 입력 오류: "${val}" — 두 자리 숫자로 입력하세요 (예: 21, 10)`, 'log-line log-err');
+      feedbackInput.value = '';
+      feedbackInput.focus();
+      return;
+    }
+    const [S, B] = fb;
+    attempts++;
+
+    log(`#${String(attempts).padStart(2,'0')}  ${currentGuess}  →  ${S}S ${B}B`, 'log-line log-arrow');
+
+    if (S === digitCount) {
+      log(`✓ 정답! ${currentGuess} (${attempts}회 만에 완료)`, 'log-line log-win');
+      logSep();
+      feedbackInput.value = '';
+      setActive(false);
+      updateSlots(currentGuess);
+      candidateCount.textContent = 1;
+      attemptCount.textContent   = attempts;
+      return;
+    }
+
+    filterCandidates(currentGuess, S, B);
+    feedbackInput.value = '';
+
+    if (candidates.length === 0) {
+      log('✗ 후보군 소진 — 입력 오류가 있을 수 있습니다. 리셋 후 다시 시작하세요.', 'log-line log-err');
+      logSep();
+      setActive(false);
+      updateSlots(null);
+      candidateCount.textContent = 0;
+      return;
+    }
+
+    nextGuess();
+    feedbackInput.focus();
+  }
+
+  // ── 이벤트 ──
+  startBtn.addEventListener('click', startGame);
+  newGameBtn.addEventListener('click', newGame);
+  resetBtn.addEventListener('click', fullReset);
+  submitBtn.addEventListener('click', submitFeedback);
+  feedbackInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitFeedback(); });
+
+  // ── 초기화 ──
+  fullReset();
+</script>
+</body>
+</html>
