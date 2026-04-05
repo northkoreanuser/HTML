@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>숫자 맞추기</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #09090b;
+  --surface: #111113;
+  --surface2: #18181b;
+  --border: #27272a;
+  --border2: #3f3f46;
+  --text: #fafafa;
+  --muted: #71717a;
+  --accent: #a78bfa;
+  --accent2: #7c3aed;
+  --yes: #34d399;
+  --yes2: #059669;
+  --no: #f87171;
+  --no2: #dc2626;
+  --font: 'IBM Plex Mono', monospace;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+/* ── 시작 화면 ── */
+#overlay {
+  position: fixed; inset: 0;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 28px; z-index: 100;
+  transition: opacity 0.4s;
+}
+#overlay.hidden { opacity: 0; pointer-events: none; }
+
+.overlay-title {
+  font-size: 13px; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--muted);
+}
+.overlay-main {
+  font-size: clamp(28px, 6vw, 42px);
+  font-weight: 600; color: var(--text);
+  text-align: center; line-height: 1.2;
+}
+.overlay-main span { color: var(--accent); }
+.overlay-sub {
+  font-size: 12px; color: var(--muted);
+  text-align: center; line-height: 1.8; max-width: 280px;
+}
+
+#startBtn {
+  background: var(--accent2);
+  color: #fff;
+  border: none; border-radius: 3px;
+  padding: 13px 36px;
+  font-family: var(--font); font-size: 13px; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+#startBtn:hover { background: #6d28d9; }
+#startBtn:active { transform: scale(0.97); }
+
+/* ── 게임 카드 ── */
+#game {
+  width: 100%; max-width: 500px;
+  opacity: 0; transition: opacity 0.4s;
+}
+#game.show { opacity: 1; }
+
+.top-bar {
+  display: flex; align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.progress-label {
+  font-size: 11px; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.progress-val { color: var(--accent); font-weight: 500; }
+
+/* 뮤직 토글 */
+.music-toggle { display: flex; align-items: center; gap: 8px; }
+.music-toggle span { font-size: 11px; color: var(--muted); }
+.toggle { position: relative; width: 36px; height: 20px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-track {
+  position: absolute; inset: 0;
+  background: var(--border2); border-radius: 20px;
+  cursor: pointer; transition: background 0.2s;
+}
+.toggle input:checked + .toggle-track { background: var(--accent2); }
+.toggle-track::after {
+  content: ''; position: absolute;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; top: 3px; left: 3px;
+  transition: transform 0.2s;
+}
+.toggle input:checked + .toggle-track::after { transform: translateX(16px); }
+
+/* 진행 바 */
+.progress-bar {
+  height: 2px; background: var(--border);
+  border-radius: 2px; margin-bottom: 24px; overflow: hidden;
+}
+.progress-fill {
+  height: 100%; background: var(--accent);
+  border-radius: 2px; transition: width 0.3s ease;
+}
+
+/* 카드 숫자 그리드 */
+.card-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card-hint {
+  font-size: 11px; color: var(--muted);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 14px;
+}
+#numGrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.num-cell {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 4px;
+  text-align: center;
+  font-size: 13px; font-weight: 500;
+  color: var(--text);
+  transition: border-color 0.15s;
+}
+.num-cell.highlight {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(167,139,250,0.06);
+}
+.num-cell.dummy { opacity: 0; pointer-events: none; }
+
+/* O / X 버튼 */
+.ox-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px; margin-bottom: 12px;
+}
+.ox-btn {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font); font-size: 13px; font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.05em;
+}
+.ox-btn:hover { border-color: var(--border2); color: var(--text); }
+.ox-btn.selected-yes {
+  background: rgba(52,211,153,0.08);
+  border-color: var(--yes);
+  color: var(--yes);
+}
+.ox-btn.selected-no {
+  background: rgba(248,113,113,0.08);
+  border-color: var(--no);
+  color: var(--no);
+}
+
+/* 이전/다음 */
+.nav-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.nav-btn {
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font); font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.05em;
+}
+.nav-btn:hover:not(:disabled) { border-color: var(--border2); background: var(--surface2); }
+.nav-btn:active:not(:disabled) { transform: scale(0.97); }
+.nav-btn:disabled { opacity: 0.25; cursor: default; }
+.nav-btn.primary {
+  background: var(--accent2); border-color: var(--accent2); color: #fff;
+}
+.nav-btn.primary:hover:not(:disabled) { background: #6d28d9; border-color: #6d28d9; }
+
+/* ── 후보 숫자 표시 ── */
+#candidateBox {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+.candidate-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.candidate-label {
+  font-size: 10px; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.candidate-count {
+  font-size: 11px; color: var(--accent); font-weight: 500;
+}
+.candidate-nums {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  min-height: 24px;
+}
+.c-num {
+  font-size: 11px; font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted2, #999);
+  transition: all 0.2s;
+}
+.c-num.lone {
+  background: rgba(167,139,250,0.12);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-size: 13px;
+  padding: 3px 10px;
+}
+.candidate-all {
+  font-size: 11px; color: var(--border2);
+  align-self: center;
+}
+
+/* 결과 */
+#result {
+  margin-top: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 24px;
+  text-align: center;
+  display: none;
+}
+.result-label { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 10px; }
+.result-num { font-size: 52px; font-weight: 600; color: var(--accent); line-height: 1; margin-bottom: 8px; }
+.result-sub { font-size: 12px; color: var(--muted); }
+.restart-btn {
+  margin-top: 16px;
+  padding: 10px 24px;
+  background: transparent; border: 1px solid var(--border2);
+  border-radius: 4px; color: var(--text);
+  font-family: var(--font); font-size: 12px; cursor: pointer;
+  transition: all 0.15s;
+}
+.restart-btn:hover { background: var(--surface2); }
+</style>
+</head>
+<body>
+
+<!-- 시작 오버레이 -->
+<div id="overlay">
+  <div class="overlay-title">Binary Guessing Game</div>
+  <div class="overlay-main">머릿속 숫자를<br><span>맞춰드립니다</span></div>
+  <div class="overlay-sub">1~99 사이 숫자를 하나 생각하세요.<br>카드마다 O / X 로 답하면<br>당신의 숫자를 알아냅니다.</div>
+  <button id="startBtn">시작하기</button>
+</div>
+
+<!-- 게임 영역 -->
+<div id="game">
+  <div class="top-bar">
+    <span class="progress-label">카드 <span class="progress-val" id="cardIdx">1</span> / <span class="progress-val" id="cardTotal">7</span></span>
+    <div class="music-toggle">
+      <span>BGM</span>
+      <label class="toggle">
+        <input type="checkbox" id="musicToggle" checked>
+        <div class="toggle-track"></div>
+      </label>
+    </div>
+  </div>
+
+  <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+
+  <div class="card-box">
+    <div class="card-hint">이 카드에 생각한 숫자가 있나요?</div>
+    <div id="numGrid"></div>
+  </div>
+
+  <div class="ox-row">
+    <button class="ox-btn" id="btnYes">O &nbsp;있음</button>
+    <button class="ox-btn" id="btnNo">X &nbsp;없음</button>
+  </div>
+
+  <div class="nav-row">
+    <button class="nav-btn" id="btnPrev">← 이전</button>
+    <button class="nav-btn primary" id="btnNext">다음 →</button>
+  </div>
+
+  <div id="candidateBox">
+    <div class="candidate-header">
+      <span class="candidate-label">후보 숫자</span>
+      <span class="candidate-count" id="candidateCount">답변 후 범위가 좁혀집니다</span>
+    </div>
+    <div class="candidate-nums" id="candidateNums">
+      <span class="candidate-all">— 아직 답변 없음 —</span>
+    </div>
+  </div>
+
+  <div id="result">
+    <div class="result-label">당신이 생각한 숫자</div>
+    <div class="result-num" id="resultNum">0</div>
+    <div class="result-sub">이진법으로 역산한 결과입니다 🎉</div>
+    <button class="restart-btn" id="restartBtn">다시 하기</button>
+  </div>
+</div>
+
+<script>
+const MAX = 99;
+
+// ── Web Audio API ──
+let audioCtx = null;
+let bgPlaying = false, bgNodes = null, bgTimerID = null;
+
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+// 배경음악: 밝고 신비로운 ambient 루프 (4초)
+function startBgMusic() {
+  if (bgPlaying) return;
+  bgPlaying = true;
+  scheduleBgLoop();
+}
+
+function stopBgMusic() {
+  bgPlaying = false;
+  if (bgTimerID) { clearTimeout(bgTimerID); bgTimerID = null; }
+  if (bgNodes) {
+    try { bgNodes.forEach(n => { if (n.stop) n.stop(); }); } catch(e) {}
+    bgNodes = null;
+  }
+}
+
+function scheduleBgLoop() {
+  if (!bgPlaying) return;
+  const ctx = getCtx();
+  const loopDur = 4.0;
+  const now = ctx.currentTime;
+  const nodes = [];
+
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.18, now);
+  master.connect(ctx.destination);
+
+  // 잔잔한 아르페지오 멜로디 (C major 느낌)
+  const melody = [
+    {f:523.25, t:0.0},  // C5
+    {f:659.25, t:0.5},  // E5
+    {f:783.99, t:1.0},  // G5
+    {f:1046.5, t:1.5},  // C6
+    {f:783.99, t:2.0},  // G5
+    {f:659.25, t:2.5},  // E5
+    {f:587.33, t:3.0},  // D5
+    {f:523.25, t:3.5},  // C5
+  ];
+  melody.forEach(({f, t}) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, now + t);
+    g.gain.setValueAtTime(0, now + t);
+    g.gain.linearRampToValueAtTime(0.4, now + t + 0.05);
+    g.gain.exponentialRampToValueAtTime(0.001, now + t + 0.45);
+    osc.connect(g); g.connect(master);
+    osc.start(now + t); osc.stop(now + t + 0.5);
+    nodes.push(osc);
+  });
+
+  // 낮은 패드 드론 (부드럽게 깔리는 음)
+  const padFreqs = [130.81, 164.81, 196.0]; // C3, E3, G3
+  padFreqs.forEach(f => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(f, now);
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.15, now + 0.3);
+    g.gain.setValueAtTime(0.15, now + loopDur - 0.3);
+    g.gain.linearRampToValueAtTime(0, now + loopDur);
+    osc.connect(g); g.connect(master);
+    osc.start(now); osc.stop(now + loopDur + 0.05);
+    nodes.push(osc);
+  });
+
+  // 별빛 같은 틱틱 효과
+  [0.75, 1.25, 2.25, 3.25].forEach(t => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(2093, now + t); // C7
+    g.gain.setValueAtTime(0.08, now + t);
+    g.gain.exponentialRampToValueAtTime(0.001, now + t + 0.12);
+    osc.connect(g); g.connect(master);
+    osc.start(now + t); osc.stop(now + t + 0.15);
+    nodes.push(osc);
+  });
+
+  bgNodes = nodes;
+  bgTimerID = setTimeout(() => {
+    bgNodes = null;
+    scheduleBgLoop();
+  }, loopDur * 1000 - 30);
+}
+
+// 네비게이션 클릭음
+function playNav() {
+  const ctx = getCtx();
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(880, ctx.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(1320, ctx.currentTime + 0.08);
+  g.gain.setValueAtTime(0.2, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(); osc.stop(ctx.currentTime + 0.12);
+}
+
+// O/X 선택음
+function playSelect(isYes) {
+  const ctx = getCtx();
+  const f = isYes ? 659.25 : 392.0;
+  const osc = ctx.createOscillator();
+  const g = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(f, ctx.currentTime);
+  g.gain.setValueAtTime(0.25, ctx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+  osc.connect(g); g.connect(ctx.destination);
+  osc.start(); osc.stop(ctx.currentTime + 0.18);
+}
+
+// 성공음: 반짝이는 상승 아르페지오
+function playSuccess() {
+  const ctx = getCtx();
+  const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+  notes.forEach((f, i) => {
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(f, ctx.currentTime + i * 0.1);
+    g.gain.setValueAtTime(0, ctx.currentTime + i * 0.1);
+    g.gain.linearRampToValueAtTime(0.3, ctx.currentTime + i * 0.1 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.1 + 0.35);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(ctx.currentTime + i * 0.1);
+    osc.stop(ctx.currentTime + i * 0.1 + 0.4);
+  });
+}
+
+// ── 뮤직 토글 ──
+const musicToggle = document.getElementById('musicToggle');
+musicToggle.addEventListener('change', () => {
+  if (musicToggle.checked) startBgMusic();
+  else stopBgMusic();
+});
+
+// ── 게임 로직 ──
+function makeCards(max) {
+  const res = [];
+  for (let bit = 0; (1 << bit) <= max; bit++) {
+    const nums = [];
+    for (let i = 1; i <= max; i++) if (i & (1 << bit)) nums.push(i);
+    res.push(nums);
+  }
+  return res;
+}
+
+let cards = [], answers = [], cur = 0;
+
+function render() {
+  const nums = cards[cur];
+  const cols = 6, rem = nums.length % cols;
+  const dummies = rem ? cols - rem : 0;
+
+  document.getElementById('cardIdx').textContent   = cur + 1;
+  document.getElementById('cardTotal').textContent = cards.length;
+  document.getElementById('progressFill').style.width =
+    ((cur + 1) / cards.length * 100).toFixed(1) + '%';
+
+  const grid = document.getElementById('numGrid');
+  grid.innerHTML = '';
+  nums.forEach(n => {
+    const d = document.createElement('div');
+    d.className = 'num-cell' + (answers[cur] === true ? ' highlight' : '');
+    d.textContent = n;
+    grid.appendChild(d);
+  });
+  for (let i = 0; i < dummies; i++) {
+    const d = document.createElement('div');
+    d.className = 'num-cell dummy';
+    grid.appendChild(d);
+  }
+
+  const btnYes = document.getElementById('btnYes');
+  const btnNo  = document.getElementById('btnNo');
+  btnYes.className = 'ox-btn' + (answers[cur] === true  ? ' selected-yes' : '');
+  btnNo.className  = 'ox-btn' + (answers[cur] === false ? ' selected-no'  : '');
+
+  document.getElementById('btnPrev').disabled = cur === 0;
+  const last = cur === cards.length - 1;
+  const answered = answers[cur] !== undefined;
+  const allDone = answers.every(a => a !== undefined);
+  document.getElementById('btnNext').disabled = !answered || (last && !allDone);
+
+  document.getElementById('result').style.display = 'none';
+  updateCandidates();
+}
+
+function updateCandidates() {
+  // 지금까지 답한 카드만 필터 조건으로 사용
+  const answered = answers.map((a, i) => a !== undefined ? {bit: i, yes: a} : null).filter(Boolean);
+
+  const numsEl  = document.getElementById('candidateNums');
+  const countEl = document.getElementById('candidateCount');
+
+  if (answered.length === 0) {
+    numsEl.innerHTML = '<span class="candidate-all">— 아직 답변 없음 —</span>';
+    countEl.textContent = '답변 후 범위가 좁혀집니다';
+    return;
+  }
+
+  // 1~MAX 중 조건을 모두 만족하는 숫자 추림
+  const candidates = [];
+  for (let n = 1; n <= MAX; n++) {
+    const ok = answered.every(({bit, yes}) => {
+      const hasBit = !!(n & (1 << bit));
+      return yes ? hasBit : !hasBit;
+    });
+    if (ok) candidates.push(n);
+  }
+
+  countEl.textContent = `후보 ${candidates.length}개`;
+  numsEl.innerHTML = '';
+
+  if (candidates.length === 0) {
+    numsEl.innerHTML = '<span class="candidate-all">— 해당 없음 —</span>';
+    return;
+  }
+
+  const lone = candidates.length === 1;
+  // 후보가 많으면 숫자 대신 범위 요약으로 표시
+  if (candidates.length > 20) {
+    const spans = chunkRanges(candidates);
+    spans.forEach(s => {
+      const d = document.createElement('span');
+      d.className = 'c-num';
+      d.textContent = s;
+      numsEl.appendChild(d);
+    });
+  } else {
+    candidates.forEach(n => {
+      const d = document.createElement('span');
+      d.className = 'c-num' + (lone ? ' lone' : '');
+      d.textContent = n;
+      numsEl.appendChild(d);
+    });
+  }
+}
+
+// 연속 숫자를 범위 문자열로 압축 (예: [1,2,3,5] → ["1-3","5"])
+function chunkRanges(arr) {
+  const ranges = [];
+  let start = arr[0], end = arr[0];
+  for (let i = 1; i < arr.length; i++) {
+    if (arr[i] === end + 1) { end = arr[i]; }
+    else { ranges.push(start === end ? `${start}` : `${start}-${end}`); start = end = arr[i]; }
+  }
+  ranges.push(start === end ? `${start}` : `${start}-${end}`);
+  return ranges;
+}
+
+function initGame() {
+  cards   = makeCards(MAX);
+  answers = new Array(cards.length).fill(undefined);
+  cur     = 0;
+  document.getElementById('game').classList.add('show');
+  render();
+}
+
+document.getElementById('startBtn').addEventListener('click', () => {
+  document.getElementById('overlay').classList.add('hidden');
+  startBgMusic();
+  initGame();
+});
+
+function showResult() {
+  const num = answers.reduce((acc, ans, i) => ans ? acc + (1 << i) : acc, 0);
+  document.getElementById('resultNum').textContent = num;
+  document.getElementById('result').style.display  = 'block';
+  playSuccess();
+}
+
+function selectAnswer(val) {
+  answers[cur] = val;
+  playSelect(val);
+  const isLast = cur === cards.length - 1;
+  render();
+  if (isLast) showResult();
+}
+
+document.getElementById('btnYes').addEventListener('click', () => selectAnswer(true));
+document.getElementById('btnNo').addEventListener('click',  () => selectAnswer(false));
+
+document.getElementById('btnPrev').addEventListener('click', () => {
+  if (cur > 0) { cur--; render(); playNav(); }
+});
+
+document.getElementById('btnNext').addEventListener('click', () => {
+  if (cur < cards.length - 1) {
+    cur++; render(); playNav();
+    if (cur === cards.length - 1 && answers[cur] !== undefined) showResult();
+  }
+});
+
+document.getElementById('restartBtn').addEventListener('click', () => {
+  initGame();
+});
+</script>
+</body>
+</html>
