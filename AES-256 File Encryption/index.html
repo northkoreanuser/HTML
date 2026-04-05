@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AES-256 파일 암호화</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --border: #2a2a2a;
+    --border-hover: #444;
+    --text: #e8e8e8;
+    --muted: #666;
+    --accent: #00ff88;
+    --accent-dim: rgba(0,255,136,0.08);
+    --danger: #ff4d4d;
+    --font: 'IBM Plex Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 480px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 32px;
+  }
+
+  .header {
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 20px;
+  }
+  .header h1 {
+    font-size: 14px; font-weight: 500;
+    color: var(--accent); letter-spacing: 0.08em;
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .header p { font-size: 11px; color: var(--muted); }
+
+  .field { margin-bottom: 16px; }
+  label {
+    display: block; font-size: 11px; color: var(--muted);
+    letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px;
+  }
+
+  .dropzone {
+    border: 1px dashed var(--border); border-radius: 3px;
+    padding: 20px; text-align: center; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s; position: relative;
+  }
+  .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: var(--accent-dim); }
+  .dropzone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .dropzone-icon { font-size: 22px; margin-bottom: 6px; }
+  .dropzone-text { font-size: 12px; color: var(--muted); }
+  .dropzone-name { font-size: 12px; color: var(--accent); margin-top: 4px; display: none; }
+
+  .pw-wrap { position: relative; }
+  .pw-wrap input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 10px 40px 10px 12px;
+    color: var(--text); font-family: var(--font); font-size: 13px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .pw-wrap input:focus { border-color: var(--accent); }
+  .pw-toggle {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    font-size: 14px; padding: 2px; line-height: 1;
+  }
+  .pw-toggle:hover { color: var(--text); }
+
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 20px; }
+  button.btn {
+    padding: 11px; border-radius: 3px; font-family: var(--font);
+    font-size: 12px; font-weight: 500; letter-spacing: 0.05em;
+    cursor: pointer; transition: all 0.15s; border: 1px solid var(--border);
+  }
+  button.btn:hover:not(:disabled) { border-color: var(--border-hover); }
+  button.btn:active:not(:disabled) { transform: scale(0.98); }
+  button.btn:disabled { opacity: 0.3; cursor: default; }
+  .btn-enc { background: var(--accent); color: #000; border-color: var(--accent); }
+  .btn-enc:hover:not(:disabled) { background: #00e67a !important; border-color: #00e67a !important; }
+  .btn-dec { background: transparent; color: var(--text); }
+
+  #status {
+    margin-top: 16px; padding: 10px 12px; border-radius: 3px;
+    font-size: 12px; line-height: 1.5; display: none; word-break: break-all;
+  }
+  #status.info { background: var(--accent-dim); border: 1px solid rgba(0,255,136,0.2); color: var(--accent); }
+  #status.error { background: rgba(255,77,77,0.08); border: 1px solid rgba(255,77,77,0.2); color: var(--danger); }
+
+  #dl-wrap { margin-top: 12px; display: none; }
+  #dl-btn {
+    display: block; width: 100%; padding: 11px;
+    background: transparent; border: 1px solid var(--accent);
+    border-radius: 3px; color: var(--accent); font-family: var(--font);
+    font-size: 12px; text-align: center; text-decoration: none; transition: background 0.15s;
+  }
+  #dl-btn:hover { background: var(--accent-dim); }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="header">
+    <h1>AES-256 파일 암호화</h1>
+    <p>Web Crypto API — CDN 없음, 브라우저 내장, 서버 전송 없음</p>
+  </div>
+
+  <div class="field">
+    <label>파일</label>
+    <div class="dropzone" id="dropzone">
+      <input type="file" id="fileInput">
+      <div class="dropzone-icon">📁</div>
+      <div class="dropzone-text">클릭하거나 파일을 드래그</div>
+      <div class="dropzone-name" id="fileName"></div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>비밀번호</label>
+    <div class="pw-wrap">
+      <input type="password" id="pwInput" placeholder="비밀번호 입력...">
+      <button class="pw-toggle" id="pwToggle" type="button">👁</button>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-enc" id="btnEnc">암호화</button>
+    <button class="btn btn-dec" id="btnDec">복호화</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="dl-wrap"><a id="dl-btn" href="#" download>⬇ 다운로드</a></div>
+</div>
+
+<script>
+const fileInput = document.getElementById('fileInput');
+const dropzone  = document.getElementById('dropzone');
+const fileName  = document.getElementById('fileName');
+const pwInput   = document.getElementById('pwInput');
+const pwToggle  = document.getElementById('pwToggle');
+const status    = document.getElementById('status');
+const dlWrap    = document.getElementById('dl-wrap');
+const dlBtn     = document.getElementById('dl-btn');
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) { fileName.textContent = fileInput.files[0].name; fileName.style.display = 'block'; }
+});
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault(); dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) {
+    fileInput.files = e.dataTransfer.files;
+    fileName.textContent = e.dataTransfer.files[0].name;
+    fileName.style.display = 'block';
+  }
+});
+
+pwToggle.addEventListener('click', () => {
+  const isText = pwInput.type === 'text';
+  pwInput.type = isText ? 'password' : 'text';
+  pwToggle.textContent = isText ? '👁' : '🙈';
+});
+
+function showStatus(msg, type) {
+  status.textContent = msg; status.className = type; status.style.display = 'block';
+}
+function setDownload(blob, name) {
+  const url = URL.createObjectURL(blob);
+  dlBtn.href = url; dlBtn.download = name;
+  dlBtn.textContent = `⬇ ${name} 다운로드`;
+  dlWrap.style.display = 'block';
+  dlBtn.onclick = () => setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function validate() {
+  if (!fileInput.files[0]) { showStatus('파일을 선택해주세요.', 'error'); return false; }
+  if (!pwInput.value)       { showStatus('비밀번호를 입력해주세요.', 'error'); return false; }
+  return true;
+}
+
+// 비밀번호 → AES-256 키 (PBKDF2, 200000 iterations)
+async function deriveKey(password, salt) {
+  const base = await crypto.subtle.importKey(
+    'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 200000, hash: 'SHA-256' },
+    base,
+    { name: 'AES-GCM', length: 256 },
+    false, ['encrypt', 'decrypt']
+  );
+}
+
+// 암호화: salt(16) + iv(12) + ciphertext
+document.getElementById('btnEnc').addEventListener('click', async () => {
+  if (!validate()) return;
+  dlWrap.style.display = 'none';
+  showStatus('암호화 중...', 'info');
+  try {
+    const data = await fileInput.files[0].arrayBuffer();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+    const key  = await deriveKey(pwInput.value, salt);
+    const enc  = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+
+    const out = new Uint8Array(28 + enc.byteLength);
+    out.set(salt, 0); out.set(iv, 16); out.set(new Uint8Array(enc), 28);
+
+    setDownload(new Blob([out]), fileInput.files[0].name + '.enc');
+    showStatus('암호화 완료!', 'info');
+  } catch (e) { showStatus('오류: ' + e.message, 'error'); }
+});
+
+// 복호화: salt/iv 분리 후 AES-GCM 복호화
+document.getElementById('btnDec').addEventListener('click', async () => {
+  if (!validate()) return;
+  dlWrap.style.display = 'none';
+  showStatus('복호화 중...', 'info');
+  try {
+    const buf = await fileInput.files[0].arrayBuffer();
+    if (buf.byteLength < 28) throw new Error();
+    const b    = new Uint8Array(buf);
+    const key  = await deriveKey(pwInput.value, b.slice(0, 16));
+    const dec  = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(16, 28) }, key, b.slice(28));
+    const name = fileInput.files[0].name;
+    setDownload(new Blob([dec]), name.endsWith('.enc') ? name.slice(0, -4) : 'decrypted_' + name);
+    showStatus('복호화 완료!', 'info');
+  } catch { showStatus('오류: 비밀번호가 틀렸거나 손상된 파일입니다.', 'error'); }
+});
+</script>
+</body>
+</html>
