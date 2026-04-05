@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>숫자 자리 맞추기</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:           #0d0d0d;
+    --surface:      #161616;
+    --surface2:     #1e1e1e;
+    --border:       #2a2a2a;
+    --border-hover: #444;
+    --text:         #e8e8e8;
+    --muted:        #555;
+    --muted2:       #777;
+    --accent:       #00ff88;
+    --accent-dim:   rgba(0,255,136,0.08);
+    --accent-mid:   rgba(0,255,136,0.18);
+    --red:          #ff4d4d;
+    --blue:         #4d9fff;
+    --yellow:       #ffd84d;
+    --font:         'IBM Plex Mono', monospace;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  /* ── 오버레이 ── */
+  #startOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(13,13,13,0.95);
+    backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    cursor: pointer;
+    user-select: none;
+    gap: 12px;
+  }
+  #startOverlay .ol-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  #startOverlay .ol-sub {
+    font-size: 11px;
+    color: var(--muted2);
+    letter-spacing: 0.08em;
+  }
+  #startOverlay .ol-hint {
+    margin-top: 12px;
+    font-size: 11px;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: 6px 16px;
+    border-radius: 2px;
+    animation: blink 1.5s step-start infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── 카드 ── */
+  .card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  /* ── 헤더 ── */
+  .header {
+    padding: 20px 24px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+  .header-left h1 {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .header-left p {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .score-block {
+    text-align: right;
+  }
+  .score-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+  .score-value {
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  /* ── 바디 ── */
+  .body { padding: 20px 24px; }
+
+  /* ── 현재 입력 표시 ── */
+  .guess-display {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+  .guess-slot {
+    width: 52px;
+    height: 56px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--bg);
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+  .guess-slot.filled {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .guess-slot.active {
+    border-color: var(--accent);
+  }
+  .guess-slot.empty-char {
+    color: var(--muted);
+    font-size: 18px;
+  }
+
+  /* ── 숫자 버튼 ── */
+  .section-label {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .number-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .num-btn {
+    padding: 13px 0;
+    font-size: 15px;
+    font-family: var(--font);
+    font-weight: 500;
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+  .num-btn:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .num-btn:active:not(:disabled) { transform: scale(0.95); }
+  .num-btn:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+  }
+
+  /* ── 액션 버튼 ── */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .act-btn {
+    padding: 10px 0;
+    font-size: 11px;
+    font-family: var(--font);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.12s;
+    background: transparent;
+    color: var(--muted2);
+  }
+  .act-btn:hover:not(:disabled) { border-color: var(--border-hover); color: var(--text); }
+  .act-btn:active:not(:disabled) { transform: scale(0.97); }
+  .act-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .act-btn.submit {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .act-btn.submit:hover:not(:disabled) {
+    background: #00e67a;
+    border-color: #00e67a;
+  }
+  .act-btn.new-game { color: var(--accent); border-color: rgba(0,255,136,0.3); }
+  .act-btn.new-game:hover { background: var(--accent-dim); border-color: var(--accent); }
+  .act-btn.give-up { color: rgba(255,77,77,0.5); border-color: rgba(255,77,77,0.15); font-size: 10px; }
+  .act-btn.give-up:hover:not(:disabled) { color: var(--red); border-color: rgba(255,77,77,0.4); background: rgba(255,77,77,0.05); }
+  .act-btn.give-up.confirm { color: var(--red); border-color: rgba(255,77,77,0.5); background: rgba(255,77,77,0.08); animation: warn-pulse 0.6s ease-in-out infinite alternate; }
+  @keyframes warn-pulse { from { border-color: rgba(255,77,77,0.3); } to { border-color: rgba(255,77,77,0.7); } }
+
+  .giveup-bar {
+    display: none;
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: rgba(255,77,77,0.06);
+    border: 1px solid rgba(255,77,77,0.2);
+    border-radius: 3px;
+    font-size: 12px;
+    color: var(--red);
+    text-align: center;
+    letter-spacing: 0.06em;
+  }
+  .giveup-answer {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 8px;
+    margin-top: 6px;
+    color: var(--red);
+  }
+
+  /* ── 구분선 ── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+
+  /* ── 히스토리 ── */
+  .history-wrap {
+    max-height: 240px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .history-wrap::-webkit-scrollbar { width: 4px; }
+  .history-wrap::-webkit-scrollbar-track { background: transparent; }
+  .history-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .history-empty {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    padding: 20px 0;
+  }
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .h-idx { color: var(--muted); width: 18px; flex-shrink: 0; font-size: 10px; }
+  .h-guess {
+    letter-spacing: 4px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    width: 72px;
+    flex-shrink: 0;
+  }
+  .h-result { display: flex; gap: 6px; flex: 1; }
+  .h-badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 2px;
+    letter-spacing: 0.04em;
+    font-weight: 500;
+  }
+  .badge-s { background: rgba(255,77,77,0.12); color: var(--red); border: 1px solid rgba(255,77,77,0.25); }
+  .badge-b { background: rgba(77,159,255,0.12); color: var(--blue); border: 1px solid rgba(77,159,255,0.25); }
+  .badge-o { background: rgba(85,85,85,0.15); color: var(--muted2); border: 1px solid var(--border); }
+  .badge-win { background: rgba(0,255,136,0.1); color: var(--accent); border: 1px solid rgba(0,255,136,0.3); letter-spacing: 0.08em; }
+
+  /* ── 승리 메시지 ── */
+  .win-bar {
+    display: none;
+    margin-top: 14px;
+    padding: 12px 14px;
+    background: var(--accent-dim);
+    border: 1px solid rgba(0,255,136,0.25);
+    border-radius: 3px;
+    font-size: 12px;
+    color: var(--accent);
+    text-align: center;
+    letter-spacing: 0.06em;
+    animation: pulse 1.8s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.65; }
+  }
+
+  /* ── 음악 토글 ── */
+  .music-row {
+    padding: 10px 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .music-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    flex: 1;
+  }
+  .toggle-track {
+    width: 36px;
+    height: 18px;
+    background: var(--border);
+    border-radius: 9px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .toggle-track.on { background: rgba(0,255,136,0.35); }
+  .toggle-thumb {
+    width: 12px;
+    height: 12px;
+    background: var(--muted2);
+    border-radius: 50%;
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle-track.on .toggle-thumb {
+    transform: translateX(18px);
+    background: var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<!-- 시작 오버레이 -->
+<div id="startOverlay">
+  <div class="ol-title">숫자 자리 맞추기</div>
+  <div class="ol-sub">중복 없는 4자리 숫자를 추리하세요</div>
+  <div class="ol-hint">[ 클릭하여 시작 ]</div>
+</div>
+
+<div class="card">
+  <!-- 헤더 -->
+  <div class="header">
+    <div class="header-left">
+      <h1>숫자 자리 맞추기</h1>
+      <p>중복 없는 4자리 — STRIKE / BALL / OUT</p>
+    </div>
+    <div class="score-block">
+      <div class="score-label">Score</div>
+      <div class="score-value" id="score">0</div>
+    </div>
+  </div>
+
+  <!-- 바디 -->
+  <div class="body">
+
+    <!-- 입력 슬롯 -->
+    <div class="guess-display" id="guessDisplay">
+      <div class="guess-slot" id="s0"></div>
+      <div class="guess-slot" id="s1"></div>
+      <div class="guess-slot" id="s2"></div>
+      <div class="guess-slot" id="s3"></div>
+    </div>
+
+    <!-- 숫자 버튼 -->
+    <div class="section-label">숫자 입력</div>
+    <div class="number-grid" id="numberButtons"></div>
+
+    <!-- 액션 버튼 -->
+    <div class="action-row">
+      <button class="act-btn" id="resetBtn">초기화</button>
+      <button class="act-btn submit" id="submitBtn">확인</button>
+      <button class="act-btn new-game" id="newGameBtn">새 게임</button>
+    </div>
+    <div style="margin-top:6px;">
+      <button class="act-btn give-up" id="giveUpBtn" style="width:100%;">답 보기 (포기)</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- 히스토리 -->
+    <div class="section-label">시도 기록</div>
+    <div class="history-wrap" id="resultHistory">
+      <div class="history-empty">아직 시도 없음</div>
+    </div>
+
+    <!-- 승리 메시지 -->
+    <div class="win-bar" id="winMessage"></div>
+    <!-- 포기 메시지 -->
+    <div class="giveup-bar" id="giveupMessage">
+      <div>포기했습니다. 정답은</div>
+      <div class="giveup-answer" id="giveupAnswer"></div>
+    </div>
+
+  </div><!-- /body -->
+
+  <!-- 음악 토글 -->
+  <div class="music-row">
+    <span class="music-label">🎵 배경음악</span>
+    <div class="toggle-track on" id="musicToggle">
+      <div class="toggle-thumb"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 오디오: Web Audio API로 대체 -->
+
+<script>
+  // ── 상태 ──
+  let answer      = '';
+  let currentGuess = '';
+  let score       = 0;
+  let gameOver    = false;
+  let history     = [];
+
+  // ── DOM ──
+  const scoreEl      = document.getElementById('score');
+  const submitBtn    = document.getElementById('submitBtn');
+  const resetBtn     = document.getElementById('resetBtn');
+  const newGameBtn   = document.getElementById('newGameBtn');
+  const giveUpBtn    = document.getElementById('giveUpBtn');
+  const resultHistory= document.getElementById('resultHistory');
+  const winMessage   = document.getElementById('winMessage');
+  const giveupMessage= document.getElementById('giveupMessage');
+  const giveupAnswer = document.getElementById('giveupAnswer');
+  const startOverlay = document.getElementById('startOverlay');
+  const musicToggle  = document.getElementById('musicToggle');
+
+  // ── Web Audio ──
+  let audioCtx = null, bgPlaying = false, bgTimerID = null, bgNodes = null;
+  function getCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  // 숫자 입력: 타자기 클릭
+  function playNumberSound() {
+    const ctx = getCtx(), sr = ctx.sampleRate, now = ctx.currentTime;
+    const buf = ctx.createBuffer(1, sr * 0.038, sr);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++)
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 4) * 1.1;
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2200;
+    const g = ctx.createGain(); g.gain.value = 2.0;
+    src.connect(hp); hp.connect(g); g.connect(ctx.destination);
+    src.start(now);
+  }
+
+  // 초기화: 스윕 다운
+  function playResetSound() {
+    const ctx = getCtx(), now = ctx.currentTime;
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(680, now);
+    osc.frequency.exponentialRampToValueAtTime(200, now + 0.18);
+    g.gain.setValueAtTime(0.28, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.20);
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start(now); osc.stop(now + 0.22);
+  }
+
+  // 제출: 확인 투톤 상행
+  function playSubmitSound() {
+    const ctx = getCtx(), now = ctx.currentTime;
+    [[0, 660], [0.11, 990]].forEach(([dt, freq]) => {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.22, now + dt);
+      g.gain.exponentialRampToValueAtTime(0.001, now + dt + 0.13);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(now + dt); osc.stop(now + dt + 0.15);
+    });
+  }
+
+  // 새 게임: 3음 상행 아르페지오
+  function playNewGameSound() {
+    const ctx = getCtx(), now = ctx.currentTime;
+    [523.2, 659.3, 783.9].forEach((freq, i) => {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = 'triangle'; osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.20, now + i * 0.10);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.10 + 0.18);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(now + i * 0.10); osc.stop(now + i * 0.10 + 0.22);
+    });
+  }
+
+  // 정답: 승리 팡파레 (아르페지오 → 코드 홀드)
+  function playWinSound() {
+    const ctx = getCtx(), now = ctx.currentTime;
+    const freqs = [523.2, 659.3, 783.9, 1046.5];
+    freqs.forEach((freq, i) => {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      g.gain.setValueAtTime(0, now + i * 0.09);
+      g.gain.linearRampToValueAtTime(0.20, now + i * 0.09 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.45);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(now + i * 0.09); osc.stop(now + i * 0.09 + 0.5);
+    });
+    // 마지막 코드 홀드
+    freqs.forEach(freq => {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = 'sine'; osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.14, now + 0.38);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(now + 0.38); osc.stop(now + 1.1);
+    });
+  }
+
+  // 포기: 하행 2음 (어둡게)
+  function playFailSound() {
+    const ctx = getCtx(), now = ctx.currentTime;
+    [[0, 392], [0.18, 261.6]].forEach(([dt, freq]) => {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = 'sawtooth'; osc.frequency.value = freq;
+      g.gain.setValueAtTime(0.20, now + dt);
+      g.gain.exponentialRampToValueAtTime(0.001, now + dt + 0.28);
+      osc.connect(g); g.connect(ctx.destination);
+      osc.start(now + dt); osc.stop(now + dt + 0.32);
+    });
+  }
+
+  // ── 배경음악 (Web Audio, A minor ambient ~32초 루프) ──
+  function makeReverb(ctx) {
+    const conv = ctx.createConvolver();
+    const len  = ctx.sampleRate * 2.0;
+    const buf  = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < len; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.8);
+    }
+    conv.buffer = buf;
+    return conv;
+  }
+
+  function startBgMusic() {
+    if (bgPlaying) return;
+    const ctx = getCtx();
+    bgPlaying = true;
+
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0, ctx.currentTime);
+    master.gain.linearRampToValueAtTime(0.55, ctx.currentTime + 2.5);
+    master.connect(ctx.destination);
+
+    const reverb  = makeReverb(ctx);
+    const revSend = ctx.createGain(); revSend.gain.value = 0.40;
+    reverb.connect(revSend); revSend.connect(master);
+    bgNodes = { master };
+
+    const N = {
+      A2:110, C3:130.8, D3:146.8, E3:164.8, F3:174.6, G3:196,
+      A3:220, B3:246.9, C4:261.6, D4:293.7, E4:329.6, F4:349.2,
+      G4:392, A4:440,
+    };
+    const BPM = 76, beat = 60 / BPM, BAR = beat * 8;
+
+    function note(freq, t, dur, type, vol) {
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.type = type; osc.frequency.value = freq;
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      osc.connect(g); g.connect(master); g.connect(reverb);
+      osc.start(t); osc.stop(t + dur + 0.05);
+    }
+
+    function tick(t) {
+      const sr = ctx.sampleRate;
+      const buf = ctx.createBuffer(1, Math.floor(sr * 0.022), sr);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < d.length; i++)
+        d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 5);
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 8500;
+      const g = ctx.createGain(); g.gain.value = 0.07;
+      src.connect(hp); hp.connect(g); g.connect(master);
+      src.start(t);
+    }
+
+    // 5섹션 (~31.6초 루프) — A minor ambient
+    const sections = [
+      // Sec 0: Intro — 여백, 긴 패드
+      {
+        ticks: [0, 4, 8, 12],
+        bass: [
+          [0, N.A2, beat*3.8, 'sine', 0.20],
+          [4, N.E3, beat*1.8, 'sine', 0.16],
+          [6, N.A2, beat*2.0, 'sine', 0.18],
+        ],
+        lead: [
+          [0,   N.E4, beat*1.2, 'triangle', 0.11],
+          [2,   N.C4, beat*0.8, 'triangle', 0.09],
+          [3,   N.A3, beat*1.0, 'triangle', 0.10],
+          [5,   N.G3, beat*0.8, 'triangle', 0.08],
+          [6.5, N.A3, beat*1.5, 'triangle', 0.11],
+        ],
+      },
+      // Sec 1: Verse A — 서정적 멜로디
+      {
+        ticks: [0, 2, 4, 6, 8, 10, 12, 14],
+        bass: [
+          [0, N.A2, beat*0.8, 'sine', 0.20],
+          [1, N.C3, beat*0.7, 'sine', 0.16],
+          [2, N.E3, beat*0.8, 'sine', 0.18],
+          [3, N.D3, beat*0.6, 'sine', 0.14],
+          [4, N.A2, beat*0.8, 'sine', 0.20],
+          [5, N.G3, beat*0.7, 'sine', 0.16],
+          [6, N.E3, beat*0.8, 'sine', 0.18],
+          [7, N.A2, beat*0.8, 'sine', 0.16],
+        ],
+        lead: [
+          [0,   N.E4, beat*0.45, 'triangle', 0.12],
+          [0.5, N.D4, beat*0.40, 'triangle', 0.10],
+          [1,   N.C4, beat*0.45, 'triangle', 0.11],
+          [1.5, N.A3, beat*0.35, 'triangle', 0.09],
+          [2,   N.G3, beat*0.55, 'triangle', 0.10],
+          [3,   N.A3, beat*0.90, 'triangle', 0.11],
+          [4,   N.C4, beat*0.45, 'triangle', 0.12],
+          [5,   N.E4, beat*0.45, 'triangle', 0.12],
+          [6,   N.D4, beat*0.80, 'triangle', 0.11],
+          [7,   N.C4, beat*0.35, 'triangle', 0.09],
+          [7.5, N.A3, beat*0.30, 'triangle', 0.08],
+        ],
+      },
+      // Sec 2: Color — F 컬러 (코드 변화)
+      {
+        ticks: [0, 2, 4, 6, 8, 10, 12, 14],
+        bass: [
+          [0, N.F3, beat*0.9, 'sine', 0.18],
+          [1, N.A2, beat*0.7, 'sine', 0.15],
+          [2, N.C3, beat*0.8, 'sine', 0.17],
+          [3, N.E3, beat*0.6, 'sine', 0.14],
+          [4, N.A2, beat*0.9, 'sine', 0.19],
+          [5, N.E3, beat*0.8, 'sine', 0.16],
+          [6, N.A2, beat*1.0, 'sine', 0.20],
+          [7.5, N.G3, beat*0.4, 'sine', 0.12],
+        ],
+        lead: [
+          [0,   N.F4, beat*0.45, 'triangle', 0.12],
+          [0.5, N.E4, beat*0.40, 'triangle', 0.10],
+          [1,   N.D4, beat*0.45, 'triangle', 0.11],
+          [1.5, N.C4, beat*0.35, 'triangle', 0.09],
+          [2,   N.A3, beat*0.55, 'triangle', 0.10],
+          [3,   N.G3, beat*0.90, 'triangle', 0.11],
+          [4,   N.A3, beat*0.45, 'triangle', 0.11],
+          [4.5, N.C4, beat*0.35, 'triangle', 0.10],
+          [5,   N.E4, beat*0.45, 'triangle', 0.12],
+          [6,   N.F4, beat*0.80, 'triangle', 0.13],
+          [7,   N.E4, beat*0.35, 'triangle', 0.10],
+          [7.5, N.C4, beat*0.30, 'triangle', 0.08],
+        ],
+      },
+      // Sec 3: Build — 리드미컬 베이스 + 상행
+      {
+        ticks: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
+        bass: [
+          [0,  N.A2, beat*0.4, 'sine', 0.22],
+          [1,  N.A2, beat*0.3, 'sine', 0.16],
+          [2,  N.C3, beat*0.4, 'sine', 0.18],
+          [3,  N.E3, beat*0.3, 'sine', 0.15],
+          [4,  N.A2, beat*0.4, 'sine', 0.22],
+          [5,  N.D3, beat*0.3, 'sine', 0.16],
+          [6,  N.E3, beat*0.4, 'sine', 0.18],
+          [7,  N.G3, beat*0.3, 'sine', 0.14],
+          [8,  N.A2, beat*0.4, 'sine', 0.22],
+          [9,  N.A2, beat*0.3, 'sine', 0.16],
+          [10, N.C3, beat*0.4, 'sine', 0.18],
+          [11, N.D3, beat*0.3, 'sine', 0.14],
+          [12, N.A2, beat*0.5, 'sine', 0.20],
+          [13, N.E3, beat*0.4, 'sine', 0.16],
+          [14, N.A2, beat*0.4, 'sine', 0.18],
+          [15, N.B3, beat*0.3, 'sine', 0.12],
+        ],
+        lead: [
+          [0,  N.A3, beat*0.35, 'triangle', 0.11],
+          [1,  N.C4, beat*0.35, 'triangle', 0.11],
+          [2,  N.E4, beat*0.35, 'triangle', 0.12],
+          [3,  N.G4, beat*0.35, 'triangle', 0.12],
+          [4,  N.A4, beat*0.70, 'triangle', 0.13],
+          [5.5,N.G4, beat*0.35, 'triangle', 0.11],
+          [6.5,N.E4, beat*0.35, 'triangle', 0.11],
+          [8,  N.A3, beat*0.35, 'triangle', 0.11],
+          [9,  N.C4, beat*0.35, 'triangle', 0.11],
+          [10, N.E4, beat*0.35, 'triangle', 0.12],
+          [11, N.F4, beat*0.35, 'triangle', 0.12],
+          [12, N.E4, beat*0.35, 'triangle', 0.13],
+          [13, N.D4, beat*0.35, 'triangle', 0.12],
+          [14, N.C4, beat*0.70, 'triangle', 0.13],
+        ],
+      },
+      // Sec 4: Outro — 고음 여운 후 루프
+      {
+        ticks: [0, 4, 8, 12],
+        bass: [
+          [0, N.A2, beat*3.8, 'sine', 0.18],
+          [4, N.C3, beat*1.8, 'sine', 0.14],
+          [6, N.A2, beat*2.0, 'sine', 0.16],
+        ],
+        lead: [
+          [0.5, N.A4, beat*1.0, 'triangle', 0.10],
+          [2,   N.G4, beat*0.8, 'triangle', 0.09],
+          [3,   N.E4, beat*1.2, 'triangle', 0.10],
+          [5,   N.C4, beat*0.8, 'triangle', 0.09],
+          [6,   N.A3, beat*2.0, 'triangle', 0.11],
+        ],
+      },
+    ];
+
+    let loopStart = ctx.currentTime + 0.05;
+    let sectionIdx = 0;
+
+    function scheduleBar() {
+      if (!bgPlaying) return;
+      const sec = sections[sectionIdx % sections.length];
+      sectionIdx++;
+      (sec.ticks || []).forEach(i => tick(loopStart + i * (beat / 2)));
+      sec.bass.forEach(([b, f, d, tp, v]) => note(f, loopStart + b*(beat/2), d, tp, v));
+      sec.lead.forEach(([b, f, d, tp, v]) => note(f, loopStart + b*(beat/2), d, tp, v));
+      loopStart += BAR;
+      bgTimerID = setTimeout(scheduleBar, (BAR - 0.3) * 1000);
+    }
+    scheduleBar();
+  }
+
+  function stopBgMusic() {
+    if (!bgPlaying) return;
+    bgPlaying = false;
+    clearTimeout(bgTimerID);
+    if (bgNodes?.master) {
+      const ctx = getCtx();
+      bgNodes.master.gain.setValueAtTime(bgNodes.master.gain.value, ctx.currentTime);
+      bgNodes.master.gain.linearRampToValueAtTime(0, ctx.currentTime + 1.0);
+    }
+    bgNodes = null;
+  }
+
+  // ── 초기화 ──
+  document.addEventListener('DOMContentLoaded', () => {
+    loadGameState();
+    createNumberButtons();
+
+    submitBtn.addEventListener('click', submitGuess);
+    resetBtn.addEventListener('click', resetCurrentGuess);
+    newGameBtn.addEventListener('click', startNewGame);
+    giveUpBtn.addEventListener('click', handleGiveUp);
+    musicToggle.addEventListener('click', toggleMusic);
+
+    // 오버레이는 항상 먼저 표시 — 클릭(유저 제스처)이 있어야 브라우저가 오디오 허용
+    startOverlay.addEventListener('click', () => {
+      startOverlay.style.display = 'none';
+      startBgMusic();
+
+      // 저장된 게임 복원 or 새 게임 생성
+      if (answer && answer.length === 4) {
+        updateUI();
+        if (isGameFinished()) handleFinishedGame();
+      } else {
+        generateAnswer();
+        updateUI();
+        saveGameState();
+      }
+    });
+  });
+
+  // ── 정답 생성 (순수 함수, 사운드 없음) ──
+  function generateAnswer() {
+    answer = '';
+    while (answer.length < 4) {
+      const d = Math.floor(Math.random() * 10).toString();
+      if (!answer.includes(d)) answer += d;
+    }
+  }
+
+  // ── 새 게임 ──
+  function startNewGame() {
+    playNewGameSound();
+    generateAnswer();
+    currentGuess = '';
+    gameOver = false;
+    history = [];
+    enableAllButtons();
+    submitBtn.disabled = true;
+    winMessage.style.display = 'none';
+    giveupMessage.style.display = 'none';
+    giveUpBtn.disabled = false;
+    giveUpBtn.classList.remove('confirm');
+    giveUpBtn.textContent = '답 보기 (포기)';
+    updateUI();
+    saveGameState();
+  }
+
+  // ── 포기 / 답 보기 (2-click 확인) ──
+  let giveUpPending = false;
+  let giveUpTimer   = null;
+  function handleGiveUp() {
+    if (gameOver) return;
+    if (!giveUpPending) {
+      // 1번째 클릭: 경고 상태
+      giveUpPending = true;
+      giveUpBtn.classList.add('confirm');
+      giveUpBtn.textContent = '정말 포기? 한 번 더 클릭';
+      // 3초 후 자동 취소
+      giveUpTimer = setTimeout(() => {
+        giveUpPending = false;
+        giveUpBtn.classList.remove('confirm');
+        giveUpBtn.textContent = '답 보기 (포기)';
+      }, 3000);
+    } else {
+      // 2번째 클릭: 실제 포기
+      clearTimeout(giveUpTimer);
+      giveUpPending = false;
+      gameOver = true;
+      playFailSound();
+      disableAllButtons();
+      submitBtn.disabled = true;
+      giveUpBtn.disabled = true;
+      giveUpBtn.classList.remove('confirm');
+      giveUpBtn.textContent = '포기함';
+      giveupAnswer.textContent = answer.split('').join(' ');
+      giveupMessage.style.display = 'block';
+      // 점수 차감 없이 정답만 공개, localStorage 정리
+      localStorage.removeItem('baseballAnswer');
+      saveGameState();
+      updateUI();
+    }
+  }
+
+  // ── 저장 / 불러오기 ──
+  function saveGameState() {
+    localStorage.setItem('baseballAnswer',  answer);
+    localStorage.setItem('baseballScore',   score);
+    localStorage.setItem('baseballHistory', JSON.stringify(history));
+  }
+  function loadGameState() {
+    const a = localStorage.getItem('baseballAnswer');
+    const s = localStorage.getItem('baseballScore');
+    const h = localStorage.getItem('baseballHistory');
+    if (a) answer  = a;
+    if (s) score   = parseInt(s);
+    if (h) history = JSON.parse(h);
+    scoreEl.textContent = score;
+  }
+
+  // ── 숫자 버튼 생성 ──
+  function createNumberButtons() {
+    const grid = document.getElementById('numberButtons');
+    grid.innerHTML = '';
+    for (let i = 0; i <= 9; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'num-btn';
+      btn.textContent = i;
+      btn.dataset.number = i;
+      btn.addEventListener('click', () => addNumber(i));
+      grid.appendChild(btn);
+    }
+  }
+
+  function enableAllButtons() {
+    document.querySelectorAll('.num-btn').forEach(b => b.disabled = false);
+  }
+  function disableAllButtons() {
+    document.querySelectorAll('.num-btn').forEach(b => b.disabled = true);
+  }
+
+  // ── 숫자 입력 ──
+  function addNumber(n) {
+    if (gameOver || currentGuess.length >= 4) return;
+    playNumberSound();
+    currentGuess += n;
+    document.querySelector(`.num-btn[data-number="${n}"]`).disabled = true;
+    updateUI();
+  }
+
+  // ── 초기화 ──
+  function resetCurrentGuess() {
+    if (gameOver) return;
+    playResetSound();
+    currentGuess = '';
+    enableAllButtons();
+    updateUI();
+  }
+
+  // ── 제출 ──
+  function submitGuess() {
+    if (gameOver || currentGuess.length !== 4) return;
+    playSubmitSound();
+
+    const result = checkAnswer(currentGuess);
+    history.push({ guess: currentGuess, ...result });
+
+    if (result.strikes === 4) {
+      handleCorrectAnswer();
+    } else {
+      currentGuess = '';
+      enableAllButtons();
+      updateUI();
+      saveGameState();
+    }
+  }
+
+  // ── 정답 확인 ──
+  function checkAnswer(guess) {
+    let strikes = 0, balls = 0;
+    for (let i = 0; i < 4; i++) {
+      if (guess[i] === answer[i])        strikes++;
+      else if (answer.includes(guess[i])) balls++;
+    }
+    return { strikes, balls, outs: 4 - strikes - balls };
+  }
+
+  // ── 정답 ──
+  function handleCorrectAnswer() {
+    gameOver = true;
+    score++;
+    scoreEl.textContent = score;
+    playWinSound();
+    winMessage.textContent = `✓ 정답 — ${currentGuess} (${history.length}번 만에 성공)`;
+    winMessage.style.display = 'block';
+    disableAllButtons();
+    submitBtn.disabled = true;
+    giveUpBtn.disabled = true;
+    updateUI();
+    localStorage.removeItem('baseballAnswer');
+    localStorage.setItem('baseballScore',   score);
+    localStorage.setItem('baseballHistory', JSON.stringify(history));
+  }
+
+  function isGameFinished() {
+    return history.length > 0 && history[history.length - 1].strikes === 4;
+  }
+  function handleFinishedGame() {
+    gameOver = true;
+    disableAllButtons();
+    submitBtn.disabled = true;
+    giveUpBtn.disabled = true;
+    const last = history[history.length - 1];
+    winMessage.textContent = `✓ 정답 — ${last.guess} (${history.length}번 만에 성공)`;
+    winMessage.style.display = 'block';
+  }
+
+  // ── UI 업데이트 ──
+  function updateUI() {
+    // 슬롯 업데이트
+    for (let i = 0; i < 4; i++) {
+      const slot = document.getElementById('s' + i);
+      slot.className = 'guess-slot';
+      if (i < currentGuess.length) {
+        slot.textContent = currentGuess[i];
+        slot.classList.add('filled');
+      } else if (i === currentGuess.length && !gameOver) {
+        slot.textContent = '';
+        slot.classList.add('active');
+      } else {
+        slot.textContent = '';
+      }
+    }
+
+    // 확인 버튼
+    submitBtn.disabled = currentGuess.length !== 4 || gameOver;
+
+    // 히스토리
+    if (history.length === 0) {
+      resultHistory.innerHTML = '<div class="history-empty">아직 시도 없음</div>';
+      return;
+    }
+    resultHistory.innerHTML = '';
+    history.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'history-item';
+
+      const idxEl = document.createElement('span');
+      idxEl.className = 'h-idx';
+      idxEl.textContent = idx + 1;
+
+      const guessEl = document.createElement('span');
+      guessEl.className = 'h-guess';
+      guessEl.textContent = item.guess.split('').join(' ');
+
+      const resEl = document.createElement('span');
+      resEl.className = 'h-result';
+
+      if (item.strikes === 4) {
+        const b = document.createElement('span');
+        b.className = 'h-badge badge-win';
+        b.textContent = '정답';
+        resEl.appendChild(b);
+      } else {
+        const bs = document.createElement('span');
+        bs.className = 'h-badge badge-s';
+        bs.textContent = `${item.strikes}S`;
+
+        const bb = document.createElement('span');
+        bb.className = 'h-badge badge-b';
+        bb.textContent = `${item.balls}B`;
+
+        const bo = document.createElement('span');
+        bo.className = 'h-badge badge-o';
+        bo.textContent = `${item.outs}O`;
+
+        resEl.appendChild(bs);
+        resEl.appendChild(bb);
+        resEl.appendChild(bo);
+      }
+
+      row.appendChild(idxEl);
+      row.appendChild(guessEl);
+      row.appendChild(resEl);
+      resultHistory.appendChild(row);
+    });
+
+    resultHistory.scrollTop = resultHistory.scrollHeight;
+  }
+
+  // ── 음악 토글 ──
+  function toggleMusic() {
+    musicToggle.classList.toggle('on');
+    if (musicToggle.classList.contains('on')) {
+      startBgMusic();
+    } else {
+      stopBgMusic();
+    }
+  }
+</script>
+</body>
+</html>
