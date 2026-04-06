@@ -2,18 +2,11 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>러시안 룰렛</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
-        /* ── 브라우저 기본값 정규화: 모든 브라우저에서 동일한 기준점 */
-        html {
-            font-size: 16px; /* 모든 브라우저에서 rem 기준 고정 */
-            -webkit-text-size-adjust: 100%; /* 모바일 사파리 자동 확대 방지 */
-            text-size-adjust: 100%;
-        }
-
         :root {
             --bg:       #0a0806;
             --surface:  #111009;
@@ -29,19 +22,8 @@
             --red-hi:   #e74c3c;
             --green:    #27ae60;
             --blue:     #2980b9;
-            --font-head:'Bebas Neue', cursive, sans-serif;
+            --font-head:'Bebas Neue', sans-serif;
             --font-body:'Noto Sans KR', sans-serif;
-
-            /* ── 고정 사이즈 토큰 (clamp 대신 고정값 + 미디어쿼리로 제어) */
-            --title-size: 3rem;
-            --status-size: 1.5rem;
-            --btn-size: 1.05rem;
-            --score-size: 2.4rem;
-            --cylinder-w: 130px;
-            --cylinder-h: 130px;
-            --revolver-h: 160px;
-            --card-pad-v: 36px;
-            --card-pad-h: 32px;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -55,11 +37,10 @@
                 repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.015) 40px);
             color: var(--text);
             min-height: 100vh;
-            min-height: 100dvh; /* 모바일 주소바 포함한 진짜 뷰포트 */
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 24px 16px;
+            padding: 24px;
         }
 
         /* ── START OVERLAY ── */
@@ -74,7 +55,7 @@
         }
         .start-overlay h2 {
             font-family: var(--font-head);
-            font-size: var(--title-size);
+            font-size: clamp(3rem, 10vw, 5.5rem);
             color: var(--accent);
             letter-spacing: 0.12em;
             text-shadow: 0 0 40px rgba(200,146,42,0.5), 0 0 80px rgba(200,146,42,0.2);
@@ -87,7 +68,7 @@
 
         /* ── MUSIC CONTROL ── */
         .music-control {
-            position: fixed; top: 16px; right: 16px;
+            position: fixed; top: 20px; right: 20px;
             background: rgba(0,0,0,0.5);
             padding: 8px 14px; border-radius: 40px;
             display: flex; align-items: center; gap: 10px;
@@ -95,7 +76,7 @@
         }
         .music-icon { font-size: 16px; }
         .music-toggle {
-            width: 44px; height: 24px; /* 터치 타겟 확보 */
+            width: 44px; height: 22px;
             background: var(--border); border-radius: 22px;
             position: relative; cursor: pointer;
             transition: background 0.3s;
@@ -104,19 +85,18 @@
         .toggle-switch {
             width: 18px; height: 18px; background: #fff;
             border-radius: 50%; position: absolute;
-            top: 3px; left: 3px; transition: transform 0.3s;
+            top: 2px; left: 2px; transition: transform 0.3s;
             box-shadow: 0 1px 4px rgba(0,0,0,0.4);
         }
-        .music-toggle.active .toggle-switch { transform: translateX(20px); }
+        .music-toggle.active .toggle-switch { transform: translateX(22px); }
 
         /* ── CARD ── */
         .game-container {
-            width: 100%;
-            max-width: 520px;
+            width: 100%; max-width: 520px;
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 4px;
-            padding: var(--card-pad-v) var(--card-pad-h) 32px;
+            padding: 36px 32px 32px;
             position: relative; overflow: hidden;
             box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.03) inset;
         }
@@ -134,11 +114,11 @@
         /* ── TITLE ── */
         h1 {
             font-family: var(--font-head);
-            font-size: var(--title-size);
+            font-size: clamp(2.2rem, 8vw, 3.2rem);
             letter-spacing: 0.08em;
             text-align: center;
             color: var(--text);
-            margin-bottom: 24px;
+            margin-bottom: 28px;
             text-shadow: 0 2px 10px rgba(0,0,0,0.6);
         }
         h1 span { color: var(--accent); }
@@ -149,30 +129,41 @@
             border: 1px solid var(--border);
             border-radius: 3px;
             padding: 14px 18px;
-            margin-bottom: 20px;
+            margin-bottom: 24px;
             display: flex; justify-content: center;
         }
         .status-container { text-align: center; }
         #status {
             font-family: var(--font-head);
-            font-size: var(--status-size);
+            font-size: 1.5rem;
             letter-spacing: 0.06em;
             color: var(--accent-hi);
         }
         #debug-status {
             font-size: 0.75rem; color: var(--muted); margin-top: 4px;
         }
+        /* AI 전략 배지 */
+        #strategy-badge {
+            font-size: 0.72rem;
+            margin-top: 5px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: none; /* 기본 숨김, 디버그 모드에서만 표시 */
+        }
+        #strategy-badge.brave    { color: #e74c3c; background: rgba(231,76,60,0.12); border: 1px solid rgba(231,76,60,0.25); }
+        #strategy-badge.random   { color: #9b59b6; background: rgba(155,89,182,0.12); border: 1px solid rgba(155,89,182,0.25); }
+        #strategy-badge.calculated { color: #2ecc71; background: rgba(46,204,113,0.12); border: 1px solid rgba(46,204,113,0.25); }
 
         /* ── CYLINDER ── */
         .revolver {
-            width: 200px;
-            height: var(--revolver-h);
-            margin: 4px auto 24px;
+            width: 200px; height: 160px;
+            margin: 4px auto 28px;
             display: flex; align-items: center; justify-content: center;
         }
         .cylinder {
-            width: var(--cylinder-w);
-            height: var(--cylinder-h);
+            width: 130px; height: 130px;
             border-radius: 50%;
             background: radial-gradient(circle at 35% 35%, #3a3228, #1a1410);
             border: 6px solid #2a2218;
@@ -211,13 +202,26 @@
             box-shadow: 0 0 8px rgba(192,57,43,0.7);
         }
 
+        /* ── 빈 챔버 격발 이펙트 ── */
+        @keyframes chamberMiss {
+            0%   { background: #222018; border-color: #353020; color: var(--muted); box-shadow: none; }
+            12%  { background: #3a3830; border-color: #5a5540; color: #aaa;
+                   box-shadow: 0 0 6px rgba(180,170,140,0.35); }
+            40%  { background: #2e2c24; border-color: #464035; color: #888; box-shadow: none; }
+            100% { background: #222018; border-color: #353020; color: var(--muted); box-shadow: none; }
+        }
+        .chamber-miss {
+            animation: chamberMiss 0.55s ease-out forwards;
+            z-index: 10;
+        }
+
         /* ── MESSAGES ── */
         #messages {
             min-height: 52px; padding: 14px 16px;
             background: var(--panel);
             border: 1px solid var(--border);
             border-radius: 3px;
-            margin: 0 0 18px;
+            margin: 0 0 20px;
             text-align: center;
             font-size: 0.95rem; line-height: 1.5;
             color: var(--text);
@@ -226,11 +230,12 @@
         }
         #messages.danger { color: var(--red-hi); border-color: rgba(231,76,60,0.35); }
         #messages.safe   { color: var(--green); border-color: rgba(39,174,96,0.35); }
+        #messages.spin-msg { color: #7ec8e3; border-color: rgba(126,200,227,0.35); }
 
         /* ── SCORES ── */
         .death-scores {
             display: grid; grid-template-columns: 1fr 1fr;
-            gap: 10px; margin-bottom: 18px;
+            gap: 10px; margin-bottom: 22px;
         }
         .score {
             background: var(--panel);
@@ -246,8 +251,7 @@
         }
         .score-value {
             font-family: var(--font-head);
-            font-size: var(--score-size);
-            line-height: 1;
+            font-size: 2.4rem; line-height: 1;
             letter-spacing: 0.04em;
         }
         .player-score .score-value { color: var(--green); }
@@ -257,13 +261,12 @@
         .button-container {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 10px;
+            gap: 8px;
         }
         button {
-            padding: 14px 8px;
-            min-height: 52px; /* 터치 타겟 최소 크기 */
+            padding: 12px 8px;
             font-family: var(--font-head);
-            font-size: var(--btn-size);
+            font-size: 1.05rem;
             letter-spacing: 0.08em;
             border: 1px solid var(--border);
             border-radius: 3px;
@@ -272,8 +275,6 @@
             color: var(--text);
             transition: all 0.18s ease;
             position: relative; overflow: hidden;
-            -webkit-tap-highlight-color: transparent; /* 모바일 탭 하이라이트 제거 */
-            touch-action: manipulation; /* 모바일 더블탭 확대 방지 */
         }
         button::before {
             content: ''; position: absolute;
@@ -318,7 +319,7 @@
         .divider {
             border: none;
             border-top: 1px solid var(--border);
-            margin: 18px 0;
+            margin: 22px 0;
         }
 
         /* ── ANIMATIONS ── */
@@ -342,98 +343,9 @@
         .shake   { animation: shake 0.45s cubic-bezier(.36,.07,.19,.97) both; }
         .spinning{ animation: spin 0.55s cubic-bezier(.4,0,.2,1) both; }
 
-        /* ════════════════════════════════════════
-           반응형: 태블릿 이하 (600px)
-        ════════════════════════════════════════ */
-        @media (max-width: 600px) {
-            :root {
-                --title-size:  2.6rem;
-                --status-size: 1.35rem;
-                --btn-size:    1rem;
-                --score-size:  2rem;
-                --cylinder-w: 120px;
-                --cylinder-h: 120px;
-                --revolver-h: 145px;
-                --card-pad-v: 28px;
-                --card-pad-h: 22px;
-            }
-            body { padding: 16px 12px; }
-        }
-
-        /* ════════════════════════════════════════
-           반응형: 모바일 (430px 이하 — 대부분의 폰)
-        ════════════════════════════════════════ */
-        @media (max-width: 430px) {
-            :root {
-                --title-size:  2.2rem;
-                --status-size: 1.25rem;
-                --btn-size:    1.05rem;
-                --score-size:  1.9rem;
-                --cylinder-w: 110px;
-                --cylinder-h: 110px;
-                --revolver-h: 135px;
-                --card-pad-v: 22px;
-                --card-pad-h: 16px;
-            }
-            body {
-                padding: 12px 8px;
-                align-items: flex-start;
-                padding-top: 56px; /* 뮤직 버튼 공간 */
-            }
-            .game-container {
-                border-radius: 6px;
-            }
-            .button-container {
-                grid-template-columns: 1fr 1fr;
-                gap: 10px;
-            }
-            button {
-                min-height: 56px; /* 모바일 터치 타겟 충분히 */
-                font-size: 1.1rem;
-                padding: 16px 8px;
-            }
-            h1 { margin-bottom: 18px; }
-            .game-info { padding: 12px 14px; margin-bottom: 16px; }
-            #messages { margin-bottom: 14px; font-size: 0.9rem; }
-            .death-scores { margin-bottom: 14px; gap: 8px; }
-            .score { padding: 10px 8px; }
-            .score label { font-size: 0.65rem; }
-            .divider { margin: 14px 0; }
-            .revolver { margin-bottom: 16px; }
-            /* 챔버 위치 텍스트 조금 더 작게 */
-            .chamber-position { font-size: 10px; }
-        }
-
-        /* ════════════════════════════════════════
-           아주 작은 화면 (360px 이하)
-        ════════════════════════════════════════ */
-        @media (max-width: 360px) {
-            :root {
-                --title-size:  2rem;
-                --cylinder-w: 100px;
-                --cylinder-h: 100px;
-                --revolver-h: 125px;
-            }
-            button { min-height: 50px; font-size: 1rem; }
-        }
-
-        /* ════════════════════════════════════════
-           가로 모드 모바일 (짧은 높이)
-        ════════════════════════════════════════ */
-        @media (max-height: 600px) and (orientation: landscape) {
-            :root {
-                --cylinder-w: 90px;
-                --cylinder-h: 90px;
-                --revolver-h: 110px;
-                --card-pad-v: 16px;
-            }
-            body { padding: 8px 16px; align-items: flex-start; padding-top: 8px; }
-            .revolver { margin-bottom: 10px; }
-            h1 { margin-bottom: 12px; }
-            .game-info { margin-bottom: 10px; padding: 10px 14px; }
-            #messages { margin-bottom: 10px; min-height: 40px; }
-            .death-scores { margin-bottom: 10px; }
-            .divider { margin: 10px 0; }
+        @media (max-width: 480px) {
+            .game-container { padding: 24px 18px; }
+            .button-container { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -458,6 +370,7 @@
         <div class="status-container">
             <div id="status">게임 준비</div>
             <div id="debug-status"></div>
+            <div id="strategy-badge"></div>
         </div>
     </div>
 
@@ -502,6 +415,7 @@
     // ── DOM 참조
     const $ = id => document.getElementById(id);
     const statusDiv    = $('status'),      debugStatusDiv = $('debug-status');
+    const strategyBadge = $('strategy-badge');
     const messagesDiv  = $('messages'),    cylinder       = $('cylinder');
     const fireButton   = $('fire-button'), spinButton     = $('spin-button');
     const musicToggle  = $('musicToggle'), startOverlay   = $('startOverlay');
@@ -510,23 +424,47 @@
 
     // ── 상수
     const RESTART_DELAY  = 3000, AI_THINK_MAX  = 3000;
-    const AI_SPIN_CHANCE = 0.4,  AI_FIRE_DELAY = 1000;
-    const SPIN_RANGES = [3, 3, 4, 5, 6, 6];
+    const AI_FIRE_DELAY  = 1000;
 
-    // ── Web Audio (로컬 사운드 생성)
+    // ── AI 전략 시스템 ──────────────────────────────────────────
+    // 전략 종류: brave(깡따구) / random(무작위) / calculated(계산형)
+    // 새로고침해도 유지됨 (localStorage)
+    const AI_STRATEGIES = ['brave', 'random', 'calculated'];
+    const STRATEGY_LABELS = {
+        brave:      '깡따구',
+        random:     '랜덤',
+        calculated: '계산형',
+    };
+
+    function getAiStrategy() {
+        let s = localStorage.getItem('ai_strategy');
+        if (!s || !AI_STRATEGIES.includes(s)) {
+            s = AI_STRATEGIES[Math.floor(Math.random() * AI_STRATEGIES.length)];
+            localStorage.setItem('ai_strategy', s);
+        }
+        return s;
+    }
+
+    // 새 게임 시작할 때마다 전략을 재랜덤 (단, 사용자가 원하면 고정 가능)
+    // 현재 구현: 라운드마다 재배정 (localStorage 갱신)
+    function rollNewStrategy() {
+        const s = AI_STRATEGIES[Math.floor(Math.random() * AI_STRATEGIES.length)];
+        localStorage.setItem('ai_strategy', s);
+        return s;
+    }
+    // ────────────────────────────────────────────────────────────
+
+    // ── Web Audio
     let audioCtx = null, bgNodes = null, bgPlaying = false;
 
     function getCtx() {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // resume이 필요한 경우 처리 (브라우저 정책)
-        if (audioCtx.state === 'suspended') audioCtx.resume();
         return audioCtx;
     }
 
     function playGunshot() {
         const ctx = getCtx(), sr = ctx.sampleRate;
         const now = ctx.currentTime;
-
         const punchLen = sr * 0.018;
         const punchBuf = ctx.createBuffer(1, punchLen, sr);
         const punchD = punchBuf.getChannelData(0);
@@ -538,7 +476,6 @@
         punchG.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
         punchSrc.connect(punchG); punchG.connect(ctx.destination);
         punchSrc.start(now);
-
         const bodyLen = sr * 0.55;
         const bodyBuf = ctx.createBuffer(1, bodyLen, sr);
         const bodyD = bodyBuf.getChannelData(0);
@@ -554,7 +491,6 @@
         bodyG.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
         bodySrc.connect(bodyLP); bodyLP.connect(bodyLP2); bodyLP2.connect(bodyG); bodyG.connect(ctx.destination);
         bodySrc.start(now);
-
         const crackLen = sr * 0.12;
         const crackBuf = ctx.createBuffer(1, crackLen, sr);
         const crackD = crackBuf.getChannelData(0);
@@ -567,7 +503,6 @@
         crackG.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
         crackSrc.connect(crackHP); crackHP.connect(crackG); crackG.connect(ctx.destination);
         crackSrc.start(now);
-
         const tailLen = sr * 1.0;
         const tailBuf = ctx.createBuffer(1, tailLen, sr);
         const tailD = tailBuf.getChannelData(0);
@@ -585,7 +520,6 @@
     function playClick() {
         const ctx = getCtx(), sr = ctx.sampleRate;
         const now = ctx.currentTime;
-
         const clickLen = sr * 0.045;
         const clickBuf = ctx.createBuffer(1, clickLen, sr);
         const clickD = clickBuf.getChannelData(0);
@@ -596,7 +530,6 @@
         const clickG = ctx.createGain(); clickG.gain.value = 2.8;
         clickSrc.connect(clickHP); clickHP.connect(clickG); clickG.connect(ctx.destination);
         clickSrc.start(now);
-
         const ringOsc = ctx.createOscillator();
         const ringG = ctx.createGain();
         ringOsc.type = 'triangle';
@@ -605,7 +538,6 @@
         ringG.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
         ringOsc.connect(ringG); ringG.connect(ctx.destination);
         ringOsc.start(now); ringOsc.stop(now + 0.09);
-
         const thunkOsc = ctx.createOscillator();
         const thunkG = ctx.createGain();
         thunkOsc.type = 'sine';
@@ -620,7 +552,6 @@
     function playSpin() {
         const ctx = getCtx(), sr = ctx.sampleRate;
         const now = ctx.currentTime;
-
         const clickTimes = [0, 0.055, 0.115, 0.185, 0.265, 0.36, 0.47, 0.595, 0.73, 0.85];
         clickTimes.forEach((ct, idx) => {
             const isLast = idx === clickTimes.length - 1;
@@ -636,7 +567,6 @@
             const cG = ctx.createGain(); cG.gain.value = 1.0;
             cSrc.connect(cHP); cHP.connect(cG); cG.connect(ctx.destination);
             cSrc.start(now + ct);
-
             if (isLast) {
                 const stopLen = sr * 0.06;
                 const stopBuf = ctx.createBuffer(1, stopLen, sr);
@@ -650,7 +580,6 @@
                 stopSrc.start(now + ct);
             }
         });
-
         const hissLen = sr * 0.82;
         const hissBuf = ctx.createBuffer(1, hissLen, sr);
         const hissD = hissBuf.getChannelData(0);
@@ -684,29 +613,23 @@
         if (bgPlaying) return;
         const ctx = getCtx();
         bgPlaying = true;
-
         const master = ctx.createGain();
         master.gain.setValueAtTime(0, ctx.currentTime);
         master.gain.linearRampToValueAtTime(0.72, ctx.currentTime + 3);
         master.connect(ctx.destination);
-
         const reverb    = makeReverb(ctx);
         const reverbSend = ctx.createGain(); reverbSend.gain.value = 0.28;
         reverb.connect(reverbSend); reverbSend.connect(master);
-
         bgNodes = { master, reverb, reverbSend };
-
         const N = {
             A1:55, E2:82.4, A2:110, B2:123.5, C3:130.8, D3:146.8,
             E3:164.8, F3:174.6, G3:196, A3:220, B3:246.9,
             C4:261.6, D4:293.7, E4:329.6, F4:349.2, G4:392, A4:440,
         };
-
         const BPM  = 82;
         const beat = 60 / BPM;
         const BAR  = beat * 8;
-
-        function note(freq, t, dur, type, vol, dry = true) {
+        function note(freq, t, dur, type, vol) {
             const osc = ctx.createOscillator();
             const g   = ctx.createGain();
             osc.type = type; osc.frequency.value = freq;
@@ -714,11 +637,10 @@
             g.gain.linearRampToValueAtTime(vol, t + 0.012);
             g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
             osc.connect(g);
-            if (dry) g.connect(master);
+            g.connect(master);
             g.connect(reverb);
             osc.start(t); osc.stop(t + dur + 0.05);
         }
-
         function kick(t) {
             const osc = ctx.createOscillator(), g = ctx.createGain();
             osc.type = 'sine';
@@ -729,7 +651,6 @@
             osc.connect(g); g.connect(master);
             osc.start(t); osc.stop(t + 0.38);
         }
-
         function rim(t) {
             const sr = ctx.sampleRate;
             const buf = ctx.createBuffer(1, sr * 0.08, sr);
@@ -741,7 +662,6 @@
             src.connect(hp); hp.connect(g); g.connect(master); g.connect(reverb);
             src.start(t); src.stop(t + 0.1);
         }
-
         function hat(t, open=false) {
             const sr = ctx.sampleRate, dur = open ? 0.14 : 0.035;
             const buf = ctx.createBuffer(1, sr * dur, sr);
@@ -753,178 +673,18 @@
             src.connect(hp); hp.connect(g); g.connect(master);
             src.start(t); src.stop(t + dur + 0.02);
         }
-
         const sections = [
-            {
-                drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'],
-                bass: [
-                    [0,N.A1,beat*0.9,'sawtooth',0.30],[0.5,N.A1,beat*0.4,'sawtooth',0.18],
-                    [1,N.E2,beat*0.8,'sawtooth',0.26],[1.5,N.D3,beat*0.3,'sawtooth',0.14],
-                    [2,N.A1,beat*0.9,'sawtooth',0.30],[2.5,N.C3,beat*0.4,'sawtooth',0.16],
-                    [3,N.E2,beat*0.7,'sawtooth',0.24],[3.5,N.G3,beat*0.3,'sawtooth',0.14],
-                    [4,N.A1,beat*0.9,'sawtooth',0.30],[4.5,N.A2,beat*0.4,'sawtooth',0.16],
-                    [5,N.E2,beat*0.8,'sawtooth',0.26],[5.5,N.D3,beat*0.3,'sawtooth',0.13],
-                    [6,N.A1,beat*1.2,'sawtooth',0.28],[7,N.E2,beat*0.6,'sawtooth',0.22],
-                    [7.5,N.A2,beat*0.3,'sawtooth',0.16],
-                ],
-                lead: [
-                    [0,N.E4,beat*0.45,'triangle',0.16],[0.5,N.C4,beat*0.40,'triangle',0.13],
-                    [1,N.A3,beat*0.45,'triangle',0.14],[1.5,N.G3,beat*0.35,'triangle',0.11],
-                    [2,N.E3,beat*0.55,'triangle',0.14],[2.5,N.D3,beat*0.35,'triangle',0.10],
-                    [3,N.C3,beat*0.90,'triangle',0.13],
-                    [4,N.G3,beat*0.35,'triangle',0.12],[4.5,N.A3,beat*0.35,'triangle',0.13],
-                    [5,N.C4,beat*0.45,'triangle',0.14],[5.5,N.E4,beat*0.40,'triangle',0.15],
-                    [6,N.D4,beat*0.35,'triangle',0.13],[6.5,N.C4,beat*0.35,'triangle',0.12],
-                    [7,N.B3,beat*0.80,'triangle',0.14],[7.5,N.G3,beat*0.35,'triangle',0.10],
-                ],
-            },
-            {
-                drum: ['K','H','_','R','K','H','H','_','K','H','_','R','K','H','H','_'],
-                bass: [
-                    [0,N.A1,beat*0.9,'sawtooth',0.28],[0.5,N.A1,beat*0.4,'sawtooth',0.16],
-                    [1,N.E2,beat*0.8,'sawtooth',0.24],[1.5,N.D3,beat*0.3,'sawtooth',0.12],
-                    [2,N.A1,beat*0.9,'sawtooth',0.28],[2.5,N.C3,beat*0.4,'sawtooth',0.14],
-                    [3,N.E2,beat*0.7,'sawtooth',0.22],[3.5,N.G3,beat*0.3,'sawtooth',0.12],
-                    [4,N.A1,beat*0.9,'sawtooth',0.28],[4.5,N.A2,beat*0.4,'sawtooth',0.14],
-                    [5,N.E2,beat*0.8,'sawtooth',0.24],[5.5,N.D3,beat*0.3,'sawtooth',0.11],
-                    [6,N.A1,beat*1.4,'sawtooth',0.26],[7.5,N.E2,beat*0.5,'sawtooth',0.18],
-                ],
-                lead: [
-                    [0,N.E4,beat*1.2,'triangle',0.14],[2,N.A3,beat*0.8,'triangle',0.12],
-                    [3,N.E3,beat*1.0,'triangle',0.11],[4.5,N.C4,beat*0.7,'triangle',0.13],
-                    [6,N.G3,beat*0.6,'triangle',0.10],[7,N.A3,beat*1.0,'triangle',0.12],
-                ],
-            },
-            {
-                drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'],
-                bass: [
-                    [0,N.D3,beat*0.9,'sawtooth',0.28],[0.5,N.A2,beat*0.4,'sawtooth',0.18],
-                    [1,N.F3,beat*0.8,'sawtooth',0.24],[1.5,N.A2,beat*0.3,'sawtooth',0.14],
-                    [2,N.D3,beat*0.9,'sawtooth',0.28],[2.5,N.C3,beat*0.4,'sawtooth',0.16],
-                    [3,N.G3,beat*0.7,'sawtooth',0.22],[3.5,N.E3,beat*0.3,'sawtooth',0.14],
-                    [4,N.A2,beat*0.9,'sawtooth',0.26],[4.5,N.A1,beat*0.4,'sawtooth',0.20],
-                    [5,N.E2,beat*0.8,'sawtooth',0.24],[5.5,N.C3,beat*0.3,'sawtooth',0.14],
-                    [6,N.A1,beat*1.2,'sawtooth',0.28],[7,N.E2,beat*0.6,'sawtooth',0.22],
-                    [7.5,N.G3,beat*0.3,'sawtooth',0.14],
-                ],
-                lead: [
-                    [0,N.F4,beat*0.45,'triangle',0.15],[0.5,N.D4,beat*0.40,'triangle',0.13],
-                    [1,N.C4,beat*0.45,'triangle',0.14],[1.5,N.A3,beat*0.35,'triangle',0.12],
-                    [2,N.G3,beat*0.55,'triangle',0.13],[2.5,N.F3,beat*0.35,'triangle',0.11],
-                    [3,N.E3,beat*0.90,'triangle',0.14],
-                    [4,N.D3,beat*0.35,'triangle',0.12],[4.5,N.E3,beat*0.35,'triangle',0.13],
-                    [5,N.G3,beat*0.45,'triangle',0.14],[5.5,N.A3,beat*0.40,'triangle',0.15],
-                    [6,N.C4,beat*0.35,'triangle',0.14],[6.5,N.E4,beat*0.35,'triangle',0.15],
-                    [7,N.D4,beat*0.80,'triangle',0.14],[7.5,N.B3,beat*0.35,'triangle',0.11],
-                ],
-            },
-            {
-                drum: ['K','H','R','R','K','H','O','H','K','H','R','R','K','H','O','R'],
-                bass: [
-                    [0,N.A1,beat*0.5,'sawtooth',0.32],[0.5,N.A2,beat*0.3,'sawtooth',0.20],
-                    [1,N.E2,beat*0.5,'sawtooth',0.26],[1.5,N.E2,beat*0.3,'sawtooth',0.18],
-                    [2,N.A1,beat*0.5,'sawtooth',0.32],[2.5,N.C3,beat*0.3,'sawtooth',0.20],
-                    [3,N.D3,beat*0.5,'sawtooth',0.24],[3.5,N.E3,beat*0.3,'sawtooth',0.18],
-                    [4,N.A1,beat*0.5,'sawtooth',0.32],[4.5,N.A2,beat*0.3,'sawtooth',0.20],
-                    [5,N.E2,beat*0.5,'sawtooth',0.26],[5.5,N.G3,beat*0.3,'sawtooth',0.18],
-                    [6,N.A1,beat*0.5,'sawtooth',0.30],[6.5,N.A1,beat*0.3,'sawtooth',0.22],
-                    [7,N.E2,beat*0.5,'sawtooth',0.28],[7.5,N.B2,beat*0.3,'sawtooth',0.18],
-                ],
-                lead: [
-                    [0,N.E3,beat*0.40,'triangle',0.13],[1,N.G3,beat*0.40,'triangle',0.13],
-                    [2,N.A3,beat*0.40,'triangle',0.14],[3,N.B3,beat*0.40,'triangle',0.14],
-                    [4,N.C4,beat*0.40,'triangle',0.15],[5,N.D4,beat*0.40,'triangle',0.16],
-                    [6,N.E4,beat*0.80,'triangle',0.18],[7,N.E4,beat*0.40,'triangle',0.16],
-                    [7.5,N.D4,beat*0.30,'triangle',0.14],
-                ],
-            },
-            {
-                drum: ['K','H','H','R','K','H','H','R','K','H','H','R','K','H','O','R'],
-                bass: [
-                    [0,N.A1,beat*0.7,'sawtooth',0.34],[0.5,N.A1,beat*0.3,'sawtooth',0.22],
-                    [1,N.C3,beat*0.7,'sawtooth',0.28],[1.5,N.E2,beat*0.3,'sawtooth',0.20],
-                    [2,N.A1,beat*0.7,'sawtooth',0.34],[2.5,N.A2,beat*0.3,'sawtooth',0.22],
-                    [3,N.G3,beat*0.7,'sawtooth',0.26],[3.5,N.E2,beat*0.3,'sawtooth',0.18],
-                    [4,N.A1,beat*0.7,'sawtooth',0.34],[4.5,N.D3,beat*0.3,'sawtooth',0.22],
-                    [5,N.E2,beat*0.7,'sawtooth',0.28],[5.5,N.A2,beat*0.3,'sawtooth',0.20],
-                    [6,N.A1,beat*0.7,'sawtooth',0.32],[6.5,N.A1,beat*0.3,'sawtooth',0.24],
-                    [7,N.E2,beat*0.7,'sawtooth',0.28],[7.5,N.D3,beat*0.3,'sawtooth',0.18],
-                ],
-                lead: [
-                    [0,N.A4,beat*0.45,'triangle',0.17],[0.5,N.G4,beat*0.35,'triangle',0.14],
-                    [1,N.E4,beat*0.45,'triangle',0.15],[1.5,N.D4,beat*0.35,'triangle',0.13],
-                    [2,N.C4,beat*0.55,'triangle',0.15],[2.5,N.B3,beat*0.35,'triangle',0.13],
-                    [3,N.A3,beat*0.90,'triangle',0.16],
-                    [4,N.E4,beat*0.45,'triangle',0.16],[4.5,N.G4,beat*0.35,'triangle',0.14],
-                    [5,N.A4,beat*0.45,'triangle',0.17],[5.5,N.G4,beat*0.40,'triangle',0.15],
-                    [6,N.E4,beat*0.45,'triangle',0.16],[6.5,N.D4,beat*0.35,'triangle',0.14],
-                    [7,N.C4,beat*0.80,'triangle',0.15],[7.5,N.E4,beat*0.35,'triangle',0.13],
-                ],
-            },
-            {
-                drum: ['K','_','_','_','K','_','_','_','K','_','_','_','K','_','_','_'],
-                bass: [
-                    [0,N.A1,beat*3.8,'sawtooth',0.26],[4,N.E2,beat*1.8,'sawtooth',0.22],
-                    [6,N.A1,beat*2.0,'sawtooth',0.24],
-                ],
-                lead: [
-                    [1,N.C4,beat*1.5,'triangle',0.10],[4,N.E3,beat*1.2,'triangle',0.09],
-                    [6.5,N.A3,beat*1.5,'triangle',0.11],
-                ],
-            },
-            {
-                drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'],
-                bass: [
-                    [0,N.A1,beat*0.9,'sawtooth',0.30],[0.5,N.A1,beat*0.4,'sawtooth',0.18],
-                    [1,N.E2,beat*0.8,'sawtooth',0.26],[1.5,N.D3,beat*0.3,'sawtooth',0.14],
-                    [2,N.A1,beat*0.9,'sawtooth',0.30],[2.5,N.C3,beat*0.4,'sawtooth',0.16],
-                    [3,N.E2,beat*0.7,'sawtooth',0.24],[3.5,N.G3,beat*0.3,'sawtooth',0.14],
-                    [4,N.A1,beat*0.9,'sawtooth',0.30],[4.5,N.A2,beat*0.4,'sawtooth',0.16],
-                    [5,N.E2,beat*0.8,'sawtooth',0.26],[5.5,N.D3,beat*0.3,'sawtooth',0.13],
-                    [6,N.A1,beat*1.2,'sawtooth',0.28],[7,N.E2,beat*0.6,'sawtooth',0.22],
-                    [7.5,N.A2,beat*0.3,'sawtooth',0.16],
-                ],
-                lead: [
-                    [0,N.E4,beat*0.45,'triangle',0.16],[0,N.C4,beat*0.45,'triangle',0.08],
-                    [0.5,N.C4,beat*0.40,'triangle',0.13],[0.5,N.A3,beat*0.40,'triangle',0.07],
-                    [1,N.A3,beat*0.45,'triangle',0.14],[1,N.E3,beat*0.45,'triangle',0.08],
-                    [1.5,N.G3,beat*0.35,'triangle',0.11],
-                    [2,N.E3,beat*0.55,'triangle',0.14],[2.5,N.D3,beat*0.35,'triangle',0.10],
-                    [3,N.C3,beat*0.90,'triangle',0.13],
-                    [4,N.G3,beat*0.35,'triangle',0.12],[4.5,N.A3,beat*0.35,'triangle',0.13],
-                    [5,N.C4,beat*0.45,'triangle',0.14],[5,N.A3,beat*0.45,'triangle',0.08],
-                    [5.5,N.E4,beat*0.40,'triangle',0.15],[5.5,N.C4,beat*0.40,'triangle',0.08],
-                    [6,N.D4,beat*0.35,'triangle',0.13],[6.5,N.C4,beat*0.35,'triangle',0.12],
-                    [7,N.B3,beat*0.80,'triangle',0.14],[7.5,N.G3,beat*0.35,'triangle',0.10],
-                ],
-            },
-            {
-                drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','R','O','R'],
-                bass: [
-                    [0,N.A1,beat*0.9,'sawtooth',0.30],[0.5,N.A1,beat*0.4,'sawtooth',0.18],
-                    [1,N.E2,beat*0.8,'sawtooth',0.26],[1.5,N.D3,beat*0.3,'sawtooth',0.14],
-                    [2,N.A1,beat*0.9,'sawtooth',0.30],[2.5,N.C3,beat*0.4,'sawtooth',0.16],
-                    [3,N.E2,beat*0.7,'sawtooth',0.24],[3.5,N.G3,beat*0.3,'sawtooth',0.14],
-                    [4,N.A2,beat*0.9,'sawtooth',0.28],[4.5,N.E2,beat*0.4,'sawtooth',0.20],
-                    [5,N.A1,beat*0.8,'sawtooth',0.30],[5.5,N.C3,beat*0.3,'sawtooth',0.16],
-                    [6,N.E2,beat*0.6,'sawtooth',0.26],[6.5,N.A1,beat*0.4,'sawtooth',0.22],
-                    [7,N.E2,beat*0.5,'sawtooth',0.24],[7.5,N.A2,beat*0.3,'sawtooth',0.18],
-                ],
-                lead: [
-                    [0,N.E4,beat*0.45,'triangle',0.16],[0.5,N.D4,beat*0.40,'triangle',0.14],
-                    [1,N.C4,beat*0.45,'triangle',0.14],[1.5,N.B3,beat*0.35,'triangle',0.12],
-                    [2,N.A3,beat*0.55,'triangle',0.15],[3,N.G3,beat*0.90,'triangle',0.13],
-                    [4,N.A3,beat*0.35,'triangle',0.13],[4.5,N.C4,beat*0.35,'triangle',0.14],
-                    [5,N.E4,beat*0.45,'triangle',0.16],[5.5,N.G4,beat*0.40,'triangle',0.15],
-                    [6,N.E4,beat*0.45,'triangle',0.15],[6.5,N.D4,beat*0.35,'triangle',0.14],
-                    [7,N.C4,beat*0.35,'triangle',0.15],[7.5,N.A3,beat*0.80,'triangle',0.14],
-                ],
-            },
+            { drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'], bass: [[0,N.A1,beat*0.9,'sawtooth',0.30],[0.5,N.A1,beat*0.4,'sawtooth',0.18],[1,N.E2,beat*0.8,'sawtooth',0.26],[1.5,N.D3,beat*0.3,'sawtooth',0.14],[2,N.A1,beat*0.9,'sawtooth',0.30],[2.5,N.C3,beat*0.4,'sawtooth',0.16],[3,N.E2,beat*0.7,'sawtooth',0.24],[3.5,N.G3,beat*0.3,'sawtooth',0.14],[4,N.A1,beat*0.9,'sawtooth',0.30],[4.5,N.A2,beat*0.4,'sawtooth',0.16],[5,N.E2,beat*0.8,'sawtooth',0.26],[5.5,N.D3,beat*0.3,'sawtooth',0.13],[6,N.A1,beat*1.2,'sawtooth',0.28],[7,N.E2,beat*0.6,'sawtooth',0.22],[7.5,N.A2,beat*0.3,'sawtooth',0.16]], lead: [[0,N.E4,beat*0.45,'triangle',0.16],[0.5,N.C4,beat*0.40,'triangle',0.13],[1,N.A3,beat*0.45,'triangle',0.14],[1.5,N.G3,beat*0.35,'triangle',0.11],[2,N.E3,beat*0.55,'triangle',0.14],[2.5,N.D3,beat*0.35,'triangle',0.10],[3,N.C3,beat*0.90,'triangle',0.13],[4,N.G3,beat*0.35,'triangle',0.12],[4.5,N.A3,beat*0.35,'triangle',0.13],[5,N.C4,beat*0.45,'triangle',0.14],[5.5,N.E4,beat*0.40,'triangle',0.15],[6,N.D4,beat*0.35,'triangle',0.13],[6.5,N.C4,beat*0.35,'triangle',0.12],[7,N.B3,beat*0.80,'triangle',0.14],[7.5,N.G3,beat*0.35,'triangle',0.10]] },
+            { drum: ['K','H','_','R','K','H','H','_','K','H','_','R','K','H','H','_'], bass: [[0,N.A1,beat*0.9,'sawtooth',0.28],[0.5,N.A1,beat*0.4,'sawtooth',0.16],[1,N.E2,beat*0.8,'sawtooth',0.24],[1.5,N.D3,beat*0.3,'sawtooth',0.12],[2,N.A1,beat*0.9,'sawtooth',0.28],[2.5,N.C3,beat*0.4,'sawtooth',0.14],[3,N.E2,beat*0.7,'sawtooth',0.22],[3.5,N.G3,beat*0.3,'sawtooth',0.12],[4,N.A1,beat*0.9,'sawtooth',0.28],[4.5,N.A2,beat*0.4,'sawtooth',0.14],[5,N.E2,beat*0.8,'sawtooth',0.24],[5.5,N.D3,beat*0.3,'sawtooth',0.11],[6,N.A1,beat*1.4,'sawtooth',0.26],[7.5,N.E2,beat*0.5,'sawtooth',0.18]], lead: [[0,N.E4,beat*1.2,'triangle',0.14],[2,N.A3,beat*0.8,'triangle',0.12],[3,N.E3,beat*1.0,'triangle',0.11],[4.5,N.C4,beat*0.7,'triangle',0.13],[6,N.G3,beat*0.6,'triangle',0.10],[7,N.A3,beat*1.0,'triangle',0.12]] },
+            { drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'], bass: [[0,N.D3,beat*0.9,'sawtooth',0.28],[0.5,N.A2,beat*0.4,'sawtooth',0.18],[1,N.F3,beat*0.8,'sawtooth',0.24],[1.5,N.A2,beat*0.3,'sawtooth',0.14],[2,N.D3,beat*0.9,'sawtooth',0.28],[2.5,N.C3,beat*0.4,'sawtooth',0.16],[3,N.G3,beat*0.7,'sawtooth',0.22],[3.5,N.E3,beat*0.3,'sawtooth',0.14],[4,N.A2,beat*0.9,'sawtooth',0.26],[4.5,N.A1,beat*0.4,'sawtooth',0.20],[5,N.E2,beat*0.8,'sawtooth',0.24],[5.5,N.C3,beat*0.3,'sawtooth',0.14],[6,N.A1,beat*1.2,'sawtooth',0.28],[7,N.E2,beat*0.6,'sawtooth',0.22],[7.5,N.G3,beat*0.3,'sawtooth',0.14]], lead: [[0,N.F4,beat*0.45,'triangle',0.15],[0.5,N.D4,beat*0.40,'triangle',0.13],[1,N.C4,beat*0.45,'triangle',0.14],[1.5,N.A3,beat*0.35,'triangle',0.12],[2,N.G3,beat*0.55,'triangle',0.13],[2.5,N.F3,beat*0.35,'triangle',0.11],[3,N.E3,beat*0.90,'triangle',0.14],[4,N.D3,beat*0.35,'triangle',0.12],[4.5,N.E3,beat*0.35,'triangle',0.13],[5,N.G3,beat*0.45,'triangle',0.14],[5.5,N.A3,beat*0.40,'triangle',0.15],[6,N.C4,beat*0.35,'triangle',0.14],[6.5,N.E4,beat*0.35,'triangle',0.15],[7,N.D4,beat*0.80,'triangle',0.14],[7.5,N.B3,beat*0.35,'triangle',0.11]] },
+            { drum: ['K','H','R','R','K','H','O','H','K','H','R','R','K','H','O','R'], bass: [[0,N.A1,beat*0.5,'sawtooth',0.32],[0.5,N.A2,beat*0.3,'sawtooth',0.20],[1,N.E2,beat*0.5,'sawtooth',0.26],[1.5,N.E2,beat*0.3,'sawtooth',0.18],[2,N.A1,beat*0.5,'sawtooth',0.32],[2.5,N.C3,beat*0.3,'sawtooth',0.20],[3,N.D3,beat*0.5,'sawtooth',0.24],[3.5,N.E3,beat*0.3,'sawtooth',0.18],[4,N.A1,beat*0.5,'sawtooth',0.32],[4.5,N.A2,beat*0.3,'sawtooth',0.20],[5,N.E2,beat*0.5,'sawtooth',0.26],[5.5,N.G3,beat*0.3,'sawtooth',0.18],[6,N.A1,beat*0.5,'sawtooth',0.30],[6.5,N.A1,beat*0.3,'sawtooth',0.22],[7,N.E2,beat*0.5,'sawtooth',0.28],[7.5,N.B2,beat*0.3,'sawtooth',0.18]], lead: [[0,N.E3,beat*0.40,'triangle',0.13],[1,N.G3,beat*0.40,'triangle',0.13],[2,N.A3,beat*0.40,'triangle',0.14],[3,N.B3,beat*0.40,'triangle',0.14],[4,N.C4,beat*0.40,'triangle',0.15],[5,N.D4,beat*0.40,'triangle',0.16],[6,N.E4,beat*0.80,'triangle',0.18],[7,N.E4,beat*0.40,'triangle',0.16],[7.5,N.D4,beat*0.30,'triangle',0.14]] },
+            { drum: ['K','H','H','R','K','H','H','R','K','H','H','R','K','H','O','R'], bass: [[0,N.A1,beat*0.7,'sawtooth',0.34],[0.5,N.A1,beat*0.3,'sawtooth',0.22],[1,N.C3,beat*0.7,'sawtooth',0.28],[1.5,N.E2,beat*0.3,'sawtooth',0.20],[2,N.A1,beat*0.7,'sawtooth',0.34],[2.5,N.A2,beat*0.3,'sawtooth',0.22],[3,N.G3,beat*0.7,'sawtooth',0.26],[3.5,N.E2,beat*0.3,'sawtooth',0.18],[4,N.A1,beat*0.7,'sawtooth',0.34],[4.5,N.D3,beat*0.3,'sawtooth',0.22],[5,N.E2,beat*0.7,'sawtooth',0.28],[5.5,N.A2,beat*0.3,'sawtooth',0.20],[6,N.A1,beat*0.7,'sawtooth',0.32],[6.5,N.A1,beat*0.3,'sawtooth',0.24],[7,N.E2,beat*0.7,'sawtooth',0.28],[7.5,N.D3,beat*0.3,'sawtooth',0.18]], lead: [[0,N.A4,beat*0.45,'triangle',0.17],[0.5,N.G4,beat*0.35,'triangle',0.14],[1,N.E4,beat*0.45,'triangle',0.15],[1.5,N.D4,beat*0.35,'triangle',0.13],[2,N.C4,beat*0.55,'triangle',0.15],[2.5,N.B3,beat*0.35,'triangle',0.13],[3,N.A3,beat*0.90,'triangle',0.16],[4,N.E4,beat*0.45,'triangle',0.16],[4.5,N.G4,beat*0.35,'triangle',0.14],[5,N.A4,beat*0.45,'triangle',0.17],[5.5,N.G4,beat*0.40,'triangle',0.15],[6,N.E4,beat*0.45,'triangle',0.16],[6.5,N.D4,beat*0.35,'triangle',0.14],[7,N.C4,beat*0.80,'triangle',0.15],[7.5,N.E4,beat*0.35,'triangle',0.13]] },
+            { drum: ['K','_','_','_','K','_','_','_','K','_','_','_','K','_','_','_'], bass: [[0,N.A1,beat*3.8,'sawtooth',0.26],[4,N.E2,beat*1.8,'sawtooth',0.22],[6,N.A1,beat*2.0,'sawtooth',0.24]], lead: [[1,N.C4,beat*1.5,'triangle',0.10],[4,N.E3,beat*1.2,'triangle',0.09],[6.5,N.A3,beat*1.5,'triangle',0.11]] },
+            { drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','H','O','H'], bass: [[0,N.A1,beat*0.9,'sawtooth',0.30],[0.5,N.A1,beat*0.4,'sawtooth',0.18],[1,N.E2,beat*0.8,'sawtooth',0.26],[1.5,N.D3,beat*0.3,'sawtooth',0.14],[2,N.A1,beat*0.9,'sawtooth',0.30],[2.5,N.C3,beat*0.4,'sawtooth',0.16],[3,N.E2,beat*0.7,'sawtooth',0.24],[3.5,N.G3,beat*0.3,'sawtooth',0.14],[4,N.A1,beat*0.9,'sawtooth',0.30],[4.5,N.A2,beat*0.4,'sawtooth',0.16],[5,N.E2,beat*0.8,'sawtooth',0.26],[5.5,N.D3,beat*0.3,'sawtooth',0.13],[6,N.A1,beat*1.2,'sawtooth',0.28],[7,N.E2,beat*0.6,'sawtooth',0.22],[7.5,N.A2,beat*0.3,'sawtooth',0.16]], lead: [[0,N.E4,beat*0.45,'triangle',0.16],[0,N.C4,beat*0.45,'triangle',0.08],[0.5,N.C4,beat*0.40,'triangle',0.13],[0.5,N.A3,beat*0.40,'triangle',0.07],[1,N.A3,beat*0.45,'triangle',0.14],[1,N.E3,beat*0.45,'triangle',0.08],[1.5,N.G3,beat*0.35,'triangle',0.11],[2,N.E3,beat*0.55,'triangle',0.14],[2.5,N.D3,beat*0.35,'triangle',0.10],[3,N.C3,beat*0.90,'triangle',0.13],[4,N.G3,beat*0.35,'triangle',0.12],[4.5,N.A3,beat*0.35,'triangle',0.13],[5,N.C4,beat*0.45,'triangle',0.14],[5,N.A3,beat*0.45,'triangle',0.08],[5.5,N.E4,beat*0.40,'triangle',0.15],[5.5,N.C4,beat*0.40,'triangle',0.08],[6,N.D4,beat*0.35,'triangle',0.13],[6.5,N.C4,beat*0.35,'triangle',0.12],[7,N.B3,beat*0.80,'triangle',0.14],[7.5,N.G3,beat*0.35,'triangle',0.10]] },
+            { drum: ['K','H','H','R','K','H','O','H','K','H','H','R','K','R','O','R'], bass: [[0,N.A1,beat*0.9,'sawtooth',0.30],[0.5,N.A1,beat*0.4,'sawtooth',0.18],[1,N.E2,beat*0.8,'sawtooth',0.26],[1.5,N.D3,beat*0.3,'sawtooth',0.14],[2,N.A1,beat*0.9,'sawtooth',0.30],[2.5,N.C3,beat*0.4,'sawtooth',0.16],[3,N.E2,beat*0.7,'sawtooth',0.24],[3.5,N.G3,beat*0.3,'sawtooth',0.14],[4,N.A2,beat*0.9,'sawtooth',0.28],[4.5,N.E2,beat*0.4,'sawtooth',0.20],[5,N.A1,beat*0.8,'sawtooth',0.30],[5.5,N.C3,beat*0.3,'sawtooth',0.16],[6,N.E2,beat*0.6,'sawtooth',0.26],[6.5,N.A1,beat*0.4,'sawtooth',0.22],[7,N.E2,beat*0.5,'sawtooth',0.24],[7.5,N.A2,beat*0.3,'sawtooth',0.18]], lead: [[0,N.E4,beat*0.45,'triangle',0.16],[0.5,N.D4,beat*0.40,'triangle',0.14],[1,N.C4,beat*0.45,'triangle',0.14],[1.5,N.B3,beat*0.35,'triangle',0.12],[2,N.A3,beat*0.55,'triangle',0.15],[3,N.G3,beat*0.90,'triangle',0.13],[4,N.A3,beat*0.35,'triangle',0.13],[4.5,N.C4,beat*0.35,'triangle',0.14],[5,N.E4,beat*0.45,'triangle',0.16],[5.5,N.G4,beat*0.40,'triangle',0.15],[6,N.E4,beat*0.45,'triangle',0.15],[6.5,N.D4,beat*0.35,'triangle',0.14],[7,N.C4,beat*0.35,'triangle',0.15],[7.5,N.A3,beat*0.80,'triangle',0.14]] },
         ];
-
         let loopStart = ctx.currentTime + 0.05;
         let sectionIdx = 0;
-
         function scheduleBar() {
             if (!bgPlaying) return;
             const sec = sections[sectionIdx % sections.length];
@@ -960,14 +720,19 @@
     const LS = {
         save(s) {
             localStorage.setItem('rr_game', JSON.stringify({
-                bullet: s.bullet, shot: s.shot,
-                turn: s.turn, spinUsed: s.spinUsed,
+                bullet:   s.bullet,
+                shot:     s.shot,
+                turn:     s.turn,
+                spinUsed: s.spinUsed,
             }));
         },
-        load() { try { return JSON.parse(localStorage.getItem('rr_game')); } catch { return null; } },
+        load() {
+            try { return JSON.parse(localStorage.getItem('rr_game')); } catch { return null; }
+        },
         clear() { localStorage.removeItem('rr_game'); },
     };
 
+    // ── 상태
     const state = {
         bullet: 0, shot: 0,
         turn: '플레이어',
@@ -979,18 +744,30 @@
         debug: false, audioReady: false,
     };
 
+    // ── 유틸
     const rand  = n => Math.floor(Math.random() * n);
     const other = p => p === '플레이어' ? '컴퓨터' : '플레이어';
     function setMsg(text, cls = '') { messagesDiv.textContent = text; messagesDiv.className = cls; }
 
+    // ── 전략 배지 렌더
+    function renderStrategyBadge() {
+        const s = getAiStrategy();
+        const label = STRATEGY_LABELS[s] || s;
+        strategyBadge.textContent = `컴퓨터 전략: ${label}`;
+        strategyBadge.className = s;
+    }
+
+    // ── 렌더
     function render() {
         const { bullet, shot, turn, spinUsed, debug } = state;
         const isPlayer = turn === '플레이어';
         statusDiv.textContent      = `챔버 ${shot + 1}  ·  ${turn}`;
         debugStatusDiv.textContent = debug ? `DEBUG  탄환:${bullet}  현재:${shot + 1}` : '';
         resetBtn.style.display     = debug ? 'block' : 'none';
+        strategyBadge.style.display = debug ? 'inline-block' : 'none';
+        // 스핀: 이미 사용했거나 스핀이 없으면 비활성화. 챔버 제한 없음
         fireButton.disabled = !isPlayer;
-        spinButton.disabled = !isPlayer || spinUsed[turn] || shot >= 5;
+        spinButton.disabled = !isPlayer || spinUsed[turn];
         document.querySelectorAll('.chamber-position').forEach(el => el.classList.remove('active'));
         if (isPlayer) setMsg('당신의 차례입니다');
     }
@@ -999,11 +776,27 @@
         ['플레이어', '컴퓨터'].forEach(p => scoreEls[p].textContent = state.scores[p]);
     }
 
+    // ── 챔버 miss 이펙트
+    function flashChamberMiss(shotIndex) {
+        // shotIndex: 0-based (현재 발사된 챔버 번호 - 1)
+        const chamberEls = document.querySelectorAll('.chamber-position');
+        const el = chamberEls[shotIndex];
+        if (!el) return;
+        el.classList.remove('chamber-miss');
+        // reflow 강제 → 애니메이션 재시작
+        void el.offsetWidth;
+        el.classList.add('chamber-miss');
+        setTimeout(() => el.classList.remove('chamber-miss'), 750);
+    }
+
+    // ── 게임 흐름
     function initGame() {
         state.bullet   = rand(6) + 1;
         state.shot     = 0;
         state.turn     = Math.random() < 0.5 ? '플레이어' : '컴퓨터';
         state.spinUsed = { 플레이어: false, 컴퓨터: false };
+        rollNewStrategy(); // 매 판 새 전략
+        renderStrategyBadge();
         LS.save(state);
         setMsg('');
         render();
@@ -1015,6 +808,7 @@
         state.shot     = saved.shot;
         state.turn     = saved.turn;
         state.spinUsed = saved.spinUsed;
+        renderStrategyBadge();
         setMsg('');
         render();
         if (state.turn === '컴퓨터') aiTurn();
@@ -1028,6 +822,7 @@
     }
 
     function fire() {
+        const prevShot = state.shot; // 0-based 인덱스로 사용
         state.shot++;
         cylinder.classList.add('shake');
         setTimeout(() => cylinder.classList.remove('shake'), 500);
@@ -1048,12 +843,14 @@
             setTimeout(initGame, RESTART_DELAY);
         } else if (survived) {
             playClick();
+            flashChamberMiss(prevShot);
             LS.clear();
             fireButton.disabled = spinButton.disabled = true;
             setMsg(`✓ ${state.turn} 생존! ${RESTART_DELAY / 1000}초 후 새 게임`, 'safe');
             setTimeout(initGame, RESTART_DELAY);
         } else {
             playClick();
+            flashChamberMiss(prevShot); // ← 빈 챔버 이펙트
             state.turn = other(state.turn);
             LS.save(state);
             render();
@@ -1061,34 +858,90 @@
         }
     }
 
+    // ── 스핀 함수 (완전히 새로운 로직)
+    // - 탄환을 1~6 중 랜덤 재배치
+    // - 격발 챔버가 1번으로 초기화
+    // - 상대 턴으로 넘어감
     function spin() {
-        if (state.spinUsed[state.turn]) {
-            if (state.turn === '플레이어') setMsg('이미 스핀을 사용했습니다.');
+        const who = state.turn;
+        if (state.spinUsed[who]) {
+            if (who === '플레이어') setMsg('이미 스핀을 사용했습니다.');
             return;
         }
-        const range = SPIN_RANGES[state.shot] ?? 0;
-        if (!range) { setMsg('스핀을 할 수 없습니다.'); return; }
 
-        state.bullet = Math.max(state.shot + 1, rand(range) + (7 - range));
-        state.spinUsed[state.turn] = true;
+        // 탄환 랜덤 재배치 (1~6 중 하나)
+        state.bullet = rand(6) + 1;
+        // 챔버를 1번으로 초기화
+        state.shot = 0;
+        // 스핀 사용 표시
+        state.spinUsed[who] = true;
+        // 상대 턴으로 이양
+        state.turn = other(who);
+
         LS.save(state);
 
         cylinder.classList.add('spinning');
         setTimeout(() => cylinder.classList.remove('spinning'), 600);
         playSpin();
-        setMsg(`${state.turn}가 실린더를 돌렸습니다.`);
+
+        // 챔버 표시 초기화
+        document.querySelectorAll('.chamber-position').forEach(el => el.classList.remove('active'));
+
+        setMsg(`🔄 ${who}가 스핀! 탄환 재배치 → 챔버 1번부터 시작`, 'spin-msg');
         render();
-        if (state.turn === '컴퓨터') setTimeout(fire, AI_FIRE_DELAY);
+
+        if (state.turn === '컴퓨터') aiTurn();
+    }
+
+    // ── AI 의사결정
+    function aiDecide() {
+        const strategy    = getAiStrategy();
+        const canSpin     = !state.spinUsed['컴퓨터'];
+        const chamber     = state.shot + 1; // 1~6
+        const deathProb   = 1 / (7 - chamber); // 현재 사망 확률
+
+        // 공통 규칙: 챔버 6 (100% 사망) → 무조건 스핀 (스핀 가능하면)
+        if (chamber === 6 && canSpin) return 'spin';
+        if (!canSpin) return 'fire';
+
+        switch (strategy) {
+            case 'brave':
+                // 깡따구: 절대 스핀 안 씀
+                return 'fire';
+
+            case 'random':
+                // 무작위: 30~40% 확률로 스핀
+                return Math.random() < 0.35 ? 'spin' : 'fire';
+
+            case 'calculated':
+                // 계산형: 사망 확률 임계값 기반
+                // 챔버 5 (50%) → 무조건 스핀
+                if (chamber >= 5) return 'spin';
+                // 챔버 4 (33%) → 60% 확률로 스핀
+                if (chamber >= 4) return Math.random() < 0.60 ? 'spin' : 'fire';
+                // 챔버 3 (25%) → 25% 확률로 스핀
+                if (chamber >= 3) return Math.random() < 0.25 ? 'spin' : 'fire';
+                return 'fire';
+
+            default:
+                return 'fire';
+        }
     }
 
     function aiTurn() {
-        setMsg('컴퓨터가 생각 중…');
+        const strategy = getAiStrategy();
+        setMsg(state.debug ? `컴퓨터가 생각 중… [${STRATEGY_LABELS[strategy]}]` : '컴퓨터가 생각 중…');
         setTimeout(() => {
-            const canSpin = !state.spinUsed['컴퓨터'] && state.shot < 5;
-            canSpin && Math.random() < AI_SPIN_CHANCE ? spin() : fire();
+            const decision = aiDecide();
+            if (decision === 'spin') {
+                spin();
+            } else {
+                fire();
+            }
         }, rand(AI_THINK_MAX));
     }
 
+    // ── 이벤트
     startOverlay.addEventListener('click', () => {
         startOverlay.style.display = 'none';
         if (!state.audioReady) {
@@ -1118,6 +971,7 @@
         renderScores();
     });
 
+    // ── 초기 점수 표시
     renderScores();
 </script>
 </body>
