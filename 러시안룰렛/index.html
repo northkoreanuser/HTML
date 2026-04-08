@@ -311,7 +311,6 @@
             border-color: var(--border);
             color: var(--muted);
             font-size: 0.8rem; letter-spacing: 0.12em;
-            display: none;
         }
         #reset-death-counts:hover:not(:disabled) { color: var(--text); }
 
@@ -347,6 +346,229 @@
             .game-container { padding: 24px 18px; }
             .button-container { grid-template-columns: 1fr; }
         }
+
+        /* ── 단축키 힌트 ── */
+        .shortcut-hints {
+            display: flex; justify-content: center; gap: 16px;
+            margin-top: 8px;
+        }
+        .shortcut-hint {
+            font-size: 0.68rem; color: var(--muted);
+            letter-spacing: 0.08em;
+        }
+        .shortcut-hint kbd {
+            display: inline-block;
+            background: var(--panel);
+            border: 1px solid var(--border-hi);
+            border-radius: 3px;
+            padding: 1px 5px;
+            font-size: 0.65rem;
+            color: var(--accent);
+            font-family: monospace;
+        }
+
+        /* ── 6번째 WARNING 마퀴 ── */
+        .warning-marquee-wrap {
+            overflow: hidden;
+            height: 22px;
+            background: rgba(192,57,43,0.12);
+            border: 1px solid rgba(192,57,43,0.3);
+            border-radius: 3px;
+            margin-bottom: 10px;
+            display: none;
+        }
+        .warning-marquee-wrap.visible { display: block; }
+        .warning-marquee {
+            display: inline-block;
+            white-space: nowrap;
+            animation: marqueeScroll 4s linear infinite;
+            font-family: var(--font-head);
+            font-size: 0.85rem;
+            letter-spacing: 0.2em;
+            color: var(--red-hi);
+            padding: 2px 0;
+            text-shadow: 0 0 8px rgba(231,76,60,0.8);
+        }
+        @keyframes marqueeScroll {
+            0%   { transform: translateX(100vw); }
+            100% { transform: translateX(-100%); }
+        }
+
+        /* ── 6번째 버튼 강조: SPIN ── */
+        @keyframes btnShakeHeavy {
+            0%,100% { transform: translate(0,0) rotate(0deg); }
+            10% { transform: translate(-4px,-3px) rotate(-1.5deg); }
+            20% { transform: translate(4px,3px) rotate(1.5deg); }
+            30% { transform: translate(-5px,2px) rotate(-2deg); }
+            40% { transform: translate(5px,-2px) rotate(2deg); }
+            50% { transform: translate(-3px,4px) rotate(-1deg); }
+            60% { transform: translate(3px,-4px) rotate(1deg); }
+            70% { transform: translate(-4px,-2px) rotate(-1.5deg); }
+            80% { transform: translate(4px,2px) rotate(1.5deg); }
+            90% { transform: translate(-2px,3px) rotate(-0.5deg); }
+        }
+        .btn-sixth-spin {
+            animation: btnShakeHeavy 0.35s ease-in-out infinite !important;
+            box-shadow: 0 0 18px 6px rgba(41,128,185,0.85), 0 0 40px 12px rgba(41,128,185,0.45) !important;
+            border-color: #5dade2 !important;
+            z-index: 10;
+        }
+        /* ── 6번째 버튼 강조: FIRE ── */
+        .btn-sixth-fire {
+            animation: btnShakeHeavy 0.3s ease-in-out infinite !important;
+            box-shadow: 0 0 22px 8px rgba(231,76,60,0.9), 0 0 50px 16px rgba(231,76,60,0.5) !important;
+            border-color: #ff6b6b !important;
+            z-index: 10;
+        }
+
+        /* ── 유리 깨짐 오버레이 ── */
+        #glass-break-overlay {
+            position: fixed; inset: 0;
+            pointer-events: none;
+            z-index: 500;
+            opacity: 0;
+            /* transition 완전 제거 → JS에서 직접 제어해 버그 방지 */
+        }
+        #glass-break-overlay svg {
+            width: 100%; height: 100%;
+        }
+
+        /* ── 날아가는 유리 파편 파티클 ── */
+        @keyframes glassShardFly {
+            0%   { transform: translate(0,0) rotate(0deg) scale(1);   opacity: 0.95; }
+            25%  { opacity: 0.85; }
+            70%  { opacity: 0.5; }
+            100% { transform: translate(var(--sx), var(--sy)) rotate(var(--sr)) scale(var(--ss)); opacity: 0; }
+        }
+        @keyframes glassSparkle {
+            0%   { transform: scale(0) rotate(0deg);    opacity: 1; }
+            35%  { transform: scale(1.3) rotate(130deg); opacity: 0.9; }
+            100% { transform: scale(0.2) rotate(380deg); opacity: 0; }
+        }
+        @keyframes glassRipple {
+            0%   { transform: translate(-50%,-50%) scale(0); opacity: 0.7; }
+            100% { transform: translate(-50%,-50%) scale(1);  opacity: 0; }
+        }
+        .glass-fly-shard {
+            position: fixed;
+            pointer-events: none;
+            z-index: 503;
+            animation: glassShardFly var(--dur) cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+            will-change: transform, opacity;
+            filter: drop-shadow(0 0 3px rgba(180,210,255,0.7));
+        }
+        .glass-sparkle-dot {
+            position: fixed;
+            width: var(--sz); height: var(--sz);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 504;
+            background: radial-gradient(circle, #fff 0%, rgba(180,210,255,0.8) 50%, transparent 100%);
+            animation: glassSparkle var(--sdur) ease-out forwards;
+            will-change: transform, opacity;
+        }
+        .glass-ripple-ring {
+            position: fixed;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 502;
+            border: 2px solid rgba(180,210,255,0.6);
+            animation: glassRipple var(--rdur) ease-out forwards;
+            will-change: transform, opacity;
+        }
+
+        /* ── 디버그 패널 ── */
+        #debug-panel {
+            display: none;
+            position: fixed;
+            top: 0; right: 0;
+            width: 280px;
+            max-height: 100vh;
+            overflow-y: auto;
+            background: rgba(8,6,4,0.97);
+            border-left: 1px solid var(--accent);
+            border-bottom: 1px solid var(--accent);
+            padding: 14px;
+            z-index: 900;
+            font-size: 0.78rem;
+            color: var(--text);
+        }
+        #debug-panel.open { display: block; }
+        #debug-panel h3 {
+            font-family: var(--font-head);
+            color: var(--accent);
+            letter-spacing: 0.12em;
+            margin-bottom: 10px;
+            font-size: 1rem;
+        }
+        .dbg-section {
+            border-top: 1px solid var(--border);
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+        .dbg-label {
+            color: var(--muted);
+            font-size: 0.7rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .dbg-row {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 5px;
+        }
+        .dbg-row label { flex: 1; font-size: 0.72rem; }
+        .dbg-row input[type=number], .dbg-row select {
+            width: 70px;
+            background: var(--panel);
+            border: 1px solid var(--border-hi);
+            color: var(--text);
+            border-radius: 3px;
+            padding: 2px 4px;
+            font-size: 0.72rem;
+        }
+        .dbg-row select { width: auto; flex: 1; }
+        .dbg-btn {
+            width: 100%; padding: 5px;
+            background: var(--panel);
+            border: 1px solid var(--border-hi);
+            color: var(--accent);
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            margin-top: 4px;
+        }
+        .dbg-btn:hover { background: var(--accent); color: #000; }
+        #debug-toggle-btn {
+            position: fixed; bottom: 20px; right: 20px;
+            background: rgba(200,146,42,0.15);
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            border-radius: 40px;
+            padding: 6px 12px;
+            font-size: 0.7rem;
+            cursor: pointer;
+            z-index: 901;
+            letter-spacing: 0.1em;
+            display: none;
+        }
+        #debug-toggle-btn.visible { display: block; }
+
+        /* ── 생각주기 배지 ── */
+        #think-cycle-badge {
+            font-size: 0.68rem;
+            margin-top: 4px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 20px;
+            display: none;
+        }
+        #think-cycle-badge.fast   { color: #f39c12; background: rgba(243,156,18,0.12); border: 1px solid rgba(243,156,18,0.3); }
+        #think-cycle-badge.normal { color: #2ecc71; background: rgba(46,204,113,0.12); border: 1px solid rgba(46,204,113,0.3); }
+        #think-cycle-badge.careful{ color: #9b59b6; background: rgba(155,89,182,0.12); border: 1px solid rgba(155,89,182,0.3); }
+
     </style>
 </head>
 <body>
@@ -371,6 +593,7 @@
             <div id="status">게임 준비</div>
             <div id="debug-status"></div>
             <div id="strategy-badge"></div>
+            <div id="think-cycle-badge"></div>
         </div>
     </div>
 
@@ -384,6 +607,10 @@
             <div class="chamber-position" style="transform:rotate(240deg) translate(52px) rotate(-240deg);">5</div>
             <div class="chamber-position" style="transform:rotate(300deg) translate(52px) rotate(-300deg);">6</div>
         </div>
+    </div>
+
+    <div class="warning-marquee-wrap" id="warningMarquee">
+        <span class="warning-marquee">⚠ // WARNING // &nbsp;&nbsp;&nbsp; ⚠ // WARNING // &nbsp;&nbsp;&nbsp; ⚠ // WARNING // &nbsp;&nbsp;&nbsp; ⚠ // WARNING // &nbsp;&nbsp;&nbsp; ⚠ // WARNING //</span>
     </div>
 
     <div id="messages">GAME START 버튼을 눌러주세요</div>
@@ -406,7 +633,101 @@
         <button id="spin-button">SPIN</button>
     </div>
 
-    <button id="reset-death-counts">Reset Scores</button>
+    <div class="shortcut-hints">
+        <span class="shortcut-hint"><kbd>F</kbd> Fire</span>
+        <span class="shortcut-hint"><kbd>S</kbd> Spin</span>
+    </div>
+</div>
+
+<!-- 유리 깨짐 오버레이 -->
+<div id="glass-break-overlay"></div>
+
+<!-- 디버그 토글 버튼 (모바일) -->
+<button id="debug-toggle-btn">⚙ DEBUG</button>
+
+<!-- 디버그 패널 -->
+<div id="debug-panel">
+    <h3>🛠 DEBUG MODE</h3>
+
+    <div class="dbg-section">
+        <div class="dbg-label">실시간 상태</div>
+        <div id="dbg-live-status" style="font-size:0.7rem;color:#aaa;line-height:1.7;padding:4px 0;"></div>
+    </div>
+
+    <div class="dbg-section">
+        <div class="dbg-label">상태 수정</div>
+        <div class="dbg-row">
+            <label>실탄 위치 (1~6)</label>
+            <input type="number" id="dbg-bullet" min="1" max="6" value="1">
+        </div>
+        <div class="dbg-row">
+            <label>현재 챔버 (1~6)</label>
+            <input type="number" id="dbg-shot" min="1" max="6" value="1">
+        </div>
+        <div class="dbg-row">
+            <label>현재 턴</label>
+            <select id="dbg-turn">
+                <option value="플레이어">플레이어</option>
+                <option value="컴퓨터">컴퓨터</option>
+            </select>
+        </div>
+        <button class="dbg-btn" id="dbg-apply">▶ 상태 적용</button>
+    </div>
+
+    <div class="dbg-section">
+        <div class="dbg-label">스핀 갯수</div>
+        <div class="dbg-row">
+            <label>플레이어 스핀 사용</label>
+            <select id="dbg-spin-player">
+                <option value="false">미사용</option>
+                <option value="true">사용됨</option>
+            </select>
+        </div>
+        <div class="dbg-row">
+            <label>컴퓨터 스핀 사용</label>
+            <select id="dbg-spin-computer">
+                <option value="false">미사용</option>
+                <option value="true">사용됨</option>
+            </select>
+        </div>
+        <button class="dbg-btn" id="dbg-apply-spin">▶ 스핀 상태 적용</button>
+    </div>
+
+    <div class="dbg-section">
+        <div class="dbg-label">컴퓨터 전략</div>
+        <div class="dbg-row">
+            <label>전략</label>
+            <select id="dbg-strategy">
+                <option value="brave">없음</option>
+                <option value="random">랜덤</option>
+                <option value="calculated">계산형</option>
+            </select>
+        </div>
+        <button class="dbg-btn" id="dbg-apply-strategy">▶ 전략 적용</button>
+    </div>
+
+    <div class="dbg-section">
+        <div class="dbg-label">생각 주기</div>
+        <div class="dbg-row">
+            <label>주기</label>
+            <select id="dbg-think-cycle">
+                <option value="fast">짧음 (빠름)</option>
+                <option value="normal">보통</option>
+                <option value="careful">신중 (느림)</option>
+            </select>
+        </div>
+        <button class="dbg-btn" id="dbg-apply-cycle">▶ 주기 적용</button>
+    </div>
+
+    <div class="dbg-section" id="dbg-ai-info">
+        <div class="dbg-label">현재 AI 행동</div>
+        <div id="dbg-ai-desc" style="color:#aaa;font-size:0.72rem;line-height:1.5;"></div>
+    </div>
+
+    <div class="dbg-section">
+        <div class="dbg-label">스코어</div>
+        <button class="dbg-btn" id="reset-death-counts" style="color:var(--red-hi);border-color:rgba(192,57,43,0.5);">✕ 스코어 초기화</button>
+    </div>
 </div>
 
 
@@ -414,27 +735,53 @@
 <script>
     // ── DOM 참조
     const $ = id => document.getElementById(id);
-    const statusDiv    = $('status'),      debugStatusDiv = $('debug-status');
-    const strategyBadge = $('strategy-badge');
-    const messagesDiv  = $('messages'),    cylinder       = $('cylinder');
-    const fireButton   = $('fire-button'), spinButton     = $('spin-button');
-    const musicToggle  = $('musicToggle'), startOverlay   = $('startOverlay');
-    const resetBtn     = $('reset-death-counts');
-    const scoreEls     = { 플레이어: $('player-death-score'), 컴퓨터: $('opponent-death-score') };
+    const statusDiv      = $('status'),         debugStatusDiv = $('debug-status');
+    const strategyBadge  = $('strategy-badge'), thinkCycleBadge = $('think-cycle-badge');
+    const messagesDiv    = $('messages'),       cylinder       = $('cylinder');
+    const fireButton     = $('fire-button'),    spinButton     = $('spin-button');
+    const musicToggle    = $('musicToggle'),    startOverlay   = $('startOverlay');
+    const resetBtn       = $('reset-death-counts');
+    const scoreEls       = { 플레이어: $('player-death-score'), 컴퓨터: $('opponent-death-score') };
+    const warningMarquee = $('warningMarquee');
+    const glassOverlay   = $('glass-break-overlay');
+    const debugPanel     = $('debug-panel');
+    const debugToggleBtn = $('debug-toggle-btn');
 
     // ── 상수
-    const RESTART_DELAY  = 3000, AI_THINK_MAX  = 3000;
-    const AI_FIRE_DELAY  = 1000;
+    const RESTART_DELAY = 3000;
+
+    // ── 생각 주기 시스템 ─────────────────────────────────────────
+    // fast: 상당히 빠름, normal: 약간 빠름, careful: 원본(디폴트)
+    const THINK_CYCLES = ['fast', 'normal', 'careful'];
+    const THINK_CYCLE_LABELS = { fast: '짧음', normal: '보통', careful: '신중' };
+    // 생각주기별 AI 딜레이 범위 [min, max] ms
+    const THINK_CYCLE_DELAY = {
+        fast:    [200,  600],
+        normal:  [500, 1400],
+        careful: [800, 3000],
+    };
+
+    function getThinkCycle() {
+        let c = localStorage.getItem('ai_think_cycle');
+        if (!c || !THINK_CYCLES.includes(c)) {
+            c = THINK_CYCLES[Math.floor(Math.random() * THINK_CYCLES.length)];
+            localStorage.setItem('ai_think_cycle', c);
+        }
+        return c;
+    }
+    function setThinkCycle(c) { localStorage.setItem('ai_think_cycle', c); }
+
+    function getAiDelay(chamberIndex) {
+        // 챔버 1~3(index 0~2)까지는 전략 무관 빠르게
+        if (chamberIndex < 3) return 200 + Math.random() * 400;
+        const cycle = getThinkCycle();
+        const [mn, mx] = THINK_CYCLE_DELAY[cycle];
+        return mn + Math.random() * (mx - mn);
+    }
 
     // ── AI 전략 시스템 ──────────────────────────────────────────
-    // 전략 종류: brave(깡따구) / random(무작위) / calculated(계산형)
-    // 새로고침해도 유지됨 (localStorage)
     const AI_STRATEGIES = ['brave', 'random', 'calculated'];
-    const STRATEGY_LABELS = {
-        brave:      '깡따구',
-        random:     '랜덤',
-        calculated: '계산형',
-    };
+    const STRATEGY_LABELS = { brave: '없음', random: '랜덤', calculated: '계산형' };
 
     function getAiStrategy() {
         let s = localStorage.getItem('ai_strategy');
@@ -444,9 +791,6 @@
         }
         return s;
     }
-
-    // 새 게임 시작할 때마다 전략을 재랜덤 (단, 사용자가 원하면 고정 가능)
-    // 현재 구현: 라운드마다 재배정 (localStorage 갱신)
     function rollNewStrategy() {
         const s = AI_STRATEGIES[Math.floor(Math.random() * AI_STRATEGIES.length)];
         localStorage.setItem('ai_strategy', s);
@@ -463,58 +807,205 @@
     }
 
     function playGunshot() {
-        const ctx = getCtx(), sr = ctx.sampleRate;
+        _playGunshotInternal(1.0);
+    }
+    function playLoudGunshot() {
+        _playGunshotInternal(2.8); // 6번째 - 훨씬 크게
+    }
+    function _playGunshotInternal(volumeMult) {
+        const ctx = getCtx();
+        const sr = ctx.sampleRate;
         const now = ctx.currentTime;
-        const punchLen = sr * 0.018;
-        const punchBuf = ctx.createBuffer(1, punchLen, sr);
-        const punchD = punchBuf.getChannelData(0);
-        for (let i = 0; i < punchLen; i++)
-            punchD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / punchLen, 0.2);
-        const punchSrc = ctx.createBufferSource(); punchSrc.buffer = punchBuf;
-        const punchG = ctx.createGain();
-        punchG.gain.setValueAtTime(4.0, now);
-        punchG.gain.exponentialRampToValueAtTime(0.001, now + 0.018);
-        punchSrc.connect(punchG); punchG.connect(ctx.destination);
-        punchSrc.start(now);
-        const bodyLen = sr * 0.55;
-        const bodyBuf = ctx.createBuffer(1, bodyLen, sr);
-        const bodyD = bodyBuf.getChannelData(0);
-        for (let i = 0; i < bodyLen; i++) {
-            const t = i / bodyLen;
-            bodyD[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 1.2) * 2.2;
+
+        // ── 마스터 체인: Gain → Compressor → Destination
+        const masterGain = ctx.createGain();
+        masterGain.gain.value = volumeMult * 1.8;
+        const comp = ctx.createDynamicsCompressor();
+        comp.threshold.value = -4;
+        comp.knee.value      = 2;
+        comp.ratio.value     = 18;
+        comp.attack.value    = 0.0001;
+        comp.release.value   = 0.3;
+        masterGain.connect(comp);
+        comp.connect(ctx.destination);
+
+        // ── LAYER 1: 초기 임팩트 트랜지언트 (극도로 짧고 강렬)
+        (function() {
+            const len = Math.ceil(sr * 0.0025);
+            const buf = ctx.createBuffer(1, len, sr);
+            const d   = buf.getChannelData(0);
+            for (let i = 0; i < len; i++)
+                d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 0.05);
+            const src = ctx.createBufferSource(); src.buffer = buf;
+            const g   = ctx.createGain();
+            g.gain.setValueAtTime(18.0, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.003);
+            src.connect(g); g.connect(masterGain);
+            src.start(now);
+        })();
+
+        // ── LAYER 2: 서브 베이스 폭발 쿵 (저음 진동)
+        (function() {
+            const len = Math.ceil(sr * 0.85);
+            const buf = ctx.createBuffer(1, len, sr);
+            const d   = buf.getChannelData(0);
+            for (let i = 0; i < len; i++) {
+                const t = i / len;
+                // 급격한 어택 + 느린 감쇠
+                const env = Math.pow(1 - t, 0.55);
+                d[i] = (Math.random() * 2 - 1) * env * 4.0;
+            }
+            const src = ctx.createBufferSource(); src.buffer = buf;
+            const lp1 = ctx.createBiquadFilter(); lp1.type = 'lowpass'; lp1.frequency.value = 110; lp1.Q.value = 1.2;
+            const lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass'; lp2.frequency.value = 70;  lp2.Q.value = 0.7;
+            const g   = ctx.createGain();
+            g.gain.setValueAtTime(9.0, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+            src.connect(lp1); lp1.connect(lp2); lp2.connect(g); g.connect(masterGain);
+            src.start(now);
+        })();
+
+        // ── LAYER 3: 폭발 메인 바디 (중저음 굉음)
+        (function() {
+            const len = Math.ceil(sr * 0.6);
+            const buf = ctx.createBuffer(1, len, sr);
+            const d   = buf.getChannelData(0);
+            for (let i = 0; i < len; i++) {
+                const t = i / len;
+                d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 0.8) * 3.5;
+            }
+            const src = ctx.createBufferSource(); src.buffer = buf;
+            const hp  = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 60;
+            const lp  = ctx.createBiquadFilter(); lp.type = 'lowpass';  lp.frequency.value = 1100;
+            const g   = ctx.createGain();
+            g.gain.setValueAtTime(7.5, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+            src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(masterGain);
+            src.start(now);
+        })();
+
+        // ── LAYER 4: 총구 충격파 크랙 (고음역 날카로운 파열)
+        (function() {
+            const len = Math.ceil(sr * 0.09);
+            const buf = ctx.createBuffer(1, len, sr);
+            const d   = buf.getChannelData(0);
+            for (let i = 0; i < len; i++)
+                d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 0.3) * 2.8;
+            const src  = ctx.createBufferSource(); src.buffer = buf;
+            const hp   = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2800;
+            const peak = ctx.createBiquadFilter(); peak.type = 'peaking'; peak.frequency.value = 5500; peak.gain.value = 10;
+            const g    = ctx.createGain();
+            g.gain.setValueAtTime(6.5, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+            src.connect(hp); hp.connect(peak); peak.connect(g); g.connect(masterGain);
+            src.start(now);
+        })();
+
+        // ── LAYER 5: 초음속 총알 날개음 (짧은 하강 톤)
+        (function() {
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(3200, now);
+            osc.frequency.exponentialRampToValueAtTime(380, now + 0.03);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(2.2, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+            osc.connect(g); g.connect(masterGain);
+            osc.start(now); osc.stop(now + 0.035);
+        })();
+
+        // ── LAYER 6: 압력파 저주파 진동 (공기 압박감)
+        (function() {
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(62, now);
+            osc.frequency.exponentialRampToValueAtTime(28, now + 0.38);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(3.8, now);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+            osc.connect(g); g.connect(masterGain);
+            osc.start(now); osc.stop(now + 0.42);
+        })();
+
+        // ── LAYER 7: 실내 반향 테일 (에코/리버브 느낌)
+        (function() {
+            const len = Math.ceil(sr * 2.2);
+            const buf = ctx.createBuffer(1, len, sr);
+            const d   = buf.getChannelData(0);
+            // 반향은 여러 작은 임펄스들의 감쇠
+            for (let i = 0; i < len; i++) {
+                const t = i / len;
+                d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 1.5) * 1.2;
+            }
+            const src = ctx.createBufferSource(); src.buffer = buf;
+            const lp  = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+            const g   = ctx.createGain();
+            g.gain.setValueAtTime(0.001, now + 0.01);
+            g.gain.linearRampToValueAtTime(1.8, now + 0.025);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 2.2);
+            src.connect(lp); lp.connect(g); g.connect(masterGain);
+            src.start(now + 0.012);
+        })();
+
+        // ── LAYER 8: 금속 격발 기계음 (공이 치는 소리)
+        (function() {
+            const osc1 = ctx.createOscillator(); osc1.type = 'triangle';
+            const osc2 = ctx.createOscillator(); osc2.type = 'square';
+            osc1.frequency.setValueAtTime(380, now); osc1.frequency.exponentialRampToValueAtTime(95, now + 0.045);
+            osc2.frequency.setValueAtTime(920, now); osc2.frequency.exponentialRampToValueAtTime(180, now + 0.03);
+            const g1 = ctx.createGain(); const g2 = ctx.createGain();
+            g1.gain.setValueAtTime(1.4, now); g1.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+            g2.gain.setValueAtTime(0.8, now); g2.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+            osc1.connect(g1); g1.connect(masterGain);
+            osc2.connect(g2); g2.connect(masterGain);
+            osc1.start(now); osc1.stop(now + 0.06);
+            osc2.start(now); osc2.stop(now + 0.04);
+        })();
+
+        // ── 6번째 발사 전용: 추가 레이어 (극한 충격음)
+        if (volumeMult > 2.0) {
+            // 초저주파 서브 쿵 (배 더 강한 베이스)
+            (function() {
+                const osc = ctx.createOscillator(); osc.type = 'sine';
+                osc.frequency.setValueAtTime(42, now);
+                osc.frequency.exponentialRampToValueAtTime(18, now + 0.55);
+                const g = ctx.createGain();
+                g.gain.setValueAtTime(5.5, now);
+                g.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+                osc.connect(g); g.connect(masterGain);
+                osc.start(now); osc.stop(now + 0.6);
+            })();
+            // 고음 날카로운 파열 추가
+            (function() {
+                const len = Math.ceil(sr * 0.05);
+                const buf = ctx.createBuffer(1, len, sr);
+                const d   = buf.getChannelData(0);
+                for (let i = 0; i < len; i++)
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/len, 0.2) * 3.0;
+                const src  = ctx.createBufferSource(); src.buffer = buf;
+                const hp   = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 5000;
+                const g    = ctx.createGain();
+                g.gain.setValueAtTime(5.0, now); g.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                src.connect(hp); hp.connect(g); g.connect(masterGain);
+                src.start(now);
+            })();
+            // 긴 공명 리버브 (실내에서 울리는 느낌)
+            (function() {
+                const len = Math.ceil(sr * 3.5);
+                const buf = ctx.createBuffer(1, len, sr);
+                const d   = buf.getChannelData(0);
+                for (let i = 0; i < len; i++)
+                    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i/len, 2.0) * 0.9;
+                const src = ctx.createBufferSource(); src.buffer = buf;
+                const lp  = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 450;
+                const g   = ctx.createGain();
+                g.gain.setValueAtTime(0.001, now + 0.02);
+                g.gain.linearRampToValueAtTime(2.5, now + 0.04);
+                g.gain.exponentialRampToValueAtTime(0.001, now + 3.5);
+                src.connect(lp); lp.connect(g); g.connect(masterGain);
+                src.start(now + 0.02);
+            })();
         }
-        const bodySrc = ctx.createBufferSource(); bodySrc.buffer = bodyBuf;
-        const bodyLP = ctx.createBiquadFilter(); bodyLP.type = 'lowpass'; bodyLP.frequency.value = 1400;
-        const bodyLP2 = ctx.createBiquadFilter(); bodyLP2.type = 'lowpass'; bodyLP2.frequency.value = 700;
-        const bodyG = ctx.createGain();
-        bodyG.gain.setValueAtTime(2.2, now);
-        bodyG.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
-        bodySrc.connect(bodyLP); bodyLP.connect(bodyLP2); bodyLP2.connect(bodyG); bodyG.connect(ctx.destination);
-        bodySrc.start(now);
-        const crackLen = sr * 0.12;
-        const crackBuf = ctx.createBuffer(1, crackLen, sr);
-        const crackD = crackBuf.getChannelData(0);
-        for (let i = 0; i < crackLen; i++)
-            crackD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackLen, 0.7);
-        const crackSrc = ctx.createBufferSource(); crackSrc.buffer = crackBuf;
-        const crackHP = ctx.createBiquadFilter(); crackHP.type = 'highpass'; crackHP.frequency.value = 2800;
-        const crackG = ctx.createGain();
-        crackG.gain.setValueAtTime(1.6, now);
-        crackG.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
-        crackSrc.connect(crackHP); crackHP.connect(crackG); crackG.connect(ctx.destination);
-        crackSrc.start(now);
-        const tailLen = sr * 1.0;
-        const tailBuf = ctx.createBuffer(1, tailLen, sr);
-        const tailD = tailBuf.getChannelData(0);
-        for (let i = 0; i < tailLen; i++)
-            tailD[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / tailLen, 0.9) * 0.35;
-        const tailSrc = ctx.createBufferSource(); tailSrc.buffer = tailBuf;
-        const tailLP = ctx.createBiquadFilter(); tailLP.type = 'lowpass'; tailLP.frequency.value = 500;
-        const tailG = ctx.createGain();
-        tailG.gain.setValueAtTime(0.6, now + 0.015);
-        tailG.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
-        tailSrc.connect(tailLP); tailLP.connect(tailG); tailG.connect(ctx.destination);
-        tailSrc.start(now + 0.015);
     }
 
     function playClick() {
@@ -749,44 +1240,396 @@
     const other = p => p === '플레이어' ? '컴퓨터' : '플레이어';
     function setMsg(text, cls = '') { messagesDiv.textContent = text; messagesDiv.className = cls; }
 
-    // ── 전략 배지 렌더
-    function renderStrategyBadge() {
-        const s = getAiStrategy();
-        const label = STRATEGY_LABELS[s] || s;
-        strategyBadge.textContent = `컴퓨터 전략: ${label}`;
-        strategyBadge.className = s;
-    }
-
     // ── 렌더
     function render() {
         const { bullet, shot, turn, spinUsed, debug } = state;
         const isPlayer = turn === '플레이어';
-        statusDiv.textContent      = `챔버 ${shot + 1}  ·  ${turn}`;
-        debugStatusDiv.textContent = debug ? `DEBUG  탄환:${bullet}  현재:${shot + 1}` : '';
-        resetBtn.style.display     = debug ? 'block' : 'none';
+        const chamber = shot + 1;
+        statusDiv.textContent = `챔버 ${chamber}  ·  ${turn}`;
+        debugStatusDiv.textContent = '';
+        resetBtn.style.display      = debug ? 'block' : 'none';
         strategyBadge.style.display = debug ? 'inline-block' : 'none';
-        // 스핀: 이미 사용했거나 스핀이 없으면 비활성화. 챔버 제한 없음
+        thinkCycleBadge.style.display = debug ? 'inline-block' : 'none';
+        debugToggleBtn.classList.toggle('visible', true); // always show for mobile toggle
+
         fireButton.disabled = !isPlayer;
         spinButton.disabled = !isPlayer || spinUsed[turn];
         document.querySelectorAll('.chamber-position').forEach(el => el.classList.remove('active'));
         if (isPlayer) setMsg('당신의 차례입니다');
+
+        // ── 6번째 챔버 강조
+        const isSixth = chamber === 6;
+        const canSpin = !spinUsed[turn];
+
+        warningMarquee.classList.toggle('visible', isSixth && isPlayer);
+
+        // 버튼 강조 클래스 초기화
+        fireButton.classList.remove('btn-sixth-fire', 'btn-sixth-spin');
+        spinButton.classList.remove('btn-sixth-fire', 'btn-sixth-spin');
+
+        if (isSixth && isPlayer) {
+            if (canSpin) {
+                // 스핀 있음 → 스핀 버튼 강조
+                spinButton.classList.add('btn-sixth-spin');
+            } else {
+                // 스핀 없음 → Fire 버튼 강조
+                fireButton.classList.add('btn-sixth-fire');
+            }
+        }
     }
 
     function renderScores() {
         ['플레이어', '컴퓨터'].forEach(p => scoreEls[p].textContent = state.scores[p]);
     }
 
+    function renderStrategyBadge() {
+        const s = getAiStrategy();
+        const label = STRATEGY_LABELS[s] || s;
+        strategyBadge.textContent = `전략: ${label}`;
+        strategyBadge.className = s;
+        const c = getThinkCycle();
+        thinkCycleBadge.textContent = `생각주기: ${THINK_CYCLE_LABELS[c]}`;
+        thinkCycleBadge.className = c;
+    }
+
     // ── 챔버 miss 이펙트
     function flashChamberMiss(shotIndex) {
-        // shotIndex: 0-based (현재 발사된 챔버 번호 - 1)
         const chamberEls = document.querySelectorAll('.chamber-position');
         const el = chamberEls[shotIndex];
         if (!el) return;
         el.classList.remove('chamber-miss');
-        // reflow 강제 → 애니메이션 재시작
         void el.offsetWidth;
         el.classList.add('chamber-miss');
         setTimeout(() => el.classList.remove('chamber-miss'), 750);
+    }
+
+    // ── 유리 깨짐 이펙트 타이머 추적 (중복 호출 시 이전 타이머 취소)
+    let _glassTimers = [];
+    function _clearGlassTimers() {
+        _glassTimers.forEach(id => clearTimeout(id));
+        _glassTimers = [];
+        // 이전 파편 파티클 즉시 제거
+        document.querySelectorAll('.glass-fly-shard,.glass-sparkle-dot,.glass-ripple-ring').forEach(el => el.remove());
+    }
+
+    // ── 유리 깨짐 이펙트 (버그 수정 + 역동적 파편 이펙트)
+    function triggerGlassBreak() {
+        _clearGlassTimers(); // 이전 타이머 / 파티클 정리
+
+        const W = window.innerWidth, H = window.innerHeight;
+
+        // ── 탄착점: 화면 중앙 ±30% 내 랜덤
+        const cx = W * (0.3 + Math.random() * 0.4);
+        const cy = H * (0.25 + Math.random() * 0.35);
+
+        // ── 헬퍼: 지그재그 균열 경로
+        function crackPath(sx, sy, angle, totalLen, jitter) {
+            let px = sx, py = sy;
+            let d = `M ${px.toFixed(1)} ${py.toFixed(1)}`;
+            const segs = 5 + Math.floor(Math.random() * 6);
+            for (let s = 0; s < segs; s++) {
+                const segLen = (totalLen / segs) * (0.6 + Math.random() * 0.8);
+                const devAngle = angle + (Math.random() - 0.5) * jitter;
+                px += Math.cos(devAngle) * segLen;
+                py += Math.sin(devAngle) * segLen;
+                if (Math.random() > 0.6) {
+                    const mx = px - Math.cos(devAngle) * segLen * 0.4 + (Math.random()-0.5) * 8;
+                    const my = py - Math.sin(devAngle) * segLen * 0.4 + (Math.random()-0.5) * 8;
+                    d += ` Q ${mx.toFixed(1)} ${my.toFixed(1)} ${px.toFixed(1)} ${py.toFixed(1)}`;
+                } else {
+                    d += ` L ${px.toFixed(1)} ${py.toFixed(1)}`;
+                }
+            }
+            return { d, ex: px, ey: py };
+        }
+
+        let svgContent = '';
+
+        // ── 1. 전체 유리 표면 미세 성에/서리 질감 오버레이
+        svgContent += `<rect x="0" y="0" width="${W}" height="${H}" fill="rgba(200,220,255,0.04)"/>`;
+
+        // ── 2. 주요 방사형 균열 (16~22개)
+        const numPrimary = 16 + Math.floor(Math.random() * 7);
+        const primaryEndPoints = [];
+        for (let i = 0; i < numPrimary; i++) {
+            const baseAngle = (i / numPrimary) * Math.PI * 2;
+            const angle = baseAngle + (Math.random() - 0.5) * (Math.PI / numPrimary) * 0.9;
+            const len = Math.max(W, H) * (0.45 + Math.random() * 0.65);
+            const { d, ex, ey } = crackPath(cx, cy, angle, len, 0.38);
+            const sw = 1.0 + Math.random() * 1.6;
+            const opacity = 0.75 + Math.random() * 0.25;
+            svgContent += `<path d="${d}" stroke="rgba(80,100,140,0.35)" stroke-width="${sw + 2.0}" fill="none" stroke-linecap="round"/>`;
+            svgContent += `<path d="${d}" stroke="rgba(230,240,255,${opacity})" stroke-width="${sw}" fill="none" stroke-linecap="round"/>`;
+            svgContent += `<path d="${d}" stroke="rgba(255,255,255,0.5)" stroke-width="${sw * 0.35}" fill="none" stroke-linecap="round" stroke-dasharray="${3 + Math.random()*6} ${8 + Math.random()*12}"/>`;
+            primaryEndPoints.push({ x: ex, y: ey, angle });
+
+            const numBranches = 2 + Math.floor(Math.random() * 4);
+            for (let b = 0; b < numBranches; b++) {
+                const branchT = 0.18 + Math.random() * 0.65;
+                const bx = cx + Math.cos(angle) * len * branchT + (Math.random()-0.5) * 20;
+                const by = cy + Math.sin(angle) * len * branchT + (Math.random()-0.5) * 20;
+                const bAngle = angle + (Math.random() > 0.5 ? 1 : -1) * (0.45 + Math.random() * 0.65);
+                const bLen = len * (0.12 + Math.random() * 0.28);
+                const { d: bd } = crackPath(bx, by, bAngle, bLen, 0.55);
+                const bsw = 0.4 + Math.random() * 0.9;
+                svgContent += `<path d="${bd}" stroke="rgba(200,215,255,0.60)" stroke-width="${bsw}" fill="none" stroke-linecap="round"/>`;
+                svgContent += `<path d="${bd}" stroke="rgba(255,255,255,0.30)" stroke-width="${bsw * 0.4}" fill="none" stroke-linecap="round" stroke-dasharray="2 6"/>`;
+                if (Math.random() > 0.45) {
+                    const numMicro = 1 + Math.floor(Math.random() * 3);
+                    for (let m = 0; m < numMicro; m++) {
+                        const mAngle = bAngle + (Math.random() - 0.5) * 1.2;
+                        const mLen = bLen * (0.15 + Math.random() * 0.35);
+                        const mt = 0.2 + Math.random() * 0.7;
+                        const mx2 = bx + Math.cos(bAngle) * bLen * mt;
+                        const my2 = by + Math.sin(bAngle) * bLen * mt;
+                        const { d: md } = crackPath(mx2, my2, mAngle, mLen, 0.7);
+                        svgContent += `<path d="${md}" stroke="rgba(180,200,240,0.40)" stroke-width="${0.3 + Math.random()*0.5}" fill="none" stroke-linecap="round"/>`;
+                    }
+                }
+            }
+        }
+
+        // ── 3. 동심원 균열 (거미줄 원형 연결선, 3~5 레이어)
+        const numRings = 3 + Math.floor(Math.random() * 3);
+        for (let r = 0; r < numRings; r++) {
+            const ringR = (60 + r * (Math.min(W,H) * 0.13)) * (0.85 + Math.random() * 0.3);
+            const numArcSegs = numPrimary;
+            for (let i = 0; i < numArcSegs; i++) {
+                if (Math.random() > 0.72) continue;
+                const a1 = (i / numArcSegs) * Math.PI * 2 + (Math.random()-0.5)*0.2;
+                const a2 = ((i+1) / numArcSegs) * Math.PI * 2 + (Math.random()-0.5)*0.2;
+                const r1 = ringR * (0.88 + Math.random() * 0.24);
+                const r2 = ringR * (0.88 + Math.random() * 0.24);
+                const x1 = cx + Math.cos(a1) * r1 + (Math.random()-0.5)*6;
+                const y1 = cy + Math.sin(a1) * r1 + (Math.random()-0.5)*6;
+                const x2 = cx + Math.cos(a2) * r2 + (Math.random()-0.5)*6;
+                const y2 = cy + Math.sin(a2) * r2 + (Math.random()-0.5)*6;
+                const midA = (a1+a2)/2;
+                const midR = ringR * (0.9 + Math.random()*0.2);
+                const mx = cx + Math.cos(midA)*midR + (Math.random()-0.5)*12;
+                const my = cy + Math.sin(midA)*midR + (Math.random()-0.5)*12;
+                const arcOpacity = 0.30 + Math.random() * 0.35;
+                const arcW = 0.4 + Math.random() * 0.8;
+                svgContent += `<path d="M ${x1.toFixed(1)} ${y1.toFixed(1)} Q ${mx.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}"
+                    stroke="rgba(210,225,255,${arcOpacity})" stroke-width="${arcW}" fill="none" stroke-linecap="round"/>`;
+            }
+        }
+
+        // ── 4. 유리 파편 폴리곤 (80~120개)
+        const numShards = 80 + Math.floor(Math.random() * 40);
+        for (let i = 0; i < numShards; i++) {
+            const dist = 18 + Math.random() * Math.min(W, H) * 0.55;
+            const angle = Math.random() * Math.PI * 2;
+            const sx = cx + Math.cos(angle) * dist;
+            const sy = cy + Math.sin(angle) * dist;
+            const numPts = 3 + Math.floor(Math.random() * 2);
+            const pts = [];
+            const baseSize = 6 + Math.random() * (dist < 80 ? 18 : 38);
+            for (let p = 0; p < numPts; p++) {
+                const pa = (p / numPts) * Math.PI * 2 + Math.random() * 0.9;
+                const pr = baseSize * (0.5 + Math.random() * 0.9);
+                pts.push(`${(sx + Math.cos(pa)*pr).toFixed(1)},${(sy + Math.sin(pa)*pr).toFixed(1)}`);
+            }
+            const shardFillAlpha = Math.random() > 0.7 ? (0.04 + Math.random()*0.06) : (0.01 + Math.random()*0.025);
+            const shardFill = Math.random() > 0.5 ? `rgba(200,220,255,${shardFillAlpha})` : `rgba(255,255,255,${shardFillAlpha * 0.6})`;
+            const shardStrokeAlpha = 0.25 + Math.random() * 0.5;
+            const shardStrokeW = 0.3 + Math.random() * 0.7;
+            svgContent += `<polygon points="${pts.join(' ')}" fill="${shardFill}"
+                stroke="rgba(220,235,255,${shardStrokeAlpha})" stroke-width="${shardStrokeW}" stroke-linejoin="round"/>`;
+            if (Math.random() > 0.68) {
+                const glintA = Math.random() * Math.PI * 2;
+                const gr = baseSize * 0.3;
+                svgContent += `<line x1="${(sx+Math.cos(glintA)*gr*0.2).toFixed(1)}" y1="${(sy+Math.sin(glintA)*gr*0.2).toFixed(1)}"
+                    x2="${(sx+Math.cos(glintA)*gr).toFixed(1)}" y2="${(sy+Math.sin(glintA)*gr).toFixed(1)}"
+                    stroke="rgba(255,255,255,0.55)" stroke-width="${0.4+Math.random()*0.8}" stroke-linecap="round"/>`;
+            }
+        }
+
+        // ── 5. 탄착점 총알 구멍
+        svgContent += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="32"
+            fill="rgba(0,0,0,0.55)" stroke="rgba(255,255,255,0.15)" stroke-width="1.5"/>`;
+        svgContent += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="22"
+            fill="rgba(20,20,30,0.80)" stroke="rgba(180,200,255,0.35)" stroke-width="1"/>`;
+        svgContent += `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="10"
+            fill="rgba(0,0,0,0.97)" stroke="rgba(90,100,130,0.6)" stroke-width="1.5"/>`;
+        svgContent += `<circle cx="${(cx-3).toFixed(1)}" cy="${(cy-3).toFixed(1)}" r="3.5"
+            fill="rgba(255,255,255,0.12)"/>`;
+        const numInner = 28;
+        for (let i = 0; i < numInner; i++) {
+            const a = (i / numInner) * Math.PI * 2 + (Math.random()-0.5) * 0.22;
+            const innerLen = 18 + Math.random() * 45;
+            const x2 = cx + Math.cos(a) * (12 + innerLen);
+            const y2 = cy + Math.sin(a) * (12 + innerLen);
+            const sw = 0.5 + Math.random() * 1.0;
+            svgContent += `<line x1="${(cx + Math.cos(a)*11).toFixed(1)}" y1="${(cy + Math.sin(a)*11).toFixed(1)}"
+                x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+                stroke="rgba(255,255,255,${0.55 + Math.random()*0.4})" stroke-width="${sw}" stroke-linecap="round"/>`;
+        }
+
+        // ── 6. 충격파 발광 효과
+        const gid = `glowGrad_${Date.now()}`;
+        svgContent = `<defs>
+            <radialGradient id="${gid}" cx="50%" cy="50%" r="50%">
+                <stop offset="0%"   stop-color="rgba(255,240,200,0.55)"/>
+                <stop offset="18%"  stop-color="rgba(200,220,255,0.18)"/>
+                <stop offset="55%"  stop-color="rgba(180,200,255,0.06)"/>
+                <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+            </radialGradient>
+        </defs>` + svgContent;
+        svgContent += `<ellipse cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}"
+            rx="${Math.min(W,H)*0.38}" ry="${Math.min(W,H)*0.34}"
+            fill="url(#${gid})"/>`;
+
+        // ── 7. 화면 가장자리 어둡게
+        svgContent += `<rect x="0" y="0" width="${W}" height="${H}" fill="rgba(0,0,10,0.18)"/>`;
+
+        // ── SVG 합성 및 오버레이 즉시 표시 (CSS transition 없음 → 버그 수정)
+        glassOverlay.innerHTML = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"
+            width="${W}" height="${H}" style="position:absolute;top:0;left:0">${svgContent}</svg>`;
+        glassOverlay.style.transition = 'none';  // transition 완전 차단
+        glassOverlay.style.opacity = '1';
+
+        // ── 8. 화면 강력 흔들기
+        const shakeSeq = [
+            [-14, -8, 0],   [11,  10, 55],  [-9,  6, 110],
+            [13,  -7, 165],  [-6,  9, 215],  [8,  -5, 265],
+            [-4,   4, 315],  [3,  -3, 360],  [-2,  2, 400],
+            [0,    0, 440],
+        ];
+        shakeSeq.forEach(([tx, ty, delay]) => {
+            _glassTimers.push(setTimeout(() => {
+                glassOverlay.style.transform = `translate(${tx}px,${ty}px)`;
+            }, delay));
+        });
+
+        // ── 9. 초기 흰색 플래시
+        const flash = document.createElement('div');
+        flash.style.cssText = `position:fixed;inset:0;background:rgba(255,255,255,0.38);
+            pointer-events:none;z-index:501;opacity:1;transition:opacity 0.22s ease;`;
+        document.body.appendChild(flash);
+        _glassTimers.push(setTimeout(() => { flash.style.opacity = '0'; }, 30));
+        _glassTimers.push(setTimeout(() => { if (flash.parentNode) flash.remove(); }, 280));
+
+        // ══════════════════════════════════════════════════════════
+        // ── 10. 날아가는 유리 파편 파티클 (역동적 이펙트 추가)
+        // ══════════════════════════════════════════════════════════
+
+        // 10a. 대형 날아가는 파편 (20~28개)
+        const numFlyShards = 20 + Math.floor(Math.random() * 9);
+        for (let i = 0; i < numFlyShards; i++) {
+            const flyAngle = Math.random() * Math.PI * 2;
+            const speed    = 120 + Math.random() * 280;   // px
+            const dx       = Math.cos(flyAngle) * speed;
+            const dy       = Math.sin(flyAngle) * speed - (Math.random() * 60); // 약간 위쪽 편향
+            const rot      = (Math.random() - 0.5) * 720; // 최대 2바퀴 회전
+            const dur      = (0.5 + Math.random() * 0.7).toFixed(2); // 0.5~1.2s
+            const size     = 6 + Math.random() * 22;
+            const delay    = Math.random() * 80; // 최대 80ms 랜덤 딜레이
+
+            // SVG 파편 모양 (삼각~오각형)
+            const pts = [];
+            const numV = 3 + Math.floor(Math.random() * 3);
+            for (let v = 0; v < numV; v++) {
+                const va = (v / numV) * Math.PI * 2 + Math.random() * 0.8;
+                const vr = size * (0.5 + Math.random() * 0.7);
+                pts.push(`${(Math.cos(va)*vr).toFixed(1)},${(Math.sin(va)*vr).toFixed(1)}`);
+            }
+
+            const shardEl = document.createElement('div');
+            shardEl.className = 'glass-fly-shard';
+            shardEl.style.cssText = `
+                left: ${cx}px; top: ${cy}px;
+                --sx: ${dx.toFixed(1)}px;
+                --sy: ${dy.toFixed(1)}px;
+                --sr: ${rot.toFixed(0)}deg;
+                --ss: ${(0.1 + Math.random() * 0.4).toFixed(2)};
+                --dur: ${dur}s;
+                animation-delay: ${delay}ms;
+            `;
+            // SVG 파편 이미지
+            const fillAlpha = 0.15 + Math.random() * 0.35;
+            const strokeAlpha = 0.6 + Math.random() * 0.4;
+            shardEl.innerHTML = `<svg width="${size*2}" height="${size*2}"
+                viewBox="${-size} ${-size} ${size*2} ${size*2}"
+                style="overflow:visible;display:block;">
+                <polygon points="${pts.join(' ')}"
+                    fill="rgba(200,225,255,${fillAlpha.toFixed(2)})"
+                    stroke="rgba(255,255,255,${strokeAlpha.toFixed(2)})"
+                    stroke-width="1.2"/>
+                <polygon points="${pts.join(' ')}"
+                    fill="none"
+                    stroke="rgba(180,210,255,0.4)"
+                    stroke-width="0.5"
+                    stroke-dasharray="2 3"/>
+            </svg>`;
+            document.body.appendChild(shardEl);
+            _glassTimers.push(setTimeout(() => { if (shardEl.parentNode) shardEl.remove(); },
+                (parseFloat(dur) * 1000) + delay + 100));
+        }
+
+        // 10b. 잔 스파클 파티클 (30~45개 반짝이는 파편)
+        const numSparkles = 30 + Math.floor(Math.random() * 16);
+        for (let i = 0; i < numSparkles; i++) {
+            const sAngle = Math.random() * Math.PI * 2;
+            const sDist  = 10 + Math.random() * 120;
+            const spx    = cx + Math.cos(sAngle) * sDist;
+            const spy    = cy + Math.sin(sAngle) * sDist;
+            const sz     = 2 + Math.random() * 6;
+            const sdur   = (0.3 + Math.random() * 0.6).toFixed(2);
+            const sdelay = Math.random() * 150;
+            const sparkEl = document.createElement('div');
+            sparkEl.className = 'glass-sparkle-dot';
+            sparkEl.style.cssText = `
+                left: ${spx}px; top: ${spy}px;
+                --sz: ${sz}px; --sdur: ${sdur}s;
+                margin: -${sz/2}px 0 0 -${sz/2}px;
+                animation-delay: ${sdelay}ms;
+            `;
+            document.body.appendChild(sparkEl);
+            _glassTimers.push(setTimeout(() => { if (sparkEl.parentNode) sparkEl.remove(); },
+                (parseFloat(sdur) * 1000) + sdelay + 100));
+        }
+
+        // 10c. 충격파 파문 원 (3개, 순차적으로 퍼짐)
+        for (let r = 0; r < 3; r++) {
+            const rippleDelay = r * 80;
+            const rippleSize  = 20 + r * 15;
+            const rdur        = (0.55 + r * 0.15).toFixed(2);
+            const targetSize  = Math.min(W, H) * (0.25 + r * 0.18);
+            const rippleEl    = document.createElement('div');
+            rippleEl.className = 'glass-ripple-ring';
+            rippleEl.style.cssText = `
+                left: ${cx}px; top: ${cy}px;
+                width: ${targetSize}px; height: ${targetSize}px;
+                margin-left: -${targetSize/2}px; margin-top: -${targetSize/2}px;
+                --rdur: ${rdur}s;
+                animation-delay: ${rippleDelay}ms;
+                border-color: rgba(180,210,255,${(0.5 - r * 0.13).toFixed(2)});
+                border-width: ${2 - r * 0.4}px;
+            `;
+            document.body.appendChild(rippleEl);
+            _glassTimers.push(setTimeout(() => { if (rippleEl.parentNode) rippleEl.remove(); },
+                (parseFloat(rdur) * 1000) + rippleDelay + 100));
+        }
+
+        // ── 11. 페이드아웃 (버그 수정: transition 명시적 설정 + reflow 강제)
+        _glassTimers.push(setTimeout(() => {
+            // reflow 강제 → opacity 변화 이전 상태를 브라우저가 확실히 인식
+            void glassOverlay.offsetHeight;
+            glassOverlay.style.transition = 'opacity 2.2s cubic-bezier(0.25,0.46,0.45,0.94)';
+            // 다음 프레임에서 opacity 0 적용 → transition이 확실히 발동
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    glassOverlay.style.opacity = '0';
+                });
+            });
+            _glassTimers.push(setTimeout(() => {
+                glassOverlay.style.transition = 'none';
+                glassOverlay.style.opacity    = '0';
+                glassOverlay.style.transform  = '';
+                glassOverlay.innerHTML        = '';
+            }, 2300));
+        }, 1800));
     }
 
     // ── 게임 흐름
@@ -795,7 +1638,10 @@
         state.shot     = 0;
         state.turn     = Math.random() < 0.5 ? '플레이어' : '컴퓨터';
         state.spinUsed = { 플레이어: false, 컴퓨터: false };
-        rollNewStrategy(); // 매 판 새 전략
+        rollNewStrategy();
+        // 생각주기도 매 판 새로 랜덤 배정
+        const newCycle = THINK_CYCLES[Math.floor(Math.random() * THINK_CYCLES.length)];
+        setThinkCycle(newCycle);
         renderStrategyBadge();
         LS.save(state);
         setMsg('');
@@ -815,29 +1661,40 @@
     }
 
     function recordDeath(who) {
-        const key = who === '플레이어' ? 'playerDeathCount' : 'opponentDeathCount';
         state.scores[who]++;
+        const key = who === '플레이어' ? 'playerDeathCount' : 'opponentDeathCount';
         localStorage.setItem(key, state.scores[who]);
         renderScores();
     }
 
     function fire() {
-        const prevShot = state.shot; // 0-based 인덱스로 사용
+        const prevShot = state.shot;
         state.shot++;
         cylinder.classList.add('shake');
         setTimeout(() => cylinder.classList.remove('shake'), 500);
 
         const hit      = state.shot === state.bullet;
-        const survived = state.shot >= 6;
+        const survived = state.shot >= 6 && !hit;
+        const isSixthShot = (state.shot === 6); // 6번째 발사
 
         if (hit) {
-            playGunshot();
+            // 6번째 챔버에서 맞은 경우 → 더 큰 소리
+            if (isSixthShot) {
+                playLoudGunshot();
+            } else {
+                playGunshot();
+            }
+            triggerGlassBreak();
             LS.clear();
             document.querySelectorAll('.chamber-position').forEach((el, i) =>
                 el.classList.toggle('active', i + 1 === state.bullet)
             );
             recordDeath(state.turn);
             fireButton.disabled = spinButton.disabled = true;
+            // 6번째 버튼 강조 제거
+            fireButton.classList.remove('btn-sixth-fire', 'btn-sixth-spin');
+            spinButton.classList.remove('btn-sixth-fire', 'btn-sixth-spin');
+            warningMarquee.classList.remove('visible');
             setMsg(`💀 ${state.turn} 사망! ${RESTART_DELAY / 1000}초 후 새 게임`,
                    state.turn === '플레이어' ? 'danger' : 'safe');
             setTimeout(initGame, RESTART_DELAY);
@@ -846,11 +1703,14 @@
             flashChamberMiss(prevShot);
             LS.clear();
             fireButton.disabled = spinButton.disabled = true;
+            fireButton.classList.remove('btn-sixth-fire', 'btn-sixth-spin');
+            spinButton.classList.remove('btn-sixth-fire', 'btn-sixth-spin');
+            warningMarquee.classList.remove('visible');
             setMsg(`✓ ${state.turn} 생존! ${RESTART_DELAY / 1000}초 후 새 게임`, 'safe');
             setTimeout(initGame, RESTART_DELAY);
         } else {
             playClick();
-            flashChamberMiss(prevShot); // ← 빈 챔버 이펙트
+            flashChamberMiss(prevShot);
             state.turn = other(state.turn);
             LS.save(state);
             render();
@@ -858,96 +1718,83 @@
         }
     }
 
-    // ── 스핀 함수 (완전히 새로운 로직)
-    // - 탄환을 1~6 중 랜덤 재배치
-    // - 격발 챔버가 1번으로 초기화
-    // - 상대 턴으로 넘어감
     function spin() {
         const who = state.turn;
         if (state.spinUsed[who]) {
             if (who === '플레이어') setMsg('이미 스핀을 사용했습니다.');
             return;
         }
-
-        // 탄환 랜덤 재배치 (1~6 중 하나)
         state.bullet = rand(6) + 1;
-        // 챔버를 1번으로 초기화
         state.shot = 0;
-        // 스핀 사용 표시
         state.spinUsed[who] = true;
-        // 상대 턴으로 이양
         state.turn = other(who);
-
         LS.save(state);
-
         cylinder.classList.add('spinning');
         setTimeout(() => cylinder.classList.remove('spinning'), 600);
         playSpin();
-
-        // 챔버 표시 초기화
         document.querySelectorAll('.chamber-position').forEach(el => el.classList.remove('active'));
-
         setMsg(`🔄 ${who}가 스핀! 탄환 재배치 → 챔버 1번부터 시작`, 'spin-msg');
         render();
-
         if (state.turn === '컴퓨터') aiTurn();
     }
 
     // ── AI 의사결정
     function aiDecide() {
-        const strategy    = getAiStrategy();
-        const canSpin     = !state.spinUsed['컴퓨터'];
-        const chamber     = state.shot + 1; // 1~6
-        const deathProb   = 1 / (7 - chamber); // 현재 사망 확률
+        const strategy  = getAiStrategy();
+        const canSpin   = !state.spinUsed['컴퓨터'];
+        const chamber   = state.shot + 1;
 
-        // 공통 규칙: 챔버 6 (100% 사망) → 무조건 스핀 (스핀 가능하면)
         if (chamber === 6 && canSpin) return 'spin';
         if (!canSpin) return 'fire';
 
         switch (strategy) {
-            case 'brave':
-                // 깡따구: 절대 스핀 안 씀
-                return 'fire';
-
-            case 'random':
-                // 무작위: 30~40% 확률로 스핀
-                return Math.random() < 0.35 ? 'spin' : 'fire';
-
+            case 'brave':   return 'fire';
+            case 'random':  return Math.random() < 0.35 ? 'spin' : 'fire';
             case 'calculated':
-                // 계산형: 사망 확률 임계값 기반
-                // 챔버 5 (50%) → 무조건 스핀
                 if (chamber >= 5) return 'spin';
-                // 챔버 4 (33%) → 60% 확률로 스핀
                 if (chamber >= 4) return Math.random() < 0.60 ? 'spin' : 'fire';
-                // 챔버 3 (25%) → 25% 확률로 스핀
                 if (chamber >= 3) return Math.random() < 0.25 ? 'spin' : 'fire';
                 return 'fire';
-
-            default:
-                return 'fire';
+            default: return 'fire';
         }
+    }
+
+    function updateDbgAiInfo() {
+        const el = $('dbg-ai-desc');
+        if (!el) return;
+        const strategy = getAiStrategy();
+        const cycle = getThinkCycle();
+        const chamber = state.shot + 1;
+        const delay = getAiDelay(state.shot);
+        const decision = aiDecide();
+        el.textContent =
+            `전략: ${STRATEGY_LABELS[strategy]}\n` +
+            `생각주기: ${THINK_CYCLE_LABELS[cycle]}\n` +
+            `예상결정: ${decision === 'spin' ? '스핀' : '발사'}\n` +
+            `챔버: ${chamber}\n` +
+            `사망확률: ${Math.round(100/(7-chamber))}%\n` +
+            `딜레이(예상): ~${Math.round(delay)}ms`;
+        el.style.whiteSpace = 'pre';
     }
 
     function aiTurn() {
         const strategy = getAiStrategy();
-        setMsg(state.debug ? `컴퓨터가 생각 중… [${STRATEGY_LABELS[strategy]}]` : '컴퓨터가 생각 중…');
+        const cycle = getThinkCycle();
+        setMsg(state.debug
+            ? `컴퓨터가 생각 중… [${STRATEGY_LABELS[strategy]}|${THINK_CYCLE_LABELS[cycle]}]`
+            : '컴퓨터가 생각 중…');
+        if (state.debug) updateDbgAiInfo();
+        const delay = getAiDelay(state.shot);
         setTimeout(() => {
             const decision = aiDecide();
-            if (decision === 'spin') {
-                spin();
-            } else {
-                fire();
-            }
-        }, rand(AI_THINK_MAX));
+            if (decision === 'spin') spin(); else fire();
+        }, delay);
     }
 
     // ── 이벤트
     startOverlay.addEventListener('click', () => {
         startOverlay.style.display = 'none';
-        if (!state.audioReady) {
-            startBgMusic();
-            state.audioReady = true;
-        }
+        if (!state.audioReady) { startBgMusic(); state.audioReady = true; }
         const saved = LS.load();
         saved ? resumeGame(saved) : initGame();
     });
@@ -961,14 +1808,140 @@
         this.classList.toggle('active');
         this.classList.contains('active') ? startBgMusic() : stopBgMusic();
     });
+
+    // ── 단축키 F / S
     document.addEventListener('keydown', e => {
-        if (e.key === 'Pause' && state.bullet) { state.debug = !state.debug; render(); }
+        // 디버그 토글: Pause 키
+        if (e.key === 'Pause' && state.bullet) {
+            state.debug = !state.debug;
+            render();
+            debugPanel.classList.toggle('open', state.debug);
+            if (state.debug) { syncDebugPanel(); startDbgPoll(); }
+            else stopDbgPoll();
+            return;
+        }
+        if (!state.bullet) return; // 게임 시작 전
+        if (state.turn !== '플레이어') return;
+        if (e.key === 'f' || e.key === 'F') {
+            if (!fireButton.disabled) fire();
+        }
+        if (e.key === 's' || e.key === 'S') {
+            if (!spinButton.disabled) spin();
+        }
     });
+
     resetBtn.addEventListener('click', () => {
         state.scores = { 플레이어: 0, 컴퓨터: 0 };
         localStorage.setItem('playerDeathCount',   0);
         localStorage.setItem('opponentDeathCount', 0);
         renderScores();
+    });
+
+    // ── 디버그 패널 이벤트
+    $('dbg-apply').addEventListener('click', () => {
+        const b = parseInt($('dbg-bullet').value);
+        const c = parseInt($('dbg-shot').value); // 1~6 입력
+        const t = $('dbg-turn').value;
+        if (b >= 1 && b <= 6) state.bullet = b;
+        if (c >= 1 && c <= 6) state.shot = c - 1; // 내부는 0-based
+        state.turn = t;
+        LS.save(state);
+        render();
+        if (state.turn === '컴퓨터') aiTurn();
+    });
+    $('dbg-apply-spin').addEventListener('click', () => {
+        state.spinUsed['플레이어'] = $('dbg-spin-player').value === 'true';
+        state.spinUsed['컴퓨터']   = $('dbg-spin-computer').value === 'true';
+        LS.save(state);
+        render();
+    });
+    $('dbg-apply-strategy').addEventListener('click', () => {
+        const s = $('dbg-strategy').value;
+        localStorage.setItem('ai_strategy', s);
+        renderStrategyBadge();
+    });
+    $('dbg-apply-cycle').addEventListener('click', () => {
+        const c = $('dbg-think-cycle').value;
+        setThinkCycle(c);
+        renderStrategyBadge();
+    });
+
+    // ── 디버그 패널 동기화 (열릴 때 현재 상태 반영)
+    function syncDebugPanel() {
+        $('dbg-bullet').value  = state.bullet || 1;
+        $('dbg-shot').value    = (state.shot || 0) + 1; // 1-based로 표시
+        $('dbg-turn').value    = state.turn;
+        $('dbg-spin-player').value   = String(state.spinUsed['플레이어']);
+        $('dbg-spin-computer').value = String(state.spinUsed['컴퓨터']);
+        $('dbg-strategy').value      = getAiStrategy();
+        $('dbg-think-cycle').value   = getThinkCycle();
+        updateDbgAiInfo();
+        updateDbgLiveStatus();
+    }
+
+    function updateDbgLiveStatus() {
+        const el = $('dbg-live-status');
+        if (!el) return;
+        const chamber = state.shot + 1;
+        const spinP = state.spinUsed['플레이어'] ? '사용됨' : '미사용';
+        const spinC = state.spinUsed['컴퓨터'] ? '사용됨' : '미사용';
+        el.innerHTML =
+            `<span style="color:var(--accent-hi)">챔버</span>: ${chamber} / 6<br>` +
+            `<span style="color:var(--accent-hi)">실탄</span>: ${state.bullet}번 챔버<br>` +
+            `<span style="color:var(--accent-hi)">턴</span>: ${state.turn}<br>` +
+            `<span style="color:var(--accent-hi)">스핀 P</span>: ${spinP} &nbsp; <span style="color:var(--accent-hi)">C</span>: ${spinC}`;
+    }
+
+    // ── 디버그 패널 실시간 폴링 (열려있는 동안 모든 설정값 반영)
+    let dbgPollTimer = null;
+    function refreshAllDebugPanel() {
+        if (!state.debug) return;
+        updateDbgLiveStatus();
+        updateDbgAiInfo();
+        $('dbg-bullet').value        = state.bullet || 1;
+        $('dbg-shot').value          = (state.shot || 0) + 1;
+        $('dbg-turn').value          = state.turn;
+        $('dbg-spin-player').value   = String(state.spinUsed['플레이어']);
+        $('dbg-spin-computer').value = String(state.spinUsed['컴퓨터']);
+        $('dbg-strategy').value      = getAiStrategy();
+        $('dbg-think-cycle').value   = getThinkCycle();
+    }
+    function startDbgPoll() {
+        if (dbgPollTimer) return;
+        dbgPollTimer = setInterval(() => {
+            if (!state.debug) { stopDbgPoll(); return; }
+            refreshAllDebugPanel();
+        }, 200);
+    }
+    function stopDbgPoll() {
+        clearInterval(dbgPollTimer);
+        dbgPollTimer = null;
+    }
+
+    // ── 모바일: 하단 길게 터치 → 디버그 토글
+    let touchHoldTimer = null;
+    document.addEventListener('touchstart', e => {
+        const y = e.touches[0].clientY;
+        if (y > window.innerHeight * 0.75) { // 하단 25% 영역
+            touchHoldTimer = setTimeout(() => {
+                state.debug = !state.debug;
+                render();
+                debugPanel.classList.toggle('open', state.debug);
+                if (state.debug) { syncDebugPanel(); startDbgPoll(); }
+                else stopDbgPoll();
+            }, 800);
+        }
+    });
+    document.addEventListener('touchend', () => { clearTimeout(touchHoldTimer); touchHoldTimer = null; });
+    document.addEventListener('touchmove', () => { clearTimeout(touchHoldTimer); touchHoldTimer = null; });
+
+    // ── 디버그 토글 버튼 (항상 표시)
+    debugToggleBtn.addEventListener('click', () => {
+        state.debug = !state.debug;
+        render();
+        debugPanel.classList.toggle('open', state.debug);
+        if (state.debug) { syncDebugPanel(); startDbgPoll(); }
+        else stopDbgPoll();
     });
 
     // ── 초기 점수 표시
