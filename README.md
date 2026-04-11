@@ -7,3 +7,5 @@
 [몬티 홀 문제](https://northkoreanuser.github.io/HTML/몬티%20홀%20문제)
 
 [101 게임](https://northkoreanuser.github.io/HTML/101%20게임)
+
+[ect](https://northkoreanuser.github.io/HTML/ect)
