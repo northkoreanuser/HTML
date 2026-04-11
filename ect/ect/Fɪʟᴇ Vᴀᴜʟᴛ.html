@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fɪʟᴇ Vᴀᴜʟᴛ v0.1</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0e0e0f;
+  --surface: #161618;
+  --surface2: #1e1e21;
+  --border: #2a2a2e;
+  --border2: #38383d;
+  --text: #e8e8ea;
+  --muted: #6b6b72;
+  --hint: #3d3d44;
+  --accent: #7c6aff;
+  --accent-dim: #3d3480;
+  --accent-glow: rgba(124,106,255,0.15);
+  --green: #3dd68c;
+  --green-dim: #1a4a35;
+  --red: #ff6b6b;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans KR', sans-serif;
+  --radius-sm: 6px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(124,106,255,0.07) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.card {
+  width: 100%;
+  max-width: 460px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%; transform: translateX(-50%);
+  width: 60%; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
+  z-index: 1;
+}
+
+.header {
+  padding: 1.75rem 2rem 0;
+  text-align: center;
+}
+
+.logo {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--accent);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.header h1 {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
+}
+
+.header p {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  padding: 0 2rem;
+  gap: 0;
+}
+
+.tab {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 10px 16px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-content { display: none; padding: 1.5rem 2rem 2rem; }
+.tab-content.active { display: block; }
+
+.field { margin-bottom: 1.1rem; }
+
+.field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.field-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--surface2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.field-badge.saved {
+  background: var(--green-dim);
+  color: var(--green);
+  border-color: rgba(61,214,140,0.25);
+}
+
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+input[type="text"],
+input[type="password"],
+select {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 9px 12px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  appearance: none;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+select:focus {
+  border-color: var(--accent-dim);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.input-action {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: color 0.1s, background 0.1s;
+}
+
+.input-action:hover { color: var(--text); background: var(--hint); }
+
+.salt-row { display: flex; gap: 6px; }
+.salt-row input { flex: 1; }
+
+.btn-sm {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 0 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.btn-sm:hover { border-color: var(--border2); color: var(--text); background: var(--hint); }
+
+.options-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+select {
+  padding-right: 28px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b6b72' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.25rem 0;
+}
+
+.run-btn {
+  width: 100%;
+  height: 42px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: #c4baff;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+
+.run-btn:hover { filter: brightness(1.1); }
+.run-btn:active { transform: scale(0.99); }
+.run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-enc {
+  height: 42px;
+  background: var(--accent-dim);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: #c4baff;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+
+.btn-enc:hover { filter: brightness(1.1); }
+.btn-enc:active { transform: scale(0.99); }
+.btn-enc:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-dec {
+  height: 42px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+}
+
+.btn-dec:hover { border-color: var(--border2); color: var(--text); background: var(--hint); }
+.btn-dec:active { transform: scale(0.99); }
+.btn-dec:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.progress-wrap {
+  height: 2px;
+  background: var(--hint);
+  border-radius: 1px;
+  margin-top: 10px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.progress-wrap.show { opacity: 1; }
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 1px;
+  transition: width 0.15s ease;
+}
+
+.status-box {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  display: none;
+  word-break: break-all;
+}
+
+.status-box.info {
+  background: rgba(61,214,140,0.07);
+  border: 1px solid rgba(61,214,140,0.2);
+  color: var(--green);
+}
+
+.status-box.error {
+  background: rgba(255,107,107,0.07);
+  border: 1px solid rgba(255,107,107,0.2);
+  color: var(--red);
+}
+
+.result-wrap { margin-top: 1.1rem; display: none; }
+
+.result-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.key-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--green);
+  word-break: break-all;
+  line-height: 1.8;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  position: relative;
+}
+
+.key-box:hover {
+  border-color: rgba(61,214,140,0.3);
+  box-shadow: 0 0 0 3px rgba(61,214,140,0.07);
+}
+
+.copy-hint {
+  position: absolute;
+  bottom: 8px; right: 10px;
+  font-size: 10px;
+  color: var(--muted);
+  transition: color 0.15s;
+}
+
+.key-box:hover .copy-hint { color: var(--green); }
+
+.chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+
+.chip {
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: var(--surface2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.dropzone {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 18px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+}
+
+.dropzone:hover, .dropzone.dragover {
+  border-color: var(--accent-dim);
+  background: rgba(124,106,255,0.05);
+}
+
+.dropzone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+
+.dropzone-icon { font-size: 20px; margin-bottom: 5px; }
+.dropzone-text { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.dropzone-name { font-size: 12px; color: var(--accent); margin-top: 4px; display: none; font-family: var(--mono); }
+
+.dl-link {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--green);
+  border-radius: var(--radius-sm);
+  color: var(--green);
+  font-family: var(--mono);
+  font-size: 11px;
+  text-align: center;
+  text-decoration: none;
+  transition: background 0.15s;
+  letter-spacing: 0.04em;
+}
+
+.dl-link:hover { background: var(--green-dim); }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.result-wrap { animation: fadeIn 0.2s ease forwards; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header">
+    <h1>Fɪʟᴇ Vᴀᴜʟᴛ v0.1</h1>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('kdf')">키 유도</button>
+    <button class="tab" onclick="switchTab('enc')">파일 암호화</button>
+  </div>
+
+  <!-- KDF 탭 -->
+  <div class="tab-content active" id="tab-kdf">
+    <div class="field">
+      <div class="field-header"><label>입력값</label></div>
+      <div class="input-wrap">
+        <input type="password" id="pw" placeholder="입력 또는 스캔..." autocomplete="off">
+        <button class="input-action" id="pwBtn" onclick="togglePw()">표시</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-header">
+        <label>고정 Salt</label>
+        <span class="field-badge" id="saltBadge">미저장</span>
+      </div>
+      <div class="salt-row">
+        <input type="text" id="salt" placeholder="Salt 입력..." spellcheck="false" oninput="onSaltInput()">
+        <button class="btn-sm" onclick="genSalt()">랜덤</button>
+        <button class="btn-sm" onclick="saveSalt()">저장</button>
+      </div>
+    </div>
+
+    <div class="options-grid field">
+      <div>
+        <div class="field-header"><label>반복 횟수</label></div>
+        <select id="iters">
+          <option value="100000">100,000</option>
+          <option value="210000" selected>210,000 ★</option>
+          <option value="600000">600,000</option>
+        </select>
+      </div>
+      <div>
+        <div class="field-header"><label>해시</label></div>
+        <select id="hash">
+          <option value="SHA-256">SHA-256</option>
+          <option value="SHA-512" selected>SHA-512 ★</option>
+        </select>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <button class="run-btn" id="runBtn" onclick="runKdf()">키 유도 실행</button>
+    <div class="progress-wrap" id="kdfProg"><div class="progress-bar" id="kdfBar"></div></div>
+    <div class="status-box" id="kdfErr"></div>
+
+    <div class="result-wrap" id="kdfResult">
+      <div class="result-label">유도된 키</div>
+      <div class="key-box" onclick="copyKey()">
+        <span id="keyVal"></span>
+        <span class="copy-hint">클릭하여 복사</span>
+      </div>
+      <div class="chips" id="kdfChips"></div>
+    </div>
+  </div>
+
+  <!-- 암호화 탭 -->
+  <div class="tab-content" id="tab-enc">
+    <div class="field">
+      <label>파일</label>
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="fileInput">
+        <div class="dropzone-icon">📁</div>
+        <div class="dropzone-text">클릭하거나 파일을 드래그</div>
+        <div class="dropzone-name" id="fileName"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-header"><label>비밀번호</label></div>
+      <div class="input-wrap">
+        <input type="password" id="encPw" placeholder="비밀번호 입력..." autocomplete="off">
+        <button class="input-action" id="encPwBtn" onclick="toggleEncPw()">표시</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <div class="btn-row">
+      <button class="btn-enc" id="btnEnc" onclick="doEnc()">암호화</button>
+      <button class="btn-dec" id="btnDec" onclick="doDec()">복호화</button>
+    </div>
+
+    <div class="progress-wrap" id="encProg"><div class="progress-bar" id="encBar"></div></div>
+    <div class="status-box" id="encStatus"></div>
+    <div id="dlWrap"></div>
+  </div>
+</div>
+
+<script>
+const SALT_KEY = 'spp_salt_v1';
+
+function b2h(b) { return Array.from(b).map(x => x.toString(16).padStart(2,'0')).join(''); }
+function h2b(h) { return new Uint8Array(h.match(/.{2}/g).map(b => parseInt(b,16))); }
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['kdf','enc'][i] === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ── KDF ──
+
+function loadSalt() {
+  try {
+    const s = localStorage.getItem(SALT_KEY);
+    if (s) { document.getElementById('salt').value = s; setSaltBadge(true); }
+  } catch(e) {}
+}
+
+function saveSalt() {
+  const v = document.getElementById('salt').value.trim();
+  if (!v) { showKdfErr('저장할 Salt를 먼저 입력하세요.'); return; }
+  try { localStorage.setItem(SALT_KEY, v); setSaltBadge(true); hideKdfErr(); }
+  catch(e) { showKdfErr('저장 실패: ' + e.message); }
+}
+
+function onSaltInput() {
+  try { setSaltBadge(localStorage.getItem(SALT_KEY) === document.getElementById('salt').value); }
+  catch(e) {}
+}
+
+function setSaltBadge(saved) {
+  const b = document.getElementById('saltBadge');
+  b.textContent = saved ? '저장됨' : '미저장';
+  b.className = 'field-badge' + (saved ? ' saved' : '');
+}
+
+function genSalt() {
+  document.getElementById('salt').value = b2h(crypto.getRandomValues(new Uint8Array(16)));
+  setSaltBadge(false);
+}
+
+function togglePw() {
+  const i = document.getElementById('pw'), b = document.getElementById('pwBtn');
+  i.type = i.type === 'password' ? 'text' : 'password';
+  b.textContent = i.type === 'password' ? '표시' : '숨기기';
+}
+
+async function runKdf() {
+  const pw = document.getElementById('pw').value;
+  const saltRaw = document.getElementById('salt').value.trim();
+  if (!pw) { showKdfErr('입력값을 입력하세요.'); return; }
+  if (!saltRaw) { showKdfErr('Salt를 입력하거나 생성하세요.'); return; }
+  const saltBytes = /^[0-9a-fA-F]{16,}$/.test(saltRaw) ? h2b(saltRaw) : new TextEncoder().encode(saltRaw);
+  if (saltBytes.length < 8) { showKdfErr('Salt는 최소 8바이트 이상이어야 합니다.'); return; }
+
+  hideKdfErr();
+  const btn = document.getElementById('runBtn');
+  const prog = document.getElementById('kdfProg'), bar = document.getElementById('kdfBar');
+  btn.disabled = true; btn.textContent = '연산 중...';
+  prog.classList.add('show'); bar.style.width = '15%';
+
+  const iters = parseInt(document.getElementById('iters').value);
+  const hash = document.getElementById('hash').value;
+
+  try {
+    await new Promise(r => setTimeout(r, 20));
+    bar.style.width = '35%';
+    const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+    bar.style.width = '60%';
+    const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: saltBytes, iterations: iters, hash }, km, 256);
+    bar.style.width = '95%';
+
+    const hex = b2h(new Uint8Array(bits));
+    document.getElementById('keyVal').textContent = hex;
+    document.getElementById('kdfChips').innerHTML =
+      [`PBKDF2-HMAC-${hash}`, `${iters.toLocaleString()}회`, `256bit`, `salt ${saltBytes.length}B`]
+      .map(t => `<span class="chip">${t}</span>`).join('');
+
+    const r = document.getElementById('kdfResult');
+    r.style.display = 'block';
+    bar.style.width = '100%';
+    setTimeout(() => { prog.classList.remove('show'); bar.style.width = '0%'; }, 400);
+  } catch(e) {
+    showKdfErr('오류: ' + e.message);
+    prog.classList.remove('show');
+  } finally {
+    btn.disabled = false; btn.textContent = '키 유도 실행';
+  }
+}
+
+function copyKey() {
+  const v = document.getElementById('keyVal').textContent;
+  navigator.clipboard.writeText(v).then(() => {
+    const h = document.querySelector('.copy-hint');
+    h.textContent = '복사됨 ✓'; h.style.color = 'var(--green)';
+    setTimeout(() => { h.textContent = '클릭하여 복사'; h.style.color = ''; }, 1500);
+  });
+}
+
+function showKdfErr(m) {
+  const e = document.getElementById('kdfErr');
+  e.textContent = m; e.className = 'status-box error'; e.style.display = 'block';
+}
+function hideKdfErr() { document.getElementById('kdfErr').style.display = 'none'; }
+
+// ── AES-256 ──
+
+document.getElementById('fileInput').addEventListener('change', () => {
+  const f = document.getElementById('fileInput').files[0];
+  if (f) { document.getElementById('fileName').textContent = f.name; document.getElementById('fileName').style.display = 'block'; }
+});
+
+const dz = document.getElementById('dropzone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) {
+    document.getElementById('fileInput').files = e.dataTransfer.files;
+    document.getElementById('fileName').textContent = e.dataTransfer.files[0].name;
+    document.getElementById('fileName').style.display = 'block';
+  }
+});
+
+function toggleEncPw() {
+  const i = document.getElementById('encPw'), b = document.getElementById('encPwBtn');
+  i.type = i.type === 'password' ? 'text' : 'password';
+  b.textContent = i.type === 'password' ? '표시' : '숨기기';
+}
+
+function showEncStatus(msg, type) {
+  const s = document.getElementById('encStatus');
+  s.textContent = msg; s.className = 'status-box ' + type; s.style.display = 'block';
+}
+
+function setDownload(blob, name) {
+  const url = URL.createObjectURL(blob);
+  document.getElementById('dlWrap').innerHTML =
+    `<a class="dl-link" href="${url}" download="${name}">⬇ ${name}</a>`;
+  document.querySelector('.dl-link').onclick = () => setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+function validateEnc() {
+  if (!document.getElementById('fileInput').files[0]) { showEncStatus('파일을 선택해주세요.', 'error'); return false; }
+  if (!document.getElementById('encPw').value) { showEncStatus('비밀번호를 입력해주세요.', 'error'); return false; }
+  return true;
+}
+
+async function deriveEncKey(password, salt) {
+  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+  );
+}
+
+async function doEnc() {
+  if (!validateEnc()) return;
+  document.getElementById('dlWrap').innerHTML = '';
+  showEncStatus('암호화 중...', 'info');
+  const prog = document.getElementById('encProg'), bar = document.getElementById('encBar');
+  prog.classList.add('show'); bar.style.width = '20%';
+  try {
+    const data = await document.getElementById('fileInput').files[0].arrayBuffer();
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    bar.style.width = '50%';
+    const key = await deriveEncKey(document.getElementById('encPw').value, salt);
+    const enc = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+    bar.style.width = '90%';
+    const out = new Uint8Array(28 + enc.byteLength);
+    out.set(salt, 0); out.set(iv, 16); out.set(new Uint8Array(enc), 28);
+    setDownload(new Blob([out]), document.getElementById('fileInput').files[0].name + '.enc');
+    showEncStatus('암호화 완료.', 'info');
+    bar.style.width = '100%';
+    setTimeout(() => { prog.classList.remove('show'); bar.style.width = '0%'; }, 400);
+  } catch(e) { showEncStatus('오류: ' + e.message, 'error'); prog.classList.remove('show'); }
+}
+
+async function doDec() {
+  if (!validateEnc()) return;
+  document.getElementById('dlWrap').innerHTML = '';
+  showEncStatus('복호화 중...', 'info');
+  const prog = document.getElementById('encProg'), bar = document.getElementById('encBar');
+  prog.classList.add('show'); bar.style.width = '20%';
+  try {
+    const buf = await document.getElementById('fileInput').files[0].arrayBuffer();
+    if (buf.byteLength < 28) throw new Error('파일이 너무 짧습니다.');
+    const b = new Uint8Array(buf);
+    bar.style.width = '50%';
+    const key = await deriveEncKey(document.getElementById('encPw').value, b.slice(0, 16));
+    const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(16, 28) }, key, b.slice(28));
+    bar.style.width = '90%';
+    const name = document.getElementById('fileInput').files[0].name;
+    setDownload(new Blob([dec]), name.endsWith('.enc') ? name.slice(0, -4) : 'decrypted_' + name);
+    showEncStatus('복호화 완료.', 'info');
+    bar.style.width = '100%';
+    setTimeout(() => { prog.classList.remove('show'); bar.style.width = '0%'; }, 400);
+  } catch { showEncStatus('오류: 비밀번호가 틀렸거나 손상된 파일입니다.', 'error'); prog.classList.remove('show'); }
+}
+
+document.getElementById('pw').addEventListener('keydown', e => { if (e.key === 'Enter') runKdf(); });
+loadSalt();
+</script>
+</body>
+</html>
