@@ -1,0 +1,127 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>MP5 TACTICAL SIM</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; cursor: crosshair; }
+        #hud {
+            position: fixed; bottom: 40px; right: 40px;
+            color: #ff1100; font-family: monospace; font-size: 20px;
+            text-align: right; pointer-events: none;
+        }
+        #gun-frame {
+            position: fixed; bottom: -20px; left: 50%;
+            transform: translateX(-50%); width: 400px; height: 200px;
+            border: 2px solid #333; border-bottom: none; border-radius: 50px 50px 0 0;
+            background: linear-gradient(to top, #111, #000); pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="hud">SYSTEM: CALIBRATED<br>FIRE_MODE: SEMI-AUTO(RAPID)<br>AMMO: ∞</div>
+    <div id="gun-frame" id="gun"></div>
+    <canvas id="c"></canvas>
+
+<script>
+    const cvs = document.getElementById('c');
+    const c = cvs.getContext('2d');
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    let isFiring = false;
+    let bullets = [];
+    let lastFireTime = 0;
+    const FIRE_RATE = 100; // 밀리초 단위 (다다다다 속도 조절)
+    let shake = 0;
+    let mX = 0, mY = 0;
+
+    // 1. MP5 전용 '다다다다' 타격음 (레트로 하드코어)
+    function playTacticalShot() {
+        const now = actx.currentTime;
+        const osc = actx.createOscillator();
+        const g = actx.createGain();
+        
+        // 찢어지는 사각파 (Square wave) + 급격한 피치 드롭
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(250, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.04);
+
+        // 아주 짧고 강렬한 엔벨로프 (다! 다! 다! 소리의 비결)
+        g.gain.setValueAtTime(0.6, now);
+        g.gain.setValueAtTime(0.6, now + 0.01); // 홀드 구간
+        g.gain.exponentialRampToValueAtTime(0.001, now + 0.04); // 급격히 끊음
+
+        osc.connect(g);
+        g.connect(actx.destination);
+        osc.start();
+        osc.stop(now + 0.05);
+    }
+
+    function fire() {
+        playTacticalShot();
+        shake = 25; // 반동
+        
+        // 레이저 총알 데이터
+        bullets.push({
+            sx: window.innerWidth / 2, // 총구 위치
+            sy: window.innerHeight - 150,
+            tx: mX + (Math.random()-0.5)*15,
+            ty: mY + (Math.random()-0.5)*15,
+            life: 1.0
+        });
+
+        // 총기 반동 애니메이션
+        const gun = document.getElementById('gun-frame');
+        gun.style.bottom = "-40px";
+        setTimeout(() => gun.style.bottom = "-20px", 50);
+    }
+
+    function draw() {
+        cvs.width = window.innerWidth; cvs.height = window.innerHeight;
+        
+        // 연사 로직
+        if (isFiring) {
+            const now = Date.now();
+            if (now - lastFireTime > FIRE_RATE) {
+                fire();
+                lastFireTime = now;
+            }
+        }
+
+        // 화면 흔들림
+        let sx = (Math.random()-0.5) * shake;
+        let sy = (Math.random()-0.5) * shake;
+        c.setTransform(1, 0, 0, 1, sx, sy);
+        if(shake > 0) shake *= 0.85;
+
+        // 배경 처리
+        c.fillStyle = 'rgba(0,0,0,0.4)';
+        c.fillRect(-100, -100, cvs.width+200, cvs.height+200);
+
+        // 레이저 및 탄착점
+        bullets.forEach((b, i) => {
+            c.beginPath();
+            c.strokeStyle = `rgba(255, 17, 0, ${b.life})`;
+            c.lineWidth = 3;
+            c.moveTo(b.sx, b.sy);
+            c.lineTo(b.tx, b.ty);
+            c.stroke();
+
+            // 탄착점 글리치 박스
+            c.fillStyle = '#ff1100';
+            c.fillRect(b.tx - 5, b.ty - 5, 10, 10);
+            
+            b.life -= 0.15;
+            if (b.life <= 0) bullets.splice(i, 1);
+        });
+
+        requestAnimationFrame(draw);
+    }
+
+    window.onmousedown = () => { if(actx.state==='suspended') actx.resume(); isFiring = true; };
+    window.onmouseup = () => isFiring = false;
+    window.onmousemove = (e) => { mX = e.clientX; mY = e.clientY; };
+
+    draw();
+</script>
+</body>
+</html>

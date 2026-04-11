@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Russian Roulette</title>
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#070707; overflow:hidden; }
+canvas { display:block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+let W, H;
+function resize() { W = cvs.width = innerWidth; H = cvs.height = innerHeight; }
+resize(); window.addEventListener('resize', resize);
+let mx = 0, my = 0;
+window.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
+
+/* ============ AUDIO ============ */
+function playTick() {
+  const t = AC.currentTime;
+  const o = AC.createOscillator(); o.type='square';
+  o.frequency.setValueAtTime(950,t); o.frequency.exponentialRampToValueAtTime(280,t+0.016);
+  const g = AC.createGain(); g.gain.setValueAtTime(0.09,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.02);
+  o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t+0.022);
+}
+
+function playEmpty() {
+  const t=AC.currentTime, sr=AC.sampleRate;
+  const buf=AC.createBuffer(1,sr*0.07,sr), d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.exp(-i/(d.length*0.14));
+  const n=AC.createBufferSource(); n.buffer=buf;
+  const o=AC.createOscillator(); o.type='triangle';
+  o.frequency.setValueAtTime(720,t); o.frequency.exponentialRampToValueAtTime(90,t+0.055);
+  const g=AC.createGain(); g.gain.setValueAtTime(0.45,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.07);
+  n.connect(g); o.connect(g); g.connect(AC.destination);
+  n.start(t); n.stop(t+0.07); o.start(t); o.stop(t+0.065);
+}
+
+function playGunshot() {
+  const t=AC.currentTime, sr=AC.sampleRate;
+  // Crack transient
+  const b1=AC.createBuffer(1,sr*0.012,sr), d1=b1.getChannelData(0);
+  for(let i=0;i<d1.length;i++) d1[i]=(Math.random()*2-1)*(1-i/d1.length);
+  const cr=AC.createBufferSource(); cr.buffer=b1;
+  const gCr=AC.createGain(); gCr.gain.setValueAtTime(3.0,t);
+  cr.connect(gCr); gCr.connect(AC.destination); cr.start(t);
+  // Body noise
+  const b2=AC.createBuffer(1,sr*1.0,sr), d2=b2.getChannelData(0);
+  for(let i=0;i<d2.length;i++) d2[i]=(Math.random()*2-1)*Math.exp(-i/(sr*0.07));
+  const bm=AC.createBufferSource(); bm.buffer=b2;
+  const lp=AC.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=260;
+  const g2=AC.createGain(); g2.gain.setValueAtTime(1.5,t); g2.gain.exponentialRampToValueAtTime(0.001,t+0.85);
+  bm.connect(lp); lp.connect(g2); g2.connect(AC.destination); bm.start(t);
+  // Bass thud
+  const osc=AC.createOscillator(); osc.type='sine';
+  osc.frequency.setValueAtTime(100,t); osc.frequency.exponentialRampToValueAtTime(25,t+0.28);
+  const g3=AC.createGain(); g3.gain.setValueAtTime(1.0,t); g3.gain.exponentialRampToValueAtTime(0.001,t+0.35);
+  osc.connect(g3); g3.connect(AC.destination); osc.start(t); osc.stop(t+0.38);
+}
+
+/* ============ GAME STATE ============ */
+let pHP=3, eHP=3;
+// States: intro | playerSpin | playerAim | playerFired | enemySpin | enemyAim | enemyFired | over
+let state='intro';
+let isBang=false, revealed=false;
+
+// Cylinder animation
+let cylAngle=0, spinSpd=0, spinning=false, spinTimer=0, decel=false;
+let tickTO=null, tickInt=180;
+
+// Revolver aim rotation (0 = barrel up toward enemy, PI = barrel down toward player)
+let revRot=0, revRotTarget=0;
+
+// Visual FX
+let flash=0, shakePow=0, muzzle=0;
+let blood=[];
+let smokeP=[];
+
+// UI text
+let msg='RUSSIAN ROULETTE', msub='1 bullet  ·  6 chambers  ·  one spin each round';
+let btnLabel='PLAY', btnOn=true, btnBox=null;
+
+/* ============ SPIN SOUND ============ */
+function startTicks() {
+  tickInt=165;
+  function tick() { if(!spinning) return; playTick(); tickInt=Math.max(20,tickInt*0.872); tickTO=setTimeout(tick,tickInt); }
+  tickTO=setTimeout(tick,tickInt);
+}
+function stopTicks() { clearTimeout(tickTO); }
+
+/* ============ GAME LOGIC ============ */
+function startGame() { pHP=3; eHP=3; blood=[]; smokeP=[]; doSpin('player'); }
+
+function doSpin(who) {
+  revealed=false; isBang=Math.random()<(1/6);
+  spinning=true; spinSpd=0.46; spinTimer=105+Math.floor(Math.random()*55); decel=false;
+  startTicks();
+  revRotTarget = (who==='player') ? Math.PI : 0;
+  if(who==='player') { state='playerSpin'; msg='SPINNING'; msub='the cylinder turns...'; }
+  else               { state='enemySpin';  msg='SPINNING'; msub='fate decides...'; }
+  btnLabel=''; btnOn=false;
+}
+
+function onSpinStop() {
+  stopTicks();
+  if(state==='playerSpin') {
+    state='playerAim'; msg='YOUR TURN'; msub='pull the trigger';
+    btnLabel='PULL TRIGGER'; btnOn=true;
+  } else {
+    state='enemyAim'; msg="ENEMY'S TURN"; msub='they take aim...';
+    setTimeout(doEnemyFire, 1200+Math.random()*800);
+  }
+}
+
+function doPlayerFire() {
+  if(!btnOn||state!=='playerAim') return;
+  btnOn=false; revealed=true; executeFire(true);
+}
+function doEnemyFire() { revealed=true; executeFire(false); }
+
+function executeFire(isPlayer) {
+  if(isBang) {
+    playGunshot(); flash=1; shakePow=30; muzzle=16;
+    if(isPlayer) {
+      pHP--;
+      state='playerFired'; msg='BANG';
+      msub = pHP>0 ? `${pHP} life remaining` : 'you are dead';
+      spawnBlood(W/2, H*0.72, 60);
+      spawnSmoke(W/2, H*0.5);
+    } else {
+      eHP--;
+      state='enemyFired'; msg='BANG';
+      msub = eHP>0 ? `enemy has ${eHP} life` : 'enemy is dead';
+      spawnBlood(W/2, H*0.22, 50);
+      spawnSmoke(W/2, H*0.5);
+    }
+    const leftHP = isPlayer ? pHP : eHP;
+    setTimeout(()=>{
+      if(leftHP<=0) {
+        state='over';
+        msg = isPlayer ? 'GAME OVER' : 'YOU WIN';
+        msub = isPlayer ? 'the bullet found you' : 'the enemy is dead';
+        btnLabel='PLAY AGAIN'; btnOn=true;
+      } else { btnLabel='CONTINUE'; btnOn=true; }
+    }, 1900);
+  } else {
+    playEmpty();
+    if(isPlayer) { state='playerFired'; msg='...click'; msub='empty chamber — you survive'; }
+    else         { state='enemyFired';  msg='...click'; msub='empty chamber — enemy survives'; }
+    setTimeout(()=>{ btnLabel='CONTINUE'; btnOn=true; }, 800);
+  }
+}
+
+function onContinue() {
+  if(state==='playerFired') doSpin('enemy');
+  else if(state==='enemyFired') doSpin('player');
+  else if(state==='over') startGame();
+}
+
+function spawnBlood(x,y,n) {
+  for(let i=0;i<n;i++) {
+    const a=Math.random()*Math.PI*2, s=0.8+Math.random()*7;
+    blood.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-1.5,life:1,r:2+Math.random()*6});
+  }
+}
+function spawnSmoke(x,y) {
+  for(let i=0;i<12;i++) {
+    smokeP.push({x:x+(Math.random()-.5)*10, y, vx:(Math.random()-.5)*0.8, vy:-0.6-Math.random()*1.2, life:1, r:4+Math.random()*8});
+  }
+}
+
+/* ============ INPUT ============ */
+window.addEventListener('click', e => {
+  if(AC.state==='suspended') AC.resume();
+  if(!btnOn||!btnBox) return;
+  const b=btnBox;
+  if(e.clientX>=b.x&&e.clientX<=b.x+b.w&&e.clientY>=b.y&&e.clientY<=b.y+b.h) {
+    if(state==='intro') startGame();
+    else if(state==='playerAim') doPlayerFire();
+    else if(state==='playerFired'||state==='enemyFired'||state==='over') onContinue();
+  }
+});
+
+/* ============ DRAW HELPERS ============ */
+function rr(x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+/* ============ REVOLVER ============ */
+// Local constants (in revolver-local coords, barrel pointing UP at y-negative)
+const CYL_Y=-20, CYL_R=34, CH_R=20, HOLE_R=8;
+
+function drawRevolver(cx, cy) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  // Smooth aim rotation
+  revRot += (revRotTarget - revRot) * 0.065;
+  ctx.rotate(revRot);
+
+  const g1='#222222', g2='#363636', gd='#0c0c0c';
+  const wd='#140800', wdl='#271200';
+
+  // ── BARREL ──
+  ctx.fillStyle=g1; ctx.strokeStyle=g2; ctx.lineWidth=1.5;
+  rr(-9,-162,18,116,3); ctx.fill(); ctx.stroke();
+  // Rail groove
+  ctx.fillStyle=gd; rr(-3,-160,6,110,2); ctx.fill();
+  // Reinforcement rings
+  for(let i=0;i<4;i++) { ctx.fillStyle='#2e2e2e'; rr(-10,-150+i*26,20,4,1); ctx.fill(); }
+  // Muzzle brake
+  ctx.fillStyle=g1; ctx.strokeStyle=g2;
+  rr(-11,-166,22,12,2); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#040404';
+  ctx.beginPath(); ctx.arc(0,-160,4.5,0,Math.PI*2); ctx.fill();
+
+  // ── FRAME ──
+  ctx.fillStyle='#1c1c1c'; ctx.strokeStyle='#303030'; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(-22,-48); ctx.lineTo(-23,32); ctx.quadraticCurveTo(-23,40,-13,40);
+  ctx.lineTo(20,40); ctx.quadraticCurveTo(27,40,27,32); ctx.lineTo(25,-6); ctx.lineTo(20,-48);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+
+  // ── CYLINDER (rotating) ──
+  ctx.save();
+  ctx.translate(0, CYL_Y);
+  ctx.rotate(cylAngle);
+  // Outer body
+  ctx.fillStyle='#2a2a2a'; ctx.strokeStyle='#404040'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(0,0,CYL_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
+  // Fluting marks between chambers
+  for(let i=0;i<6;i++) {
+    const a=(i+0.5)/6*Math.PI*2;
+    ctx.fillStyle='#141414';
+    ctx.beginPath(); ctx.arc(Math.cos(a)*CYL_R*0.76, Math.sin(a)*CYL_R*0.76, 4,0,Math.PI*2); ctx.fill();
+  }
+  // 6 chambers
+  for(let i=0;i<6;i++) {
+    const a=i/6*Math.PI*2-Math.PI/2;
+    const cx2=Math.cos(a)*CH_R, cy2=Math.sin(a)*CH_R;
+    ctx.fillStyle='#151515'; ctx.strokeStyle='#2e2e2e'; ctx.lineWidth=0.8;
+    ctx.beginPath(); ctx.arc(cx2,cy2,HOLE_R,0,Math.PI*2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#060606';
+    ctx.beginPath(); ctx.arc(cx2,cy2,HOLE_R-3,0,Math.PI*2); ctx.fill();
+  }
+  // Center pin
+  ctx.fillStyle='#363636'; ctx.beginPath(); ctx.arc(0,0,4.5,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#0a0a0a'; ctx.beginPath(); ctx.arc(0,0,2.5,0,Math.PI*2); ctx.fill();
+  ctx.restore(); // end cylinder rotate
+
+  // ── FIRING INDICATOR (world-space, top of cylinder = firing position) ──
+  // Drawn OUTSIDE cylinder rotation so it stays at 12 o'clock regardless of spin
+  if(revealed) {
+    const iy = CYL_Y - CH_R; // top of chamber orbit in revolver local space
+    if(isBang) {
+      ctx.fillStyle='#c41230'; ctx.shadowColor='#ff0028'; ctx.shadowBlur=20;
+      ctx.beginPath(); ctx.arc(0,iy,HOLE_R-0.5,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#ff3050';
+      ctx.beginPath(); ctx.arc(0,iy-1.5,4.5,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur=0;
+    } else {
+      ctx.strokeStyle='#2c2c2c'; ctx.lineWidth=1.5; ctx.shadowColor='#222'; ctx.shadowBlur=4;
+      ctx.beginPath(); ctx.arc(0,iy,HOLE_R-0.5,0,Math.PI*2); ctx.stroke();
+      ctx.shadowBlur=0;
+    }
+  }
+
+  // ── TRIGGER GUARD ──
+  ctx.strokeStyle='#282828'; ctx.lineWidth=3.5; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(-8,40); ctx.quadraticCurveTo(-18,70,0,74); ctx.quadraticCurveTo(18,78,18,40); ctx.stroke();
+  // ── TRIGGER ──
+  ctx.fillStyle='#383838';
+  ctx.beginPath(); ctx.moveTo(2,22); ctx.lineTo(7,62); ctx.lineTo(3,62); ctx.lineTo(-2,22); ctx.closePath(); ctx.fill();
+  // ── HAMMER ──
+  ctx.fillStyle='#202020'; ctx.strokeStyle='#323232'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(20,-50); ctx.lineTo(28,-68); ctx.lineTo(13,-68); ctx.lineTo(8,-50); ctx.closePath(); ctx.fill(); ctx.stroke();
+  // ── GRIP ──
+  ctx.fillStyle=wd; ctx.strokeStyle=wdl; ctx.lineWidth=1.5;
+  ctx.beginPath();
+  ctx.moveTo(-18,40); ctx.lineTo(-25,140); ctx.quadraticCurveTo(-21,152,-9,155);
+  ctx.lineTo(12,149); ctx.quadraticCurveTo(27,142,25,132); ctx.lineTo(18,40);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  // Grip texture lines
+  ctx.strokeStyle='#1c0a00'; ctx.lineWidth=0.75;
+  for(let i=0;i<9;i++) { ctx.beginPath(); ctx.moveTo(-20+i*5,58+i*2); ctx.lineTo(-22+i*5,136+i); ctx.stroke(); }
+  // Grip cap
+  ctx.fillStyle='#1e1e1e'; ctx.strokeStyle='#2c2c2c'; ctx.lineWidth=1;
+  rr(-13,148,28,12,3); ctx.fill(); ctx.stroke();
+
+  // ── MUZZLE FLASH ──
+  if(muzzle>0) {
+    const f=muzzle/16;
+    ctx.save(); ctx.translate(0,-168); ctx.globalAlpha=f*0.95;
+    // Outer bloom
+    ctx.fillStyle='#ffee88'; ctx.beginPath(); ctx.arc(0,0,18*f,0,Math.PI*2); ctx.fill();
+    // Core
+    ctx.fillStyle='#ffffff'; ctx.beginPath(); ctx.arc(0,0,9*f,0,Math.PI*2); ctx.fill();
+    // Rays
+    ctx.strokeStyle='#ffcc44'; ctx.lineWidth=2;
+    for(let i=0;i<12;i++) {
+      const a=i/12*Math.PI*2, r=(14+Math.random()*18)*f;
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/* ============ HUD: HP DOTS ============ */
+function drawHP(cx, y, hp, label) {
+  ctx.save();
+  ctx.textAlign='center'; ctx.font='13px "Bebas Neue", sans-serif';
+  ctx.fillStyle='#3e2e1e'; ctx.letterSpacing='3px';
+  ctx.fillText(label, cx, y);
+  const gap=30, sx=cx-gap;
+  for(let i=0;i<3;i++) {
+    const x=sx+i*gap, cy2=y+23;
+    if(i<hp) {
+      ctx.fillStyle='#b81428';
+      ctx.beginPath(); ctx.arc(x,cy2,9,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#e03050';
+      ctx.beginPath(); ctx.arc(x-2,cy2-2.5,3.5,0,Math.PI*2); ctx.fill();
+    } else {
+      ctx.fillStyle='#160606'; ctx.strokeStyle='#261010'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.arc(x,cy2,9,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle='#3e1212'; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(x-4.5,cy2-4.5); ctx.lineTo(x+4.5,cy2+4.5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+4.5,cy2-4.5); ctx.lineTo(x-4.5,cy2+4.5); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/* ============ BUTTON ============ */
+function drawBtn() {
+  if(!btnLabel) { btnBox=null; return; }
+  const bw=272, bh=54, bx=W/2-bw/2, by=H-112;
+  btnBox={x:bx,y:by,w:bw,h:bh};
+  const hov=btnOn&&mx>=bx&&mx<=bx+bw&&my>=by&&my<=by+bh;
+  ctx.save();
+  if(hov) { ctx.fillStyle='rgba(196,18,48,0.12)'; rr(bx,by,bw,bh,3); ctx.fill(); }
+  ctx.strokeStyle=btnOn?(hov?'#c8a880':'#604830'):'#240c0c'; ctx.lineWidth=1;
+  rr(bx,by,bw,bh,3); ctx.stroke();
+  // Corner brackets
+  const cm=10; ctx.strokeStyle=btnOn?'#c41230':'#300808'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(bx,by+cm); ctx.lineTo(bx,by); ctx.lineTo(bx+cm,by); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx+bw-cm,by); ctx.lineTo(bx+bw,by); ctx.lineTo(bx+bw,by+cm); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx,by+bh-cm); ctx.lineTo(bx,by+bh); ctx.lineTo(bx+cm,by+bh); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx+bw-cm,by+bh); ctx.lineTo(bx+bw,by+bh); ctx.lineTo(bx+bw,by+bh-cm); ctx.stroke();
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.font='23px "Bebas Neue", sans-serif';
+  ctx.fillStyle=btnOn?(hov?'#e0c89a':'#8a6040'):'#380e0e';
+  ctx.fillText(btnLabel, W/2, by+bh/2);
+  ctx.restore();
+}
+
+/* ============ INTRO OVERLAY ============ */
+function drawIntro() {
+  ctx.fillStyle='rgba(3,1,0,0.78)'; ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  // Title
+  ctx.font='96px "Bebas Neue", sans-serif';
+  ctx.fillStyle='#c41230'; ctx.shadowColor='#6a0818'; ctx.shadowBlur=32;
+  ctx.fillText('RUSSIAN', W/2, H/2-58);
+  ctx.shadowBlur=0; ctx.fillStyle='#d4c4a4';
+  ctx.fillText('ROULETTE', W/2, H/2+28);
+  // Subtitle
+  ctx.font='14px "Special Elite", cursive';
+  ctx.fillStyle='#4a3828';
+  ctx.fillText('1 bullet  ·  6 chambers  ·  one spin per turn', W/2, H/2+90);
+}
+
+/* ============ MAIN LOOP ============ */
+function loop() {
+  // ── Update ──
+  if(spinning) {
+    cylAngle += spinSpd;
+    if(!decel) { spinTimer--; if(spinTimer<=0) decel=true; }
+    else { spinSpd*=0.935; if(spinSpd<0.0025) { spinning=false; spinSpd=0; onSpinStop(); } }
+  }
+  if(muzzle>0) muzzle--;
+  if(shakePow>0) shakePow*=0.78;
+  if(flash>0) flash*=0.86;
+  for(let i=blood.length-1;i>=0;i--) {
+    const b=blood[i]; b.x+=b.vx; b.y+=b.vy; b.vy+=0.14; b.life-=0.013;
+    if(b.life<=0) blood.splice(i,1);
+  }
+  for(let i=smokeP.length-1;i>=0;i--) {
+    const s=smokeP[i]; s.x+=s.vx; s.y+=s.vy; s.r+=0.3; s.life-=0.022;
+    if(s.life<=0) smokeP.splice(i,1);
+  }
+  document.body.style.cursor=(btnOn&&btnBox&&mx>=btnBox.x&&mx<=btnBox.x+btnBox.w&&my>=btnBox.y&&my<=btnBox.y+btnBox.h)?'pointer':'default';
+
+  // ── Render ──
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#070707'; ctx.fillRect(0,0,W,H);
+
+  // Background grid texture
+  ctx.strokeStyle='rgba(16,9,3,0.6)'; ctx.lineWidth=0.5;
+  for(let x=0;x<W;x+=68) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+  for(let y=0;y<H;y+=68) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+
+  // Vignette
+  const vig=ctx.createRadialGradient(W/2,H/2,H*0.08,W/2,H/2,H*0.84);
+  vig.addColorStop(0,'rgba(0,0,0,0)'); vig.addColorStop(1,'rgba(0,0,0,0.78)');
+  ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+  // Shake offset
+  const sx=shakePow>0?(Math.random()-.5)*shakePow:0;
+  const sy=shakePow>0?(Math.random()-.5)*shakePow:0;
+  ctx.save(); ctx.translate(sx,sy);
+
+  // Blood
+  for(const b of blood) {
+    ctx.globalAlpha=b.life*0.88; ctx.fillStyle='#680010';
+    ctx.beginPath(); ctx.arc(b.x,b.y,b.r*b.life+1,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+  // Smoke
+  for(const s of smokeP) {
+    ctx.globalAlpha=s.life*0.18; ctx.fillStyle='#888';
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+
+  // Enemy HP
+  if(state!=='intro') {
+    drawHP(W/2, H*0.065, eHP, 'ENEMY');
+    // Dashed divider
+    ctx.strokeStyle='rgba(180,14,38,0.18)'; ctx.lineWidth=0.5; ctx.setLineDash([3,7]);
+    ctx.beginPath(); ctx.moveTo(W*0.24,H*0.15); ctx.lineTo(W*0.76,H*0.15); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Revolver (center-ish of screen)
+  drawRevolver(W/2, H*0.46);
+
+  // Game messages
+  if(state!=='intro') {
+    const isFired = state==='playerFired'||state==='enemyFired';
+    const bang = isFired && isBang;
+    const win  = state==='over' && msg==='YOU WIN';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font=`${bang?68:40}px "Bebas Neue", sans-serif`;
+    if(bang) { ctx.shadowColor='#880010'; ctx.shadowBlur=28; ctx.fillStyle='#c41230'; }
+    else if(win) { ctx.fillStyle='#d4c090'; }
+    else if(state==='over') { ctx.fillStyle='#703020'; }
+    else { ctx.fillStyle='#9a8870'; }
+    ctx.fillText(msg, W/2, H*0.8);
+    ctx.shadowBlur=0;
+    ctx.font='14px "Special Elite", cursive';
+    ctx.fillStyle='#4a3820';
+    ctx.fillText(msub, W/2, H*0.856);
+    drawHP(W/2, H*0.9, pHP, 'YOU');
+  }
+
+  ctx.restore(); // end shake
+
+  // Screen flash
+  if(flash>0.015) { ctx.fillStyle=`rgba(255,200,130,${flash*0.3})`; ctx.fillRect(0,0,W,H); }
+
+  // Intro overlay (after all else, darkens scene)
+  if(state==='intro') drawIntro();
+
+  // Button always on top
+  drawBtn();
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+</body>
+</html>

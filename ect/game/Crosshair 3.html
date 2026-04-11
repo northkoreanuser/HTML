@@ -1,0 +1,162 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>MP5: ANNIHILATION - FIXED</title>
+<style>
+  body { margin:0; background:#000; overflow:hidden; cursor:none; font-family:'Courier New',monospace; }
+  canvas { display:block; filter: contrast(130%) brightness(110%); }
+  /* 스캔라인 효과 */
+  body::after {
+    content:''; position:fixed; inset:0;
+    background: repeating-linear-gradient(rgba(0,0,0,0) 0px, rgba(0,0,0,0.2) 2px, rgba(0,0,0,0) 4px);
+    pointer-events:none; z-index:100;
+  }
+  #ui {
+    position:fixed; top:30px; left:30px; color:#ff1100; font-size:14px;
+    letter-spacing:2px; text-shadow: 0 0 10px #ff1100; z-index:50;
+  }
+</style>
+</head>
+<body>
+<div id="ui">
+  >> PROTOCOL: MP5_OBLITERATION<br>
+  >> SYSTEM_STATE: <span id="st">READY</span><br>
+  >> AMMO_TYPE: 9MM_LSR_BITCRUSHED
+</div>
+<canvas id="c"></canvas>
+
+<script>
+const cvs = document.getElementById('c');
+const ctx = cvs.getContext('2d');
+const actx = new (window.AudioContext || window.webkitAudioContext)();
+
+let W, H, mx = 0, my = 0, firing = false, frame = 0, recoil = 0, shake = 0;
+let bullets = [], particles = [];
+
+const resize = () => { W = cvs.width = window.innerWidth; H = cvs.height = window.innerHeight; };
+window.onresize = resize; resize();
+
+// --- 오디오 노이즈 누적 방지 수정 부분 ---
+
+// 노이즈 버퍼를 미리 한 번만 생성하여 재사용 (메모리 효율화)
+const bufferSize = actx.sampleRate * 0.06;
+const noiseBuffer = actx.createBuffer(1, bufferSize, actx.sampleRate);
+const data = noiseBuffer.getChannelData(0);
+for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+function playShot() {
+  const now = actx.currentTime;
+  
+  // 1. 노드 생성
+  const osc = actx.createOscillator();
+  const noise = actx.createBufferSource();
+  const gainNode = actx.createGain();
+
+  // 2. 설정
+  noise.buffer = noiseBuffer;
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(220, now);
+  osc.frequency.exponentialRampToValueAtTime(30, now + 0.05);
+
+  // 피킹 방지를 위해 게인값 살짝 조정
+  gainNode.gain.setValueAtTime(0.4, now);
+  gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+  // 3. 연결
+  noise.connect(gainNode);
+  osc.connect(gainNode);
+  gainNode.connect(actx.destination);
+
+  // 4. 재생 및 자동 해제 로직
+  noise.start(now);
+  osc.start(now);
+  
+  // 명시적으로 정지시켜 노드가 활성 상태로 남지 않게 함
+  noise.stop(now + 0.1);
+  osc.stop(now + 0.1);
+  
+  // 가비지 컬렉션을 위해 일정 시간 후 노드 연결 완전 해제
+  setTimeout(() => {
+    noise.disconnect();
+    osc.disconnect();
+    gainNode.disconnect();
+  }, 200);
+}
+
+// --- 시각 효과 및 드로잉 로직 ---
+
+function spawnImpact(x, y) {
+  for(let i=0; i<8; i++) {
+    particles.push({
+      x, y, vx: (Math.random()-0.5)*20, vy: (Math.random()-0.5)*20,
+      life: 1.0, color: Math.random() > 0.5 ? '#ff1100' : '#fff'
+    });
+  }
+}
+
+function draw() {
+  frame++;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)'; 
+  ctx.fillRect(0,0,W,H);
+
+  if(firing && frame % 5 === 0) {
+    playShot();
+    recoil = 30; shake = 15;
+    bullets.push({ sx: W/2+100, sy: H, tx: mx+(Math.random()-0.5)*30, ty: my+(Math.random()-0.5)*30, life: 1 });
+    spawnImpact(mx, my);
+  }
+
+  const offX = (Math.random()-0.5)*shake;
+  const offY = (Math.random()-0.5)*shake;
+  ctx.setTransform(1, 0, 0, 1, offX, offY);
+  shake *= 0.9;
+
+  bullets.forEach((b, i) => {
+    ctx.beginPath();
+    ctx.strokeStyle = `rgba(255,255,255,${b.life})`;
+    ctx.lineWidth = 4 * b.life;
+    ctx.moveTo(b.sx, b.sy + recoil);
+    ctx.lineTo(b.tx, b.ty);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255,17,0,${b.life*0.5})`;
+    ctx.lineWidth = 10 * b.life;
+    ctx.stroke();
+
+    b.life -= 0.15;
+    if(b.life <= 0) bullets.splice(i,1);
+  });
+
+  particles.forEach((p, i) => {
+    p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 3, 3);
+    if(p.life <= 0) particles.splice(i,1);
+  });
+
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(W/2+40, H-180+recoil, 120, 300);
+  recoil *= 0.8;
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.strokeStyle = '#ff1100';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(mx, my, 15, 0, Math.PI*2);
+  ctx.moveTo(mx-25, my); ctx.lineTo(mx+25, my);
+  ctx.moveTo(mx, my-25); ctx.lineTo(mx, my+25);
+  ctx.stroke();
+
+  requestAnimationFrame(draw);
+}
+
+window.onmousedown = () => { if(actx.state==='suspended') actx.resume(); firing = true; document.getElementById('st').innerText='ANNIHILATING'; };
+window.onmouseup = () => { firing = false; document.getElementById('st').innerText='READY'; };
+window.onmousemove = e => { mx = e.clientX; my = e.clientY; };
+
+draw();
+</script>
+</body>
+</html>
