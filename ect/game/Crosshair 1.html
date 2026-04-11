@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MP5 GENOCIDE SIMULATOR</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; cursor: crosshair; }
+        #hud {
+            position: fixed; top: 20px; left: 20px;
+            color: #ff1100; font-family: 'Courier New', monospace;
+            font-size: 18px; pointer-events: none; letter-spacing: 2px;
+        }
+        /* 격발 시 화면 흔들림 효과를 위한 캔버스 설정 */
+        canvas { display: block; filter: contrast(120%) brightness(110%); }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        MODEL: MP5-TERROR<br>
+        MODE: FULL-AUTO<br>
+        STATUS: <span id="st">IDLE</span>
+    </div>
+    <canvas id="c"></canvas>
+
+<script>
+    const cvs = document.getElementById('c');
+    const c = cvs.getContext('2d');
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    let isFiring = false;
+    let bullets = [];
+    let frame = 0;
+    let shake = 0;
+    let mouseX = 0, mouseY = 0;
+
+    // 1. MP5 연사음 (8-bit 하드코어 버전)
+    function playShot() {
+        const osc = actx.createOscillator();
+        const noise = actx.createBufferSource();
+        const g = actx.createGain();
+        const filter = actx.createBiquadFilter();
+
+        // 거친 화이트 노이즈
+        const b = actx.createBuffer(1, actx.sampleRate * 0.05, actx.sampleRate);
+        const d = b.getChannelData(0);
+        for (let i = 0; i < b.length; i++) d[i] = Math.random() * 2 - 1;
+
+        noise.buffer = b;
+        osc.type = 'square'; // 레트로한 사각파
+        osc.frequency.setValueAtTime(180, actx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, actx.currentTime + 0.05);
+
+        filter.type = 'lowpass';
+        filter.frequency.value = 2000;
+
+        g.gain.setValueAtTime(0.3, actx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + 0.05);
+
+        noise.connect(filter); osc.connect(filter);
+        filter.connect(g); g.connect(actx.destination);
+
+        noise.start(); osc.start();
+        noise.stop(actx.currentTime + 0.05); osc.stop(actx.currentTime + 0.05);
+    }
+
+    // 2. 레이저 총알 생성
+    function fireBullet() {
+        playShot();
+        shake = 15; // 연사 시 반동 효과
+        bullets.push({
+            x: window.innerWidth / 2, // 화면 하단 중앙(총구 위치)
+            y: window.innerHeight,
+            tx: mouseX + (Math.random()-0.5)*20, // 탄착군 형성 (분산)
+            ty: mouseY + (Math.random()-0.5)*20,
+            life: 1.0
+        });
+    }
+
+    function update() {
+        cvs.width = window.innerWidth; cvs.height = window.innerHeight;
+        frame++;
+
+        // 연사 로직 (꾹 누르면 5프레임마다 발사)
+        if (isFiring && frame % 5 === 0) fireBullet();
+
+        // 화면 흔들림
+        let sx = (Math.random()-0.5) * shake;
+        let sy = (Math.random()-0.5) * shake;
+        c.setTransform(1, 0, 0, 1, sx, sy);
+        if(shake > 0) shake *= 0.8;
+
+        // 배경 처리 (잔상 효과)
+        c.fillStyle = 'rgba(0,0,0,0.3)';
+        c.fillRect(-100, -100, cvs.width+200, cvs.height+200);
+
+        // 레이저 궤적 그리기
+        bullets.forEach((b, i) => {
+            c.beginPath();
+            c.strokeStyle = `rgba(255, 17, 0, ${b.life})`;
+            c.lineWidth = 2;
+            c.moveTo(b.x, b.y);
+            c.lineTo(b.tx, b.ty);
+            c.stroke();
+            
+            // 탄착점 불꽃
+            c.fillStyle = '#fff';
+            c.fillRect(b.tx-2, b.ty-2, 4, 4);
+
+            b.life -= 0.1; // 궤적 사라짐 속도
+            if (b.life <= 0) bullets.splice(i, 1);
+        });
+
+        requestAnimationFrame(update);
+    }
+
+    // 마우스 이벤트 핸들러
+    window.onmousedown = (e) => {
+        if (actx.state === 'suspended') actx.resume();
+        isFiring = true;
+        document.getElementById('st').innerText = 'FIRING';
+        document.getElementById('st').style.color = '#fff';
+    };
+    window.onmouseup = () => {
+        isFiring = false;
+        document.getElementById('st').innerText = 'IDLE';
+        document.getElementById('st').style.color = '#ff1100';
+    };
+    window.onmousemove = (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+    };
+
+    update();
+</script>
+</body>
+</html>
