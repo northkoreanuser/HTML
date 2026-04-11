@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TERRORCORE</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#fff;font-family:'IBM Plex Mono',monospace;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+canvas{position:fixed;inset:0;z-index:0}
+.ui{position:relative;z-index:10;text-align:center;width:100%;max-width:600px;padding:0 1rem}
+.title{font-size:clamp(32px,8vw,72px);font-weight:500;letter-spacing:-0.03em;line-height:1;margin-bottom:4px;transition:color 0.03s}
+.title.hit{color:#ff1100}
+.section-name{font-size:11px;letter-spacing:0.2em;color:#333;margin-bottom:2rem;min-height:16px;transition:color 0.3s}
+.section-name.active{color:#ff1100}
+.timeline{width:100%;height:4px;background:#111;border-radius:2px;margin-bottom:1.5rem;position:relative;overflow:hidden}
+.timeline-bar{height:100%;background:#ff1100;width:0%;transition:width 0.1s linear;border-radius:2px}
+.timeline-markers{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.marker{position:absolute;top:0;width:1px;height:100%;background:#333}
+.time-display{display:flex;justify-content:space-between;font-size:10px;color:#333;margin-bottom:1.5rem;letter-spacing:0.05em}
+.step-rows{display:flex;flex-direction:column;gap:4px;margin-bottom:1.5rem}
+.step-row{display:flex;gap:2px;align-items:center}
+.row-label{font-size:9px;color:#333;letter-spacing:0.08em;width:36px;text-align:right;padding-right:6px;flex-shrink:0}
+.step-grid{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;flex:1}
+.step{height:5px;background:#111;border-radius:1px;transition:background 0.03s}
+.step.on{background:#333}
+.step.cur{background:#ff1100}
+.step.cur.on{background:#ff4422}
+.controls{display:flex;gap:10px;justify-content:center;margin-bottom:1rem}
+.btn{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.12em;padding:10px 24px;background:transparent;border:1px solid #333;color:#555;cursor:pointer;transition:all 0.1s}
+.btn:hover{border-color:#fff;color:#fff}
+.btn.primary{border-color:#fff;color:#fff}
+.btn.primary:hover{background:#fff;color:#000}
+.btn.primary.playing{border-color:#ff1100;color:#ff1100}
+.btn.primary.playing:hover{background:#ff1100;color:#000}
+.intensity{display:flex;gap:3px;justify-content:center;margin-bottom:0.5rem}
+.int-block{width:8px;height:8px;background:#111;border-radius:1px;transition:background 0.05s}
+.int-block.on{background:#ff1100}
+.info{font-size:9px;color:#222;letter-spacing:0.08em}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="ui">
+  <div class="title" id="title">TERRORCORE</div>
+  <div class="section-name" id="secName">READY</div>
+  <div class="timeline">
+    <div class="timeline-bar" id="tlBar"></div>
+    <div class="timeline-markers" id="tlMarkers"></div>
+  </div>
+  <div class="time-display">
+    <span id="timeElapsed">0:00</span>
+    <span id="sectionInfo">—</span>
+    <span>3:00</span>
+  </div>
+  <div class="step-rows" id="stepRows"></div>
+  <div class="intensity" id="intensity"></div>
+  <div class="controls">
+    <button class="btn primary" id="playBtn">PLAY</button>
+  </div>
+  <div class="info" id="info">220 BPM · WEB AUDIO API</div>
+</div>
+
+<script>
+const BPM = 220;
+const STEP = 60 / BPM / 4;
+const TOTAL = 180; // 3분
+
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+// master chain
+const comp = ctx.createDynamicsCompressor();
+comp.threshold.value = -8; comp.knee.value = 3;
+comp.ratio.value = 20; comp.attack.value = 0.001; comp.release.value = 0.08;
+const mg = ctx.createGain(); mg.gain.value = 0.9;
+mg.connect(comp); comp.connect(ctx.destination);
+
+const analyser = ctx.createAnalyser();
+analyser.fftSize = 1024;
+comp.connect(analyser);
+
+// distortion helper
+function mkCurve(amt) {
+  const c = new Float32Array(512);
+  for (let i=0;i<512;i++) { const x=(i*2)/512-1; c[i]=Math.tanh(x*amt); }
+  return c;
+}
+
+function noise(dur) {
+  const b = ctx.createBuffer(1, ctx.sampleRate*dur, ctx.sampleRate);
+  const d = b.getChannelData(0);
+  for (let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+  return b;
+}
+const noiseBuf = noise(1.0);
+
+// ── 사운드 합성 ──
+
+function kick(t, intensity=1) {
+  // body
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  const d = ctx.createWaveShaper();
+  d.curve = mkCurve(4 + intensity*6);
+  o.frequency.setValueAtTime(200+intensity*60, t);
+  o.frequency.exponentialRampToValueAtTime(30, t+0.15);
+  g.gain.setValueAtTime(1.6*intensity, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t+0.22);
+  o.connect(d); d.connect(g); g.connect(mg);
+  o.start(t); o.stop(t+0.25);
+  // click
+  const oc = ctx.createOscillator();
+  const gc = ctx.createGain();
+  oc.frequency.value = 3000;
+  gc.gain.setValueAtTime(0.5*intensity, t);
+  gc.gain.exponentialRampToValueAtTime(0.001, t+0.01);
+  oc.connect(gc).connect(mg);
+  oc.start(t); oc.stop(t+0.012);
+  // sub
+  const os = ctx.createOscillator();
+  const gs = ctx.createGain();
+  os.frequency.setValueAtTime(60, t);
+  os.frequency.exponentialRampToValueAtTime(28, t+0.1);
+  gs.gain.setValueAtTime(0.8*intensity, t);
+  gs.gain.exponentialRampToValueAtTime(0.001, t+0.18);
+  os.connect(gs).connect(mg);
+  os.start(t); os.stop(t+0.2);
+}
+
+function snare(t, intensity=1) {
+  const ns = ctx.createBufferSource();
+  ns.buffer = noiseBuf;
+  const hpf = ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=1600;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(1.0*intensity, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t+0.16);
+  ns.connect(hpf).connect(g).connect(mg);
+  ns.start(t); ns.stop(t+0.18);
+  // tone
+  const ot = ctx.createOscillator();
+  const gt = ctx.createGain();
+  ot.frequency.value = 180;
+  gt.gain.setValueAtTime(0.4*intensity, t);
+  gt.gain.exponentialRampToValueAtTime(0.001, t+0.07);
+  ot.connect(gt).connect(mg);
+  ot.start(t); ot.stop(t+0.08);
+}
+
+function hat(t, open=false, intensity=1) {
+  const ns = ctx.createBufferSource();
+  ns.buffer = noiseBuf;
+  const hpf = ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=8000;
+  const bpf = ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=10000; bpf.Q.value=0.5;
+  const g = ctx.createGain();
+  const dur = open ? 0.09 : 0.022;
+  g.gain.setValueAtTime(0.3*intensity, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+  ns.connect(hpf).connect(bpf).connect(g).connect(mg);
+  ns.start(t); ns.stop(t+dur+0.01);
+}
+
+function bass(t, note, dur, intensity=1, distAmt=3) {
+  const freqs = [55, 41.2, 43.65, 46.25, 49, 51.91, 36.71, 32.7];
+  const freq = freqs[note % freqs.length];
+  const o1 = ctx.createOscillator(); o1.type='sawtooth'; o1.frequency.value=freq;
+  const o2 = ctx.createOscillator(); o2.type='square'; o2.frequency.value=freq*1.5;
+  const flt = ctx.createBiquadFilter(); flt.type='lowpass'; flt.Q.value=10;
+  flt.frequency.setValueAtTime(600+intensity*300, t);
+  flt.frequency.exponentialRampToValueAtTime(150, t+dur*0.8);
+  const dist = ctx.createWaveShaper(); dist.curve=mkCurve(distAmt+intensity*2);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.55*intensity, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+  o1.connect(flt); o2.connect(flt);
+  flt.connect(dist).connect(g).connect(mg);
+  o1.start(t); o2.start(t); o1.stop(t+dur); o2.stop(t+dur);
+}
+
+function acid(t, note, dur, intensity=1) {
+  const freqs = [110, 82.41, 87.31, 92.5, 98, 103.83, 73.42, 65.41];
+  const freq = freqs[note % freqs.length];
+  const o = ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=freq;
+  const flt = ctx.createBiquadFilter(); flt.type='lowpass'; flt.Q.value=18;
+  flt.frequency.setValueAtTime(200, t);
+  flt.frequency.exponentialRampToValueAtTime(2000+intensity*1000, t+dur*0.3);
+  flt.frequency.exponentialRampToValueAtTime(300, t+dur);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.3*intensity, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t+dur);
+  o.connect(flt).connect(g).connect(mg);
+  o.start(t); o.stop(t+dur);
+}
+
+function pad(t, note, dur, intensity=1) {
+  const freqs = [130.81, 110, 116.54, 123.47, 130.81, 98, 103.83];
+  const freq = freqs[note % freqs.length];
+  for (let i=0;i<3;i++) {
+    const o = ctx.createOscillator();
+    o.type = i===0 ? 'sine' : 'triangle';
+    o.frequency.value = freq * (i===1 ? 2 : i===2 ? 0.5 : 1) * (1 + (Math.random()-0.5)*0.005);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.08*intensity, t+0.1);
+    g.gain.setValueAtTime(0.08*intensity, t+dur-0.1);
+    g.gain.linearRampToValueAtTime(0, t+dur);
+    o.connect(g).connect(mg);
+    o.start(t); o.stop(t+dur);
+  }
+}
+
+function riser(t, dur) {
+  const o = ctx.createOscillator(); o.type='sawtooth';
+  const flt = ctx.createBiquadFilter(); flt.type='lowpass';
+  const g = ctx.createGain();
+  o.frequency.setValueAtTime(60, t);
+  o.frequency.exponentialRampToValueAtTime(800, t+dur);
+  flt.frequency.setValueAtTime(200, t);
+  flt.frequency.exponentialRampToValueAtTime(4000, t+dur);
+  flt.Q.value = 5;
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.3, t+dur*0.7);
+  g.gain.linearRampToValueAtTime(0, t+dur);
+  o.connect(flt).connect(g).connect(mg);
+  o.start(t); o.stop(t+dur);
+}
+
+function drop(t) {
+  const ns = ctx.createBufferSource(); ns.buffer=noiseBuf;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.6, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t+0.4);
+  ns.connect(g).connect(mg);
+  ns.start(t); ns.stop(t+0.5);
+}
+
+function clap(t, intensity=1) {
+  for (let i=0;i<3;i++) {
+    const delay = i*0.012;
+    const ns = ctx.createBufferSource(); ns.buffer=noiseBuf;
+    const bpf = ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=1200; bpf.Q.value=0.7;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.6*intensity, t+delay);
+    g.gain.exponentialRampToValueAtTime(0.001, t+delay+0.05);
+    ns.connect(bpf).connect(g).connect(mg);
+    ns.start(t+delay); ns.stop(t+delay+0.06);
+  }
+}
+
+// ── 섹션 정의 ──
+// bars = 16 steps = 1 bar
+// STEP * 16 = 1 bar duration
+
+const S = STEP; // 1 step
+const BAR = S * 16;
+
+/*
+ 섹션 구성 (3분 = ~220bpm 기준 약 137bar)
+ [0]   INTRO          0:00 - 0:16  (16bar) — 느린 빌드업, 킥 없음
+ [1]   BUILD_1       0:16 - 0:32  (16bar) — 킥 시작, 미니멀
+ [2]   DROP_1        0:32 - 1:00  (28bar) — 풀 드롭, 테러베이스
+ [3]   BREAKDOWN     1:00 - 1:16  (16bar) — 브레이크다운, 패드
+ [4]   BUILD_2       1:16 - 1:24  (8bar)  — 강도 상승
+ [5]   DROP_2        1:24 - 1:52  (28bar) — 더 강한 드롭, 에시드
+ [6]   CHAOS         1:52 - 2:08  (16bar) — 카오틱 변주
+ [7]   BUILD_3       2:08 - 2:16  (8bar)  — 최종 빌드
+ [8]   FINAL_DROP    2:16 - 2:52  (36bar) — 최대 강도
+ [9]   OUTRO         2:52 - 3:00  (8bar)  — 아웃트로
+*/
+
+const SECTIONS = [
+  { name:'INTRO',      start:0,         bars:16, bpmMult:1   },
+  { name:'BUILD I',    start:16,        bars:16, bpmMult:1   },
+  { name:'DROP I',     start:32,        bars:28, bpmMult:1   },
+  { name:'BREAKDOWN',  start:60,        bars:16, bpmMult:1   },
+  { name:'BUILD II',   start:76,        bars:8,  bpmMult:1   },
+  { name:'DROP II',    start:84,        bars:28, bpmMult:1   },
+  { name:'CHAOS',      start:112,       bars:16, bpmMult:1   },
+  { name:'BUILD III',  start:128,       bars:8,  bpmMult:1   },
+  { name:'FINAL DROP', start:136,       bars:36, bpmMult:1   },
+  { name:'OUTRO',      start:172,       bars:8,  bpmMult:1   },
+];
+
+// 섹션별 타임라인 마커 표시
+function setupMarkers() {
+  const totalBars = 180;
+  const m = document.getElementById('tlMarkers');
+  SECTIONS.forEach(sec => {
+    const pct = sec.start / totalBars * 100;
+    const el = document.createElement('div');
+    el.className = 'marker';
+    el.style.left = pct + '%';
+    m.appendChild(el);
+  });
+}
+setupMarkers();
+
+// ── 스텝 그리드 UI ──
+const ROWS = ['KICK','SNARE','HAT','BASS'];
+const rowEls = {};
+const stepEls = {};
+const stepRows = document.getElementById('stepRows');
+ROWS.forEach(r => {
+  const row = document.createElement('div'); row.className='step-row';
+  const lbl = document.createElement('div'); lbl.className='row-label'; lbl.textContent=r;
+  const grid = document.createElement('div'); grid.className='step-grid'; grid.id='grid-'+r;
+  for (let i=0;i<16;i++) {
+    const s = document.createElement('div'); s.className='step'; s.id=r+'-'+i;
+    grid.appendChild(s);
+  }
+  row.appendChild(lbl); row.appendChild(grid);
+  stepRows.appendChild(row);
+  rowEls[r] = grid;
+});
+
+// 인텐시티 바
+const intEl = document.getElementById('intensity');
+for (let i=0;i<16;i++) {
+  const b = document.createElement('div'); b.className='int-block'; b.id='ib'+i;
+  intEl.appendChild(b);
+}
+
+// ── 스케줄러 ──
+let playing = false;
+let startAudioTime = 0;
+let startWallTime = 0;
+let schedulerId = null;
+let scheduledUntil = 0;
+let currentStepIndex = 0; // 전체 스텝 인덱스
+
+// 전체 스텝 수 계산
+const TOTAL_BARS = 180;
+const TOTAL_STEPS = TOTAL_BARS * 16;
+
+// 현재 섹션 가져오기
+function getSection(barIdx) {
+  for (let i=SECTIONS.length-1;i>=0;i--) {
+    if (barIdx >= SECTIONS[i].start) return SECTIONS[i];
+  }
+  return SECTIONS[0];
+}
+
+// 섹션별 패턴 생성
+function getPattern(barIdx, stepInBar) {
+  const sec = getSection(barIdx);
+  const barInSec = barIdx - sec.start;
+  const s = stepInBar;
+  const pat = {kick:0,snare:0,hat:0,bass:-1,acid:-1,pad:-1,clap:0};
+
+  switch(sec.name) {
+    case 'INTRO': {
+      // 라이저만 + 간간이 하이햇
+      if (s%4===0 && barInSec>4) pat.hat=1;
+      if (barInSec>8 && s%8===0) pat.pad=0;
+      if (barInSec===15 && s===15) pat.kick=1; // 마지막 킥 예고
+      break;
+    }
+    case 'BUILD I': {
+      if (barInSec<4) {
+        if (s%16===0) pat.kick=1;
+      } else if (barInSec<8) {
+        if (s%8===0) pat.kick=1;
+        if (s%4===0) pat.hat=1;
+      } else if (barInSec<12) {
+        if (s%4===0) pat.kick=1;
+        if (s%2===0) pat.hat=1;
+        if (s===8) pat.snare=1;
+      } else {
+        if (s%4===0) pat.kick=1;
+        if (s%2===0) pat.hat=1;
+        if ([4,8,12].includes(s)) pat.snare=1;
+        if (s%4===0) pat.bass=barInSec%4;
+      }
+      break;
+    }
+    case 'DROP I': {
+      // 4-on-floor 킥 + 오프비트 스네어 + 빠른 하이햇 + 테러베이스
+      const kickP = [1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0];
+      const snrP  = [0,0,0,0,1,0,0,1,0,0,0,0,1,0,1,0];
+      const hatP  = [1,1,0,1,1,1,0,1,1,1,0,1,1,1,1,1];
+      const bassP = [
+        [0,0,2,0,0,1,0,0,2,0,0,1,0,2,0,0],
+        [1,0,0,2,0,1,0,0,1,0,2,0,0,0,1,0],
+        [2,0,1,0,2,0,0,1,0,2,0,1,0,0,2,0],
+        [0,1,0,2,1,0,2,0,0,1,2,0,1,0,0,2],
+      ];
+      pat.kick  = kickP[s];
+      pat.snare = snrP[s];
+      pat.hat   = hatP[s];
+      const bRow = bassP[barInSec%4];
+      if (bRow[s]>0) pat.bass = (barInSec%6) + bRow[s];
+      // 변주: 8bar마다 클랩 추가
+      if (barInSec>=8 && [4,12].includes(s)) pat.clap=1;
+      // 변주: 16bar 이후 에시드 추가
+      if (barInSec>=16 && bRow[s]>0) pat.acid = (barInSec%4)+bRow[s];
+      break;
+    }
+    case 'BREAKDOWN': {
+      // 킥 없음, 패드 + 에시드 글리치
+      if (s%8===0 && barInSec>2) pat.pad = barInSec%4;
+      if ([1,5,9,13].includes(s) && barInSec%2===1) pat.acid = barInSec%5;
+      if (barInSec>12 && s%4===0) pat.hat=1;
+      if (barInSec===15) {
+        if (s%4===0) pat.kick=1;
+        if (s%2===0) pat.hat=1;
+      }
+      break;
+    }
+    case 'BUILD II': {
+      // 압축된 빌드
+      const intensity = barInSec/8;
+      if (s%4===0) pat.kick=1;
+      if (s%2===0) pat.hat=1;
+      if ([4,8,12].includes(s)) pat.snare=1;
+      if (s%4===0) pat.bass=barInSec%5;
+      if (barInSec>4 && s%4===2) pat.clap=1;
+      break;
+    }
+    case 'DROP II': {
+      // 더 공격적인 드롭 + 에시드라인
+      const kickP2 = [1,0,1,0,1,0,0,1,1,0,0,0,1,0,1,0];
+      const snrP2  = [0,0,0,1,0,0,1,0,0,1,0,0,0,1,0,1];
+      const hatP2  = [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1];
+      const bassP2 = [
+        [1,0,2,0,1,0,0,2,1,0,2,0,0,1,0,2],
+        [2,1,0,2,0,2,1,0,2,0,1,2,0,2,1,0],
+        [0,2,1,0,2,1,0,2,0,2,1,0,2,0,2,1],
+        [1,0,0,2,1,0,2,0,1,2,0,1,0,2,0,1],
+      ];
+      pat.kick  = kickP2[s];
+      pat.snare = snrP2[s];
+      pat.hat   = hatP2[s];
+      const bRow2 = bassP2[barInSec%4];
+      if (bRow2[s]>0) pat.bass=(barInSec%7)+bRow2[s];
+      if (bRow2[s]>0) pat.acid=(barInSec%5)+bRow2[s];
+      if ([0,4,8,12].includes(s)) pat.clap=barInSec>8?1:0;
+      break;
+    }
+    case 'CHAOS': {
+      // 불규칙 카오스 패턴
+      const chaosPats = [
+        {k:[1,1,0,1,0,1,1,0,1,0,1,0,1,1,0,1], s:[0,1,0,0,1,0,1,0,0,1,0,1,0,0,1,0]},
+        {k:[1,0,1,1,0,0,1,0,1,1,0,1,0,1,1,0], s:[0,0,1,0,0,1,0,1,0,0,1,0,1,0,0,1]},
+        {k:[1,1,1,0,1,0,0,1,0,1,1,0,1,0,1,1], s:[0,1,0,1,0,0,1,0,1,0,0,1,0,1,0,0]},
+        {k:[0,1,1,0,1,1,0,1,0,1,0,1,1,0,1,0], s:[1,0,0,1,0,1,0,0,1,0,1,0,0,1,0,1]},
+      ];
+      const cp = chaosPats[barInSec%4];
+      pat.kick  = cp.k[s];
+      pat.snare = cp.s[s];
+      pat.hat   = 1; // 모든 스텝 하이햇
+      const bassNotes = [0,2,1,3,2,0,3,1,0,2,3,1,2,0,1,3];
+      if (barInSec%2===0 ? cp.k[s] : cp.s[s]) pat.bass=bassNotes[s];
+      if (s%3===0) pat.acid=barInSec%6;
+      if (cp.k[s] && cp.s[s]) pat.clap=1; // 킥+스네어 동시 = 클랩
+      break;
+    }
+    case 'BUILD III': {
+      // 최종 빌드 — 모든 요소
+      if (s%4===0) pat.kick=1;
+      if (s%2===0) pat.hat=1;
+      if ([0,4,8,12].includes(s)) pat.snare=1;
+      if ([0,4,8,12].includes(s)) pat.clap=1;
+      pat.bass=barInSec%5;
+      if (s%3===0) pat.acid=barInSec%4;
+      if (s%8===0) pat.pad=0;
+      break;
+    }
+    case 'FINAL DROP': {
+      // 최대 강도 — 모든 트랙 풀 가동
+      const kickF = [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0];
+      const snrF  = [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1];
+      const bassF = [
+        [1,2,0,1,2,0,1,0,2,1,0,2,1,0,1,2],
+        [2,0,1,2,0,2,0,1,0,2,1,0,2,1,2,0],
+        [0,1,2,0,1,0,2,1,2,0,2,1,0,2,0,1],
+        [1,2,1,0,2,1,0,2,1,2,0,1,2,0,1,2],
+      ];
+      pat.kick  = kickF[s];
+      pat.snare = snrF[s];
+      pat.hat   = 1;
+      const bRowF = bassF[barInSec%4];
+      if (bRowF[s]>0) pat.bass=(barInSec%8)+bRowF[s];
+      if (bRowF[s]>0) pat.acid=(barInSec%6)+bRowF[s];
+      if (s%4===0) pat.clap=1;
+      // 변주: 12bar 이후 더블 킥
+      if (barInSec>=12 && s%2===0) pat.kick=1;
+      // 변주: 24bar 이후 더블 스네어
+      if (barInSec>=24 && snrF[s]) { pat.snare=1; pat.clap=1; }
+      break;
+    }
+    case 'OUTRO': {
+      // 점점 소멸
+      const decay = 1 - barInSec/8;
+      if (s%4===0 && Math.random()<decay) pat.kick=1;
+      if (s===8 && Math.random()<decay) pat.snare=1;
+      if (s%2===0 && Math.random()<decay*0.7) pat.hat=1;
+      if (s%8===0 && barInSec<4) pat.bass=0;
+      break;
+    }
+  }
+  return pat;
+}
+
+// 강도 계산
+function getIntensity(barIdx) {
+  const sec = getSection(barIdx);
+  const map = {
+    'INTRO':0.1,'BUILD I':0.3,'DROP I':0.8,'BREAKDOWN':0.2,
+    'BUILD II':0.5,'DROP II':0.9,'CHAOS':0.95,'BUILD III':0.7,
+    'FINAL DROP':1.0,'OUTRO':0.2
+  };
+  return map[sec.name] || 0.5;
+}
+
+// ── 스케줄 루프 ──
+let curStepDisp = 0;
+const stepTimes = new Array(16).fill(0);
+
+function scheduleNote(stepIdx, audioTime) {
+  const barIdx = Math.floor(stepIdx / 16);
+  const stepInBar = stepIdx % 16;
+  if (barIdx >= TOTAL_BARS) return;
+
+  const pat = getPattern(barIdx, stepInBar);
+  const intens = getIntensity(barIdx);
+  const sec = getSection(barIdx);
+
+  // 라이저 — 섹션 시작 시
+  if (stepInBar === 0) {
+    const barInSec = barIdx - sec.start;
+    if ((sec.name === 'BUILD I' && barInSec === 0) ||
+        (sec.name === 'BUILD II' && barInSec === 0) ||
+        (sec.name === 'BUILD III' && barInSec === 0)) {
+      riser(audioTime, BAR * 8);
+    }
+    if (['DROP I','DROP II','FINAL DROP'].includes(sec.name) && barInSec === 0) {
+      drop(audioTime);
+    }
+  }
+
+  if (pat.kick)        kick(audioTime, intens);
+  if (pat.snare)       snare(audioTime, intens);
+  if (pat.hat)         hat(audioTime, stepInBar%8===4, intens*0.8);
+  if (pat.bass >= 0)   bass(audioTime, pat.bass, S*1.8, intens);
+  if (pat.acid >= 0)   acid(audioTime, pat.acid, S*1.5, intens*0.7);
+  if (pat.pad >= 0)    pad(audioTime, pat.pad, BAR*0.9, intens*0.5);
+  if (pat.clap)        clap(audioTime, intens*0.8);
+
+  stepTimes[stepInBar] = audioTime;
+}
+
+function scheduleLoop() {
+  const lookahead = 0.12;
+  const now = ctx.currentTime;
+
+  while (scheduledUntil < now + lookahead && currentStepIndex < TOTAL_STEPS) {
+    const t = startAudioTime + currentStepIndex * S;
+    scheduleNote(currentStepIndex, t);
+    scheduledUntil = t;
+    currentStepIndex++;
+  }
+
+  if (currentStepIndex >= TOTAL_STEPS) {
+    stop();
+    return;
+  }
+  schedulerId = setTimeout(scheduleLoop, 20);
+}
+
+// ── UI 업데이트 ──
+const fData = new Uint8Array(analyser.frequencyBinCount);
+let lastBar = -1;
+let lastSec = '';
+
+function updateUI() {
+  if (!playing) return;
+  requestAnimationFrame(updateUI);
+
+  const elapsed = ctx.currentTime - startAudioTime;
+  if (elapsed < 0) return;
+
+  const pct = Math.min(elapsed / (TOTAL_STEPS * S), 1) * 100;
+  document.getElementById('tlBar').style.width = pct + '%';
+
+  const totalSec = elapsed;
+  const m = Math.floor(totalSec / 60);
+  const s = Math.floor(totalSec % 60);
+  document.getElementById('timeElapsed').textContent = m + ':' + String(s).padStart(2,'0');
+
+  const barIdx = Math.floor(elapsed / BAR);
+  const stepInBar = Math.floor((elapsed % BAR) / S) % 16;
+  const sec = getSection(barIdx);
+
+  // 섹션 변경
+  if (sec.name !== lastSec) {
+    lastSec = sec.name;
+    const sn = document.getElementById('secName');
+    sn.textContent = sec.name;
+    sn.classList.add('active');
+    setTimeout(() => sn.classList.remove('active'), 800);
+    document.getElementById('sectionInfo').textContent = sec.name;
+  }
+
+  // 스텝 그리드 업데이트
+  if (barIdx !== lastBar) {
+    lastBar = barIdx;
+    ROWS.forEach(r => {
+      for (let i=0;i<16;i++) {
+        const el = document.getElementById(r+'-'+i);
+        if (!el) return;
+        el.classList.remove('on');
+        const pat = getPattern(barIdx, i);
+        const on = (r==='KICK'&&pat.kick)||(r==='SNARE'&&pat.snare)||(r==='HAT'&&pat.hat)||(r==='BASS'&&pat.bass>=0);
+        if (on) el.classList.add('on');
+      }
+    });
+    // 인텐시티 바
+    const intens = getIntensity(barIdx);
+    const onCount = Math.round(intens * 16);
+    for (let i=0;i<16;i++) {
+      document.getElementById('ib'+i).classList.toggle('on', i<onCount);
+    }
+  }
+
+  // 현재 스텝 하이라이트
+  for (let i=0;i<16;i++) {
+    ROWS.forEach(r => {
+      const el = document.getElementById(r+'-'+i);
+      if (el) el.classList.toggle('cur', i===stepInBar);
+    });
+  }
+
+  // 킥 플래시
+  if (stepInBar === 0 || (elapsed > 0 && Math.floor((elapsed-0.001)/S)!==Math.floor(elapsed/S))) {
+    const pat = getPattern(barIdx, stepInBar);
+    if (pat.kick) {
+      const t = document.getElementById('title');
+      t.classList.add('hit');
+      setTimeout(()=>t.classList.remove('hit'), 60);
+    }
+  }
+}
+
+// ── 비주얼라이저 ──
+const canvas = document.getElementById('cv');
+const c = canvas.getContext('2d');
+function resize(){ canvas.width=innerWidth; canvas.height=innerHeight; }
+resize(); window.addEventListener('resize',resize);
+
+function draw() {
+  requestAnimationFrame(draw);
+  analyser.getByteFrequencyData(fData);
+  c.fillStyle='rgba(0,0,0,0.18)';
+  c.fillRect(0,0,canvas.width,canvas.height);
+  const bw = canvas.width / fData.length;
+  for (let i=0;i<fData.length;i++) {
+    const v = fData[i]/255;
+    const h = v * canvas.height * 0.55;
+    const r = Math.floor(200+v*55);
+    const g2 = Math.floor(v*30);
+    c.fillStyle = `rgb(${r},${g2},0)`;
+    c.fillRect(i*bw, canvas.height-h, Math.max(bw-1,0.5), h);
+  }
+}
+draw();
+
+// ── 컨트롤 ──
+function stop() {
+  playing = false;
+  clearTimeout(schedulerId);
+  document.getElementById('playBtn').textContent='PLAY';
+  document.getElementById('playBtn').classList.remove('playing');
+  document.getElementById('secName').textContent='DONE';
+  document.getElementById('tlBar').style.width='100%';
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  ctx.resume();
+  if (!playing) {
+    playing = true;
+    currentStepIndex = 0;
+    startAudioTime = ctx.currentTime + 0.1;
+    scheduledUntil = startAudioTime;
+    lastBar = -1; lastSec = '';
+    scheduleLoop();
+    updateUI();
+    document.getElementById('playBtn').textContent='STOP';
+    document.getElementById('playBtn').classList.add('playing');
+    document.getElementById('secName').textContent='INTRO';
+    document.getElementById('info').textContent = BPM+' BPM · 3:00 · 10 SECTIONS';
+  } else {
+    stop();
+    document.getElementById('secName').textContent='STOPPED';
+    document.getElementById('timeElapsed').textContent='0:00';
+    document.getElementById('tlBar').style.width='0%';
+  }
+});
+</script>
+</body>
+</html>

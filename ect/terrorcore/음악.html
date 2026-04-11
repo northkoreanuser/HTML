@@ -1,0 +1,136 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Audio Pro Dubstep</title>
+    <style>
+        body { font-family: 'Orbitron', sans-serif; background: #050505; color: #00ffff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        #visualizer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; opacity: 0.3; }
+        button { padding: 25px 60px; font-size: 1.8rem; background: transparent; border: 4px solid #00ffff; color: #00ffff; cursor: pointer; text-transform: uppercase; letter-spacing: 5px; transition: all 0.2s; z-index: 10; box-shadow: 0 0 30px rgba(0,255,255,0.5); }
+        button:hover { background: #00ffff; color: #000; box-shadow: 0 0 60px #00ffff; }
+        .info { margin-top: 20px; font-size: 0.8rem; color: #555; }
+    </style>
+</head>
+<body>
+    <canvas id="visualizer"></canvas>
+    <h1>AGGRESSIVE 150 BPM</h1>
+    <button id="playBtn">DROP IT</button>
+    <div class="info">※ 이어폰 권장. 저음이 매우 강합니다.</div>
+
+    <script>
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        // --- 마스터 리미터/컴프레서 (소리 깨짐 방지) ---
+        const masterBus = audioCtx.createDynamicsCompressor();
+        masterBus.threshold.setValueAtTime(-10, audioCtx.currentTime);
+        masterBus.knee.setValueAtTime(40, audioCtx.currentTime);
+        masterBus.ratio.setValueAtTime(12, audioCtx.currentTime);
+        masterBus.attack.setValueAtTime(0, audioCtx.currentTime);
+        masterBus.release.setValueAtTime(0.25, audioCtx.currentTime);
+        masterBus.connect(audioCtx.destination);
+
+        function createKick(time) {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.frequency.setValueAtTime(200, time);
+            osc.frequency.exponentialRampToValueAtTime(40, time + 0.15);
+            gain.gain.setValueAtTime(1.5, time);
+            gain.gain.linearRampToValueAtTime(0, time + 0.2);
+            osc.connect(gain).connect(masterBus);
+            osc.start(time); osc.stop(time + 0.2);
+        }
+
+        function createPunchySnare(time) {
+            const noise = audioCtx.createBufferSource();
+            const buf = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.1, audioCtx.sampleRate);
+            const data = buf.getChannelData(0);
+            for(let i=0; i<buf.length; i++) data[i] = Math.random() * 2 - 1;
+            noise.buffer = buf;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = "lowpass";
+            filter.frequency.setValueAtTime(2000, time);
+
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(1, time);
+            gain.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+
+            noise.connect(filter).connect(gain).connect(masterBus);
+            noise.start(time);
+        }
+
+        function createGrowl(time, duration, speed) {
+            const carrier = audioCtx.createOscillator();
+            const modulator = audioCtx.createOscillator();
+            const modGain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+            const gain = audioCtx.createGain();
+
+            carrier.type = 'sawtooth';
+            carrier.frequency.value = 50; // 기본 베이스 주파수
+
+            modulator.type = 'sine';
+            modulator.frequency.value = speed; // LFO 속도처럼 작동
+            modGain.gain.value = 1000; // 변조 깊이 (금속성 소리)
+
+            filter.type = 'peaking';
+            filter.frequency.value = 800;
+            filter.Q.value = 10;
+            filter.gain.value = 20;
+
+            modulator.connect(modGain).connect(carrier.frequency);
+            carrier.connect(filter).connect(gain).connect(masterBus);
+
+            gain.gain.setValueAtTime(0, time);
+            gain.gain.linearRampToValueAtTime(0.4, time + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+            // 필터 휩(Sweep) 효과
+            filter.frequency.exponentialRampToValueAtTime(100, time + duration);
+
+            carrier.start(time);
+            modulator.start(time);
+            carrier.stop(time + duration);
+            modulator.stop(time + duration);
+        }
+
+        document.getElementById('playBtn').addEventListener('click', () => {
+            audioCtx.resume();
+            const bpm = 150;
+            const step = 60 / bpm / 4; // 16비트 기준
+            const startTime = audioCtx.currentTime + 0.5;
+
+            for (let i = 0; i < 480; i++) { // 약 1분 분량
+                const time = startTime + (i * step);
+                
+                // 1. 드럼 패턴 (Aggressive Half-time)
+                if (i % 16 === 0) createKick(time);
+                if (i % 16 === 8) createPunchySnare(time);
+                
+                // 2. 하이햇 (16분 음표 롤)
+                if (i % 2 === 0) {
+                    const hGain = audioCtx.createGain();
+                    const hOsc = audioCtx.createOscillator();
+                    hOsc.type = 'square';
+                    hOsc.frequency.value = 10000;
+                    hGain.gain.setValueAtTime(0.05, time);
+                    hGain.gain.linearRampToValueAtTime(0, time + 0.02);
+                    hOsc.connect(hGain).connect(masterBus);
+                    hOsc.start(time); hOsc.stop(time + 0.02);
+                }
+
+                // 3. 메인 드롭 베이스 (복잡한 리듬 변주)
+                if (i >= 32) { // 2마디 이후부터 드롭 시작
+                    const pattern = i % 32;
+                    if ([0, 3, 6, 10, 16, 19, 24, 27].includes(pattern)) {
+                        const speeds = [20, 40, 80, 10, 60];
+                        const randomSpeed = speeds[Math.floor(Math.random() * speeds.length)];
+                        createGrowl(time, step * 2, randomSpeed);
+                    }
+                }
+            }
+            document.getElementById('playBtn').innerText = "PLAYING...";
+        });
+    </script>
+</body>
+</html>

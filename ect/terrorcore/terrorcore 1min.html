@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TERRORCORE: ANNIHILATION</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000;color:#fff;font-family:'IBM Plex Mono',monospace;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;transition:filter 0.04s}
+  canvas{position:fixed;inset:0;z-index:0;opacity:0.82}
+  .ui{position:relative;z-index:10;text-align:center;width:100%;max-width:800px;padding:2rem;background:rgba(0,0,0,0.72);backdrop-filter:blur(5px);border:1px solid #1e1e1e}
+  .title{font-size:clamp(40px,10vw,90px);font-weight:700;letter-spacing:-0.05em;line-height:1;margin-bottom:10px;color:#fff;text-shadow:0 0 20px rgba(255,17,0,0.4);transition:all 0.04s}
+  .title.hit{color:#ff1100;transform:scale(1.06);text-shadow:0 0 60px #ff1100,0 0 120px rgba(255,17,0,0.4)}
+  .section-name{font-size:12px;letter-spacing:0.5em;color:#ff1100;margin-bottom:1.2rem;font-weight:700;min-height:18px;text-transform:uppercase}
+  .timeline{width:100%;height:6px;background:#0d0d0d;margin-bottom:0.4rem;position:relative;overflow:hidden}
+  .timeline-bar{height:100%;background:linear-gradient(90deg,#ff1100,#ff6600);width:0%;transition:width 0.06s linear;box-shadow:0 0 6px #ff1100}
+  .time-row{display:flex;justify-content:space-between;font-size:9px;color:#2a2a2a;margin-bottom:1.2rem;letter-spacing:0.05em}
+  .step-rows{display:flex;flex-direction:column;gap:4px;margin-bottom:1.4rem}
+  .step-row{display:flex;gap:3px;align-items:center}
+  .row-label{font-size:7px;color:#2a2a2a;width:40px;text-align:right;padding-right:6px;letter-spacing:0.08em}
+  .step-grid{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;flex:1}
+  .step{height:7px;background:#0c0c0c;border-radius:1px;transition:background 0.02s}
+  .step.on{background:#222}
+  .step.cur{background:#fff;box-shadow:0 0 10px #fff}
+  .step.cur.on{background:#ff1100;box-shadow:0 0 14px #ff1100}
+  .controls{margin-bottom:0.8rem}
+  .btn{font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:700;padding:14px 40px;background:#ff1100;border:none;color:#000;cursor:pointer;transition:0.1s;letter-spacing:0.12em;text-transform:uppercase}
+  .btn:hover{background:#fff;transform:scale(1.04)}
+  .btn.stop{background:transparent;color:#ff1100;border:1px solid #ff1100}
+  .btn.stop:hover{background:#ff1100;color:#000}
+  .stats{font-size:8px;color:#222;letter-spacing:0.1em;margin-bottom:0.3rem}
+  .info{font-size:8px;color:#161616;letter-spacing:0.08em}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="ui" id="uiMain">
+  <div class="title" id="title">ANNIHILATION</div>
+  <div class="section-name" id="secName">SYSTEM READY</div>
+  <div class="timeline"><div class="timeline-bar" id="tlBar"></div></div>
+  <div class="time-row">
+    <span id="timeEl">0:00</span>
+    <span id="secInfo">—</span>
+    <span>1:00</span>
+  </div>
+  <div class="step-rows" id="stepRows"></div>
+  <div class="controls">
+    <button class="btn" id="playBtn">INITIATE TERROR</button>
+  </div>
+  <div class="stats" id="stats">BAR — · —</div>
+  <div class="info">300 BPM · 1:00 · 7 SECTIONS · WEB AUDIO ENGINE</div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────────
+const BPM         = 300;
+const STEP        = 60 / BPM / 4;    // 0.05s per 16th note
+const BAR         = STEP * 16;        // 0.8s per bar
+const TOTAL_BARS  = 75;               // 75 × 0.8s = 60.0s = 1:00
+const TOTAL_STEPS = TOTAL_BARS * 16;
+
+// ── Audio Context ──────────────────────────────────────────
+const actx = new (window.AudioContext || window.webkitAudioContext)();
+const mg   = actx.createGain(); mg.gain.value = 1.4;
+const comp = actx.createDynamicsCompressor();
+comp.threshold.value = -18; comp.knee.value = 1;
+comp.ratio.value = 20; comp.attack.value = 0.0005; comp.release.value = 0.05;
+mg.connect(comp); comp.connect(actx.destination);
+
+const analyser = actx.createAnalyser(); analyser.fftSize = 512;
+comp.connect(analyser);
+
+// ── Wave shaper curves ─────────────────────────────────────
+function mkCurve(amt) {
+  const c = new Float32Array(512);
+  for (let i = 0; i < 512; i++) { const x = (i*2)/512 - 1; c[i] = Math.tanh(x * amt); }
+  return c;
+}
+function mkTerrorCurve() {
+  const c = new Float32Array(44100);
+  for (let i = 0; i < 44100; i++) {
+    const x = (i*2)/44100 - 1;
+    c[i] = Math.max(-0.9, Math.min(0.9, Math.tanh(x*100) * (Math.sin(x*10)*0.5 + 1)));
+  }
+  return c;
+}
+const normalCurve = mkCurve(8);
+const heavyCurve  = mkCurve(30);
+const terrorCurve = mkTerrorCurve();
+
+// ── Noise buffer ───────────────────────────────────────────
+const noiseBuf = actx.createBuffer(1, actx.sampleRate, actx.sampleRate);
+const nd = noiseBuf.getChannelData(0);
+for (let i = 0; i < nd.length; i++) nd[i] = Math.random()*2 - 1;
+
+// ── Instruments ────────────────────────────────────────────
+function kick(t, intens=1, hard=false) {
+  const startF = 460 + intens*80 + (hard ? 120 : 0);
+  const o = actx.createOscillator();
+  const g = actx.createGain();
+  const ds = actx.createWaveShaper();
+  ds.curve = hard ? terrorCurve : (intens > 0.8 ? heavyCurve : normalCurve);
+  o.frequency.setValueAtTime(startF, t);
+  o.frequency.exponentialRampToValueAtTime(28, t + 0.15);
+  g.gain.setValueAtTime(2.2 * intens, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+  o.connect(ds); ds.connect(g); g.connect(mg);
+  o.start(t); o.stop(t + 0.3);
+  // click transient
+  const oc = actx.createOscillator(), gc = actx.createGain();
+  oc.frequency.value = hard ? 5500 : 3200;
+  gc.gain.setValueAtTime(0.7 * intens, t);
+  gc.gain.exponentialRampToValueAtTime(0.001, t + 0.007);
+  oc.connect(gc).connect(mg); oc.start(t); oc.stop(t + 0.01);
+  // sub layer
+  const os = actx.createOscillator(), gs = actx.createGain();
+  os.frequency.setValueAtTime(55, t);
+  os.frequency.exponentialRampToValueAtTime(26, t + 0.12);
+  gs.gain.setValueAtTime(0.8 * intens, t);
+  gs.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+  os.connect(gs).connect(mg); os.start(t); os.stop(t + 0.22);
+}
+
+function snare(t, intens=1) {
+  const n = actx.createBufferSource(); n.buffer = noiseBuf;
+  const f = actx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 1600; f.Q.value = 0.8;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(1.6 * intens, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+  n.connect(f).connect(g).connect(mg); n.start(t); n.stop(t + 0.14);
+  const ot = actx.createOscillator(), gt = actx.createGain();
+  ot.frequency.value = 200;
+  gt.gain.setValueAtTime(0.35 * intens, t);
+  gt.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+  ot.connect(gt).connect(mg); ot.start(t); ot.stop(t + 0.07);
+}
+
+function hat(t, intens=1, open=false) {
+  const n = actx.createBufferSource(); n.buffer = noiseBuf;
+  const f = actx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 9000;
+  const g = actx.createGain();
+  const dur = open ? 0.08 : 0.022;
+  g.gain.setValueAtTime(0.65 * intens, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  n.connect(f).connect(g).connect(mg); n.start(t); n.stop(t + dur + 0.01);
+}
+
+function bass(t, freq, intens=1) {
+  const o1 = actx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = freq;
+  const o2 = actx.createOscillator(); o2.type = 'square';   o2.frequency.value = freq * 1.5;
+  const flt = actx.createBiquadFilter(); flt.type = 'lowpass'; flt.Q.value = 9;
+  flt.frequency.setValueAtTime(600 + intens*280, t);
+  flt.frequency.exponentialRampToValueAtTime(100, t + BAR*0.75);
+  const ds = actx.createWaveShaper(); ds.curve = heavyCurve;
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.48 * intens, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + BAR*0.9);
+  o1.connect(flt); o2.connect(flt);
+  flt.connect(ds).connect(g).connect(mg);
+  o1.start(t); o2.start(t); o1.stop(t+BAR); o2.stop(t+BAR);
+}
+
+// ── Sections ───────────────────────────────────────────────
+const SECTIONS = [
+  { name:'INTRO',        start:0,  bars:8  },
+  { name:'BUILD',        start:8,  bars:12 },
+  { name:'DROP',         start:20, bars:16 },
+  { name:'CHAOS',        start:36, bars:16 },
+  { name:'BREAKDOWN',    start:52, bars:8  },
+  { name:'FINAL TERROR', start:60, bars:12 },
+  { name:'OUTRO',        start:72, bars:3  },
+  // 8+12+16+16+8+12+3 = 75 bars = 60.0s
+];
+
+function getSection(barIdx) {
+  for (let i = SECTIONS.length-1; i >= 0; i--)
+    if (barIdx >= SECTIONS[i].start) return SECTIONS[i];
+  return SECTIONS[0];
+}
+
+function getIntensity(secName) {
+  return { 'INTRO':0.55, 'BUILD':0.75, 'DROP':1.0, 'CHAOS':1.15,
+           'BREAKDOWN':0.5, 'FINAL TERROR':1.25, 'OUTRO':0.4 }[secName] || 0.7;
+}
+
+// ── Pattern arrays ─────────────────────────────────────────
+const K_4ON4   = [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0];
+const K_GABBER = [1,1,0,1, 1,0,1,0, 1,1,0,1, 1,0,1,1];
+const K_TERROR = [1,1,1,0, 1,1,0,1, 1,1,1,0, 1,0,1,1];
+const K_DRILL  = [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1];
+const S_2_4    = [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0];
+const S_DENSE  = [0,0,1,0, 1,0,0,1, 0,0,1,0, 1,0,1,0];
+const S_FULL   = [0,0,1,0, 1,0,1,0, 0,1,1,0, 1,0,1,1];
+const H_QTR    = [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0];
+const H_8TH    = [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0];
+const H_16TH   = [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1];
+
+// Bass root frequencies (Hz)
+const BASS_ROOTS = [41.2, 43.65, 36.71, 32.7, 46.25, 38.89, 49.0, 55.0];
+
+// ── Pattern logic ──────────────────────────────────────────
+function getPattern(barIdx, s) {
+  const sec = getSection(barIdx);
+  const bis = barIdx - sec.start;   // bar-in-section
+  const p = { kick:0, snare:0, hat:0, bass:-1, hard:false };
+
+  switch (sec.name) {
+
+    // ── INTRO (8 bars) ─────────────────────────────────
+    // 조용한 시작, 킥만 비트1에, 하이햇 점진적으로 추가
+    case 'INTRO': {
+      if (s === 0) p.kick = 1;
+      if (bis >= 2 && H_QTR[s]) p.hat = 1;
+      if (bis >= 5 && s === 8) p.snare = 1;
+      if (bis >= 6 && s === 4) p.kick = 1;   // 마지막 2바: 킥 추가
+      break;
+    }
+
+    // ── BUILD (12 bars) ────────────────────────────────
+    // 3단계: 4-on-floor → 가브리킥 → 더블킥+베이스
+    case 'BUILD': {
+      const ph = Math.floor(bis / 4);
+
+      if (ph === 0) {                // 바 0-3: 4-on-floor
+        if (K_4ON4[s]) p.kick = 1;
+        if (H_8TH[s]) p.hat = 1;
+
+      } else if (ph === 1) {         // 바 4-7: 킥 밀도 증가
+        if (K_4ON4[s] || s === 2 || s === 10) p.kick = 1;
+        if (H_8TH[s]) p.hat = 1;
+        if (S_2_4[s]) p.snare = 1;
+        if (s === 0) p.bass = bis % 4;
+
+      } else {                       // 바 8-11: 가브리킥 진입
+        if (K_GABBER[s]) p.kick = 1;
+        if (H_8TH[s]) p.hat = 1;
+        if (S_2_4[s]) p.snare = 1;
+        if (s === 0) p.bass = bis % 6;
+      }
+      break;
+    }
+
+    // ── DROP (16 bars) ─────────────────────────────────
+    // 전반: 순수 가브리킥, 후반: 더블킥+16분 하이햇
+    case 'DROP': {
+      const ph2 = Math.floor(bis / 8);
+
+      if (ph2 === 0) {               // 바 0-7: 가브리킥
+        if (K_GABBER[s]) p.kick = 1;
+        if (H_8TH[s]) p.hat = 1;
+        if (S_2_4[s]) p.snare = 1;
+        if (s === 0) p.bass = bis % 5;
+
+      } else {                       // 바 8-15: 더블킥 + 16분
+        if (K_GABBER[s] || (s % 2 === 1 && bis % 2 === 0)) p.kick = 1;
+        if (H_16TH[s]) p.hat = 1;
+        if (S_2_4[s] || (s === 8 && bis % 2 === 1)) p.snare = 1;
+        if (s === 0) p.bass = (bis + 2) % 6;
+      }
+      break;
+    }
+
+    // ── CHAOS (16 bars) ────────────────────────────────
+    // 4단계 에스컬레이션: TERROR → 랜덤글리치 → DRILL → 전부다
+    case 'CHAOS': {
+      const ph3 = Math.floor(bis / 4);
+
+      if (ph3 === 0) {               // 바 0-3: 테러 패턴
+        if (K_TERROR[s]) p.kick = 1;
+        if (H_16TH[s]) p.hat = 1;
+        if (S_2_4[s]) p.snare = 1;
+
+      } else if (ph3 === 1) {        // 바 4-7: 테러 + 랜덤 글리치
+        if (K_TERROR[s]) p.kick = 1;
+        if (H_16TH[s]) p.hat = 1;
+        if (S_DENSE[s]) p.snare = 1;
+        p.hard = true;
+
+      } else if (ph3 === 2) {        // 바 8-11: 드릴 킥
+        if (K_DRILL[s]) p.kick = 1;
+        p.hat = 1;
+        if (S_DENSE[s]) p.snare = 1;
+        p.hard = true;
+
+      } else {                       // 바 12-15: 완전 파괴
+        p.kick = 1; p.hat = 1;
+        p.snare = S_FULL[s];
+        p.hard = true;
+      }
+      if (s === 0) p.bass = bis % 5;
+      break;
+    }
+
+    // ── BREAKDOWN (8 bars) ─────────────────────────────
+    // 극도로 미니멀: 킥 1개/바, 후반 하이햇 조금
+    case 'BREAKDOWN': {
+      if (s === 0) p.kick = 1;
+      if (bis >= 4 && s === 8) p.kick = 1;
+      if (bis >= 5 && H_QTR[s]) p.hat = 1;
+      if (s === 0 && bis % 2 === 0) p.bass = bis % 4;
+      break;
+    }
+
+    // ── FINAL TERROR (12 bars) ─────────────────────────
+    // 3단계 상승: 가브리 → TERROR → 모든 것
+    case 'FINAL TERROR': {
+      const ph4 = Math.floor(bis / 4);
+
+      if (ph4 === 0) {               // 바 0-3: 가브리킥 컴백
+        if (K_GABBER[s]) p.kick = 1;
+        if (H_16TH[s]) p.hat = 1;
+        if (S_2_4[s]) p.snare = 1;
+        p.hard = true;
+
+      } else if (ph4 === 1) {        // 바 4-7: 테러 패턴
+        if (K_TERROR[s]) p.kick = 1;
+        if (H_16TH[s]) p.hat = 1;
+        if (S_DENSE[s]) p.snare = 1;
+        p.hard = true;
+
+      } else {                       // 바 8-11: 절대 파괴
+        p.kick = 1; p.hat = 1;
+        p.snare = S_FULL[s];
+        p.hard = true;
+      }
+      if (s === 0) p.bass = (bis + 1) % 6;
+      break;
+    }
+
+    // ── OUTRO (3 bars) ─────────────────────────────────
+    // 점점 희미해지며 소멸
+    case 'OUTRO': {
+      const fade = 1 - bis / 3;
+      if (s === 0 && Math.random() < fade) p.kick = 1;
+      if (s === 8 && Math.random() < fade * 0.5) p.snare = 1;
+      if (H_QTR[s] && Math.random() < fade * 0.6) p.hat = 1;
+      break;
+    }
+  }
+  return p;
+}
+
+// ── Scheduler ──────────────────────────────────────────────
+let playing = false, startAudioTime = 0, schedulerId = null;
+let scheduledUntil = 0, stepIdx = 0;
+
+function scheduleStep(idx, t) {
+  const barIdx = Math.floor(idx / 16);
+  const s      = idx % 16;
+  if (barIdx >= TOTAL_BARS) return;
+  const sec    = getSection(barIdx);
+  const intens = getIntensity(sec.name);
+  const pat    = getPattern(barIdx, s);
+  if (pat.kick)    kick(t, intens, pat.hard);
+  if (pat.snare)   snare(t, intens);
+  if (pat.hat)     hat(t, intens * 0.72, s % 8 === 4);
+  if (pat.bass >= 0) bass(t, BASS_ROOTS[pat.bass % BASS_ROOTS.length], intens * 0.65);
+  if (pat.kick)    scheduleKickFX(t, intens, pat.hard);
+}
+
+function scheduleLoop() {
+  const now = actx.currentTime;
+  while (scheduledUntil < now + 0.12 && stepIdx < TOTAL_STEPS) {
+    const t = startAudioTime + stepIdx * STEP;
+    scheduleStep(stepIdx, t);
+    scheduledUntil = t;
+    stepIdx++;
+  }
+  if (stepIdx >= TOTAL_STEPS) { stop(); return; }
+  schedulerId = setTimeout(scheduleLoop, 20);
+}
+
+// ── Visual FX ──────────────────────────────────────────────
+let pendKick = 0;
+const particles = [];
+
+function scheduleKickFX(audioTime, intens, hard) {
+  const delay = Math.max(0, (audioTime - actx.currentTime) * 1000);
+  setTimeout(() => {
+    if (!playing) return;
+    const titleEl = document.getElementById('title');
+    const uiEl    = document.getElementById('uiMain');
+    titleEl.classList.add('hit');
+    if (hard) {
+      const br = 1 + (intens - 0.8) * 0.85;
+      document.body.style.filter = `brightness(${br.toFixed(2)}) contrast(1.12)`;
+      uiEl.style.transform =
+        `translate(${(Math.random()-0.5)*38}px,${(Math.random()-0.5)*38}px)`
+        + ` scale(${0.97+Math.random()*0.06})`
+        + ` rotate(${(Math.random()-0.5)*1.4}deg)`;
+    }
+    pendKick += Math.floor(22 + intens * 45);
+    setTimeout(() => {
+      titleEl.classList.remove('hit');
+      document.body.style.filter = 'none';
+      uiEl.style.transform = 'none';
+    }, hard ? 40 : 55);
+  }, delay);
+}
+
+// ── Canvas Visualizer ──────────────────────────────────────
+const canvas = document.getElementById('cv');
+const c      = canvas.getContext('2d');
+const fData  = new Uint8Array(analyser.frequencyBinCount);
+const wData  = new Uint8Array(analyser.fftSize);
+let glitchT  = 0;
+
+function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
+resize(); window.addEventListener('resize', resize);
+
+function draw() {
+  requestAnimationFrame(draw);
+  analyser.getByteFrequencyData(fData);
+  const w = canvas.width, h = canvas.height;
+
+  c.fillStyle = playing ? 'rgba(0,0,0,0.17)' : 'rgba(0,0,0,0.5)';
+  c.fillRect(0, 0, w, h);
+  if (!playing) return;
+
+  const avg = fData.reduce((a,b) => a+b, 0) / fData.length / 255;
+
+  // Frequency bars
+  const bw = w / fData.length;
+  for (let i = 0; i < fData.length; i++) {
+    const v  = fData[i] / 255;
+    const bh = v * h * 0.6;
+    c.fillStyle = `rgb(${Math.floor(160+v*95)},${Math.floor(v*18)},0)`;
+    c.fillRect(i*bw, h-bh, Math.max(bw-1, 0.5), bh);
+  }
+
+  // Waveform line
+  analyser.getByteTimeDomainData(wData);
+  c.beginPath();
+  c.strokeStyle = `rgba(255,17,0,${0.35 + avg*0.55})`;
+  c.lineWidth = 2;
+  for (let i = 0; i < wData.length; i++) {
+    const v = (wData[i] - 128) / 128;
+    const x = (i / wData.length) * w;
+    const y = h*0.5 + v*h*0.38;
+    i === 0 ? c.moveTo(x,y) : c.lineTo(x,y);
+  }
+  c.stroke();
+
+  // Kick particles
+  if (pendKick > 0) {
+    const cx = w/2, cy = h*0.88;
+    for (let i = 0; i < pendKick; i++) {
+      const angle = -Math.PI * (0.08 + Math.random()*0.84);
+      const sp = Math.random()*14 + 3;
+      particles.push({
+        x:cx+(Math.random()-0.5)*110, y:cy,
+        vx:Math.cos(angle)*sp, vy:Math.sin(angle)*sp,
+        life:1, decay:0.02+Math.random()*0.032, sz:Math.random()*5+1
+      });
+    }
+    pendKick = 0;
+  }
+  for (let i = particles.length-1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy; p.vy += 0.22; p.vx *= 0.96; p.life -= p.decay;
+    if (p.life <= 0) { particles.splice(i,1); continue; }
+    c.fillStyle = `rgba(255,17,0,${p.life})`;
+    c.fillRect(p.x-p.sz/2, p.y-p.sz/2, p.sz, p.sz);
+  }
+
+  // Glitch strip
+  glitchT++;
+  if (Math.random() < 0.035*avg && glitchT > 5) {
+    glitchT = 0;
+    try {
+      const gy = Math.random()*h*0.8, gh = Math.random()*20+4;
+      const id = c.getImageData(0,gy,w,gh);
+      c.putImageData(id, (Math.random()-0.5)*50, gy);
+    } catch(e) {}
+  }
+
+  // Edge strobe
+  if (avg > 0.45 && Math.random() < 0.18) {
+    c.strokeStyle = `rgba(255,17,0,${Math.random()*0.38})`;
+    c.lineWidth = Math.random()*7+1;
+    c.strokeRect(0, 0, w, h);
+  }
+}
+draw();
+
+// ── Step Grid ──────────────────────────────────────────────
+const ROWS = ['KICK','SNARE','HAT'];
+const stepRowsEl = document.getElementById('stepRows');
+ROWS.forEach(r => {
+  const row  = document.createElement('div'); row.className = 'step-row';
+  const lbl  = document.createElement('div'); lbl.className = 'row-label'; lbl.textContent = r;
+  const grid = document.createElement('div'); grid.className = 'step-grid';
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElement('div'); s.className = 'step'; s.id = r+'-'+i;
+    grid.appendChild(s);
+  }
+  row.appendChild(lbl); row.appendChild(grid);
+  stepRowsEl.appendChild(row);
+});
+
+// ── UI Update ──────────────────────────────────────────────
+let lastBar = -1, lastSec = '', lastStepInBar = -1;
+
+function updateUI() {
+  if (!playing) return;
+  requestAnimationFrame(updateUI);
+
+  const elapsed = actx.currentTime - startAudioTime;
+  if (elapsed < 0) return;
+
+  // Timeline
+  const pct = Math.min(elapsed / (TOTAL_STEPS * STEP), 1) * 100;
+  document.getElementById('tlBar').style.width = pct + '%';
+
+  // Time
+  const m = Math.floor(elapsed/60), ss = Math.floor(elapsed%60);
+  document.getElementById('timeEl').textContent = m+':'+String(ss).padStart(2,'0');
+
+  const barIdx    = Math.floor(elapsed / BAR);
+  const stepInBar = Math.floor((elapsed % BAR) / STEP) % 16;
+  const sec       = getSection(barIdx);
+
+  document.getElementById('stats').textContent = `BAR ${barIdx} · ${sec.name}`;
+
+  // Section change
+  if (sec.name !== lastSec) {
+    lastSec = sec.name;
+    document.getElementById('secName').textContent = sec.name;
+    document.getElementById('secInfo').textContent = sec.name;
+  }
+
+  // Bar change: update step grid
+  if (barIdx !== lastBar) {
+    lastBar = barIdx;
+    ROWS.forEach(r => {
+      for (let i = 0; i < 16; i++) {
+        const el = document.getElementById(r+'-'+i); if (!el) return;
+        el.classList.remove('on');
+        const pat = getPattern(barIdx, i);
+        const on = (r==='KICK'&&pat.kick)||(r==='SNARE'&&pat.snare)||(r==='HAT'&&pat.hat);
+        if (on) el.classList.add('on');
+      }
+    });
+  }
+
+  // Step cursor
+  if (stepInBar !== lastStepInBar) {
+    lastStepInBar = stepInBar;
+    for (let i = 0; i < 16; i++) {
+      ROWS.forEach(r => {
+        const el = document.getElementById(r+'-'+i);
+        if (el) el.classList.toggle('cur', i === stepInBar);
+      });
+    }
+  }
+}
+
+// ── Controls ───────────────────────────────────────────────
+function stop() {
+  playing = false;
+  clearTimeout(schedulerId);
+  document.getElementById('playBtn').textContent = 'RE-INITIATE';
+  document.getElementById('playBtn').className   = 'btn';
+  document.getElementById('secName').textContent = 'TERMINATED';
+  document.getElementById('tlBar').style.width   = '0%';
+  document.getElementById('timeEl').textContent  = '0:00';
+  particles.length = 0; pendKick = 0;
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  actx.resume();
+  if (!playing) {
+    playing = true; stepIdx = 0;
+    startAudioTime  = actx.currentTime + 0.1;
+    scheduledUntil  = startAudioTime;
+    lastBar = -1; lastSec = ''; lastStepInBar = -1;
+    particles.length = 0; pendKick = 0;
+    scheduleLoop();
+    updateUI();
+    document.getElementById('playBtn').textContent = 'TERMINATE';
+    document.getElementById('playBtn').className   = 'btn stop';
+    document.getElementById('secName').textContent = 'INTRO';
+  } else {
+    stop();
+  }
+});
+</script>
+</body>
+</html>

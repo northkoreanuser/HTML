@@ -1,0 +1,236 @@
+﻿<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TERRORCORE: ANNIHILATION</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#000;color:#fff;font-family:'IBM Plex Mono',monospace;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;transition:filter 0.05s}
+  canvas{position:fixed;inset:0;z-index:0;opacity:0.8}
+  .ui{position:relative;z-index:10;text-align:center;width:100%;max-width:800px;padding:2rem;background:rgba(0,0,0,0.7);backdrop-filter:blur(5px);border:1px solid #222}
+  .title{font-size:clamp(40px,10vw,90px);font-weight:700;letter-spacing:-0.05em;line-height:1;margin-bottom:10px;color:#fff;text-shadow:0 0 20px #ff1100}
+  .title.hit{color:#ff1100;transform:scale(1.05);text-shadow:0 0 50px #ff1100}
+  .section-name{font-size:14px;letter-spacing:0.5em;color:#ff1100;margin-bottom:2rem;font-weight:700}
+  .timeline{width:100%;height:8px;background:#111;margin-bottom:1.5rem;position:relative}
+  .timeline-bar{height:100%;background:linear-gradient(90deg, #ff1100, #fff);width:0%}
+  .step-rows{display:flex;flex-direction:column;gap:5px;margin-bottom:2rem}
+  .step-grid{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;flex:1}
+  .step{height:8px;background:#111;border-radius:1px}
+  .step.on{background:#444}
+  .step.cur{background:#fff;box-shadow:0 0 10px #fff}
+  .step.cur.on{background:#ff1100;box-shadow:0 0 15px #ff1100}
+  .controls{margin-bottom:1rem}
+  .btn{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;padding:15px 40px;background:#ff1100;border:none;color:#000;cursor:pointer;transition:0.1s}
+  .btn:hover{background:#fff;transform:scale(1.1)}
+  .info{font-size:10px;color:#444;letter-spacing:0.1em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="ui" id="uiMain">
+  <div class="title" id="title">ANNIHILATION</div>
+  <div class="section-name" id="secName">SYSTEM READY</div>
+  <div class="timeline"><div class="timeline-bar" id="tlBar"></div></div>
+  <div class="step-rows" id="stepRows"></div>
+  <div class="controls">
+    <button class="btn" id="playBtn">INITIATE TERROR</button>
+  </div>
+  <div class="info" id="info">300 BPM // OVERDRIVE ACTIVE // WEB AUDIO ENGINE</div>
+</div>
+
+<script>
+const BPM = 300; // 속도 대폭 증가
+const STEP = 60 / BPM / 4;
+const BAR = STEP * 16;
+const TOTAL_BARS = 128;
+
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+const mg = ctx.createGain();
+const comp = ctx.createDynamicsCompressor();
+
+// 마스터 리미터 설정 (소리를 짓눌러서 압도적인 질감 생성)
+comp.threshold.setValueAtTime(-24, ctx.currentTime);
+comp.knee.setValueAtTime(0, ctx.currentTime);
+comp.ratio.setValueAtTime(20, ctx.currentTime);
+comp.attack.setValueAtTime(0.0005, ctx.currentTime);
+comp.release.setValueAtTime(0.05, ctx.currentTime);
+
+mg.gain.value = 1.5; 
+mg.connect(comp);
+comp.connect(ctx.destination);
+
+const analyser = ctx.createAnalyser();
+analyser.fftSize = 256;
+comp.connect(analyser);
+
+// 파괴적인 커브 생성기 (Bitcrush + Distortion 효과)
+function mkAnnihilationCurve(amt) {
+  const c = new Float32Array(44100);
+  for (let i=0; i<44100; i++) {
+    const x = (i*2)/44100-1;
+    c[i] = Math.max(-0.9, Math.min(0.9, Math.tanh(x * amt) * (Math.sin(x * 10) * 0.5 + 1)));
+  }
+  return c;
+}
+const terrorCurve = mkAnnihilationCurve(100);
+
+// 노이즈 버퍼
+const noiseBuf = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+const d = noiseBuf.getChannelData(0);
+for(let i=0; i<d.length; i++) d[i] = Math.random() * 2 - 1;
+
+// --- 악기 합성 엔진 ---
+
+function kick(t, intens) {
+  const o = ctx.createOscillator();
+  const g = ctx.createGain();
+  const ds = ctx.createWaveShaper();
+  ds.curve = terrorCurve;
+
+  o.frequency.setValueAtTime(500 * intens, t);
+  o.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+  
+  g.gain.setValueAtTime(2.5, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+
+  o.connect(ds).connect(g).connect(mg);
+  o.start(t); o.stop(t + 0.3);
+
+  // Visual Punch
+  setTimeout(() => {
+    document.body.style.filter = `invert(${intens > 0.8 ? 1 : 0})`;
+    document.getElementById('title').classList.add('hit');
+    document.getElementById('uiMain').style.transform = `translate(${(Math.random()-0.5)*30}px, ${(Math.random()-0.5)*30}px)`;
+    setTimeout(() => {
+      document.body.style.filter = 'none';
+      document.getElementById('title').classList.remove('hit');
+      document.getElementById('uiMain').style.transform = 'none';
+    }, 40);
+  }, (t - ctx.currentTime) * 1000);
+}
+
+function snare(t, intens) {
+  const n = ctx.createBufferSource();
+  n.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass'; f.frequency.value = 1500;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(1.5 * intens, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+  n.connect(f).connect(g).connect(mg);
+  n.start(t); n.stop(t + 0.15);
+}
+
+function hat(t, intens) {
+  const n = ctx.createBufferSource();
+  n.buffer = noiseBuf;
+  const f = ctx.createBiquadFilter();
+  f.type = 'highpass'; f.frequency.value = 8000;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.8 * intens, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
+  n.connect(f).connect(g).connect(mg);
+  n.start(t); n.stop(t + 0.05);
+}
+
+// --- 시퀀서 로직 ---
+let playing = false;
+let currentStep = 0;
+let nextNoteTime = 0;
+
+function schedule() {
+  while (nextNoteTime < ctx.currentTime + 0.1) {
+    const barIdx = Math.floor(currentStep / 16);
+    const s = currentStep % 16;
+    const intens = barIdx < 32 ? 0.7 : 1.2;
+
+    // 킥 패턴 (갈수록 미쳐감)
+    if (barIdx % 2 === 0) {
+        if ([0, 4, 8, 12].includes(s)) kick(nextNoteTime, intens);
+    } else {
+        if ([0, 2, 4, 6, 8, 10, 12, 14].includes(s)) kick(nextNoteTime, intens * 1.2);
+    }
+
+    // 스네어 & 하이햇 글리치
+    if (s % 4 === 2) snare(nextNoteTime, intens);
+    if (s % 2 === 1) hat(nextNoteTime, intens);
+    
+    // 무작위 드릴 (Chaos Factor)
+    if (barIdx > 16 && Math.random() > 0.9) {
+      for(let i=0; i<4; i++) hat(nextNoteTime + (i * STEP/4), 2);
+    }
+
+    updateUI(currentStep);
+    nextNoteTime += STEP;
+    currentStep++;
+  }
+  if (playing) requestAnimationFrame(schedule);
+}
+
+// UI & 시각화
+const stepRows = document.getElementById('stepRows');
+const ROWS = ['KICK', 'SNARE', 'HAT'];
+const grids = {};
+
+ROWS.forEach(r => {
+  const div = document.createElement('div'); div.className = 'step-grid';
+  for(let i=0; i<16; i++) {
+    const s = document.createElement('div'); s.className = 'step'; s.id = `${r}-${i}`;
+    div.appendChild(s);
+  }
+  stepRows.appendChild(div);
+  grids[r] = div;
+});
+
+function updateUI(step) {
+  const s = step % 16;
+  const bar = Math.floor(step / 16);
+  document.getElementById('tlBar').style.width = `${(bar / TOTAL_BARS) * 100}%`;
+  document.querySelectorAll('.step').forEach(el => el.classList.remove('cur'));
+  ROWS.forEach(r => document.getElementById(`${r}-${s}`).classList.add('cur'));
+  
+  if (s === 0) {
+    document.getElementById('secName').textContent = bar > 32 ? "ANNIHILATION MODE" : "STABILIZING...";
+  }
+}
+
+const canvas = document.getElementById('cv');
+const c = canvas.getContext('2d');
+function draw() {
+  const data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+  c.fillStyle = 'rgba(0,0,0,0.2)';
+  c.fillRect(0,0,canvas.width, canvas.height);
+  c.beginPath();
+  c.moveTo(0, canvas.height/2);
+  for(let i=0; i<data.length; i++) {
+    const v = data[i] / 128.0;
+    const y = v * canvas.height / 2;
+    c.lineTo(i * (canvas.width/data.length), y);
+  }
+  c.strokeStyle = '#ff1100';
+  c.lineWidth = 4;
+  c.stroke();
+  requestAnimationFrame(draw);
+}
+draw();
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!playing) {
+    ctx.resume();
+    playing = true;
+    currentStep = 0;
+    nextNoteTime = ctx.currentTime;
+    schedule();
+    document.getElementById('playBtn').textContent = "TERMINATE";
+  } else {
+    playing = false;
+    document.getElementById('playBtn').textContent = "RE-INITIATE";
+  }
+});
+</script>
+</body>
+</html>
