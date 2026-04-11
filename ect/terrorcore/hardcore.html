@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HARDCORE</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:#000;
+  color:#fff;
+  font-family:'IBM Plex Mono',monospace;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  user-select:none;
+}
+canvas{position:fixed;inset:0;z-index:0;opacity:0.6}
+.ui{position:relative;z-index:10;text-align:center}
+.bpm-display{
+  font-size:clamp(60px,12vw,120px);
+  font-weight:500;
+  letter-spacing:-0.04em;
+  line-height:1;
+  color:#fff;
+  transition:color 0.05s;
+}
+.bpm-display.kick{color:#ff2200}
+.label{
+  font-size:11px;
+  letter-spacing:0.2em;
+  color:#444;
+  margin-bottom:2rem;
+  margin-top:4px;
+}
+.controls{display:flex;gap:12px;justify-content:center;margin-bottom:2rem}
+.btn{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:12px;
+  letter-spacing:0.12em;
+  padding:10px 20px;
+  background:transparent;
+  border:1px solid #333;
+  color:#666;
+  cursor:pointer;
+  transition:all 0.1s;
+}
+.btn:hover{border-color:#fff;color:#fff}
+.btn.active{border-color:#ff2200;color:#ff2200}
+.btn.play-btn{border-color:#fff;color:#fff;font-size:13px;padding:12px 32px}
+.btn.play-btn:hover{background:#fff;color:#000}
+.btn.play-btn.playing{border-color:#ff2200;color:#ff2200}
+.btn.play-btn.playing:hover{background:#ff2200;color:#000}
+.bpm-row{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:1rem}
+.bpm-label{font-size:11px;color:#444;letter-spacing:0.1em}
+input[type=range]{
+  -webkit-appearance:none;
+  width:160px;height:2px;
+  background:#222;
+  outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:14px;height:14px;
+  background:#fff;
+  border-radius:50%;
+  cursor:pointer;
+}
+.bpm-val{font-size:13px;color:#fff;min-width:36px}
+.pattern-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:1.5rem}
+.pat-btn{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:10px;
+  letter-spacing:0.08em;
+  padding:6px 12px;
+  background:transparent;
+  border:1px solid #222;
+  color:#444;
+  cursor:pointer;
+  transition:all 0.1s;
+}
+.pat-btn:hover{border-color:#666;color:#666}
+.pat-btn.on{border-color:#ff2200;color:#ff2200;background:rgba(255,34,0,0.08)}
+.step-grid{
+  display:grid;
+  grid-template-columns:repeat(16,1fr);
+  gap:3px;
+  margin-bottom:1.5rem;
+  max-width:480px;
+  width:90vw;
+}
+.step{
+  height:6px;
+  background:#111;
+  border-radius:1px;
+  transition:background 0.05s;
+}
+.step.active{background:#ff2200}
+.step.current{background:#fff}
+.info{font-size:10px;color:#333;letter-spacing:0.08em}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+
+<div class="ui">
+  <div class="bpm-display" id="bpmDisp">200</div>
+  <div class="label">BPM · HARDCORE TECHNO</div>
+
+  <div class="bpm-row">
+    <span class="bpm-label">BPM</span>
+    <input type="range" id="bpmSlider" min="160" max="300" value="200" step="1">
+    <span class="bpm-val" id="bpmVal">200</span>
+  </div>
+
+  <div class="pattern-row">
+    <button class="pat-btn on" data-p="0">GABBER</button>
+    <button class="pat-btn" data-p="1">INDUSTRIAL</button>
+    <button class="pat-btn" data-p="2">SPEEDCORE</button>
+    <button class="pat-btn" data-p="3">TERROR</button>
+  </div>
+
+  <div class="step-grid" id="stepGrid"></div>
+
+  <div class="controls">
+    <button class="btn play-btn" id="playBtn">PLAY</button>
+  </div>
+  <div class="info" id="info">클릭하여 시작</div>
+</div>
+
+<script>
+const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+const master = ctx.createDynamicsCompressor();
+master.threshold.value = -6;
+master.knee.value = 3;
+master.ratio.value = 20;
+master.attack.value = 0.001;
+master.release.value = 0.1;
+
+const masterGain = ctx.createGain();
+masterGain.gain.value = 0.85;
+masterGain.connect(master);
+master.connect(ctx.destination);
+
+const analyser = ctx.createAnalyser();
+analyser.fftSize = 512;
+master.connect(analyser);
+
+// ── 패턴 정의 (16 스텝) ──
+const PATTERNS = {
+  0: { // GABBER — 4-on-the-floor + distorted kick
+    kick:  [1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+    snare: [0,0,0,0, 1,0,0,0, 0,0,0,0, 1,0,0,0],
+    hat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    bass:  [1,0,1,0, 0,1,0,0, 1,0,0,1, 0,1,0,0],
+  },
+  1: { // INDUSTRIAL — syncopated, gritty
+    kick:  [1,0,0,1, 0,0,1,0, 1,0,0,0, 1,0,1,0],
+    snare: [0,0,1,0, 0,1,0,0, 0,0,1,0, 0,1,0,1],
+    hat:   [1,0,1,0, 1,0,1,1, 1,0,1,0, 1,1,1,0],
+    bass:  [1,1,0,0, 1,0,1,0, 0,1,1,0, 1,0,0,1],
+  },
+  2: { // SPEEDCORE — maximum density
+    kick:  [1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+    snare: [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],
+    hat:   [1,1,1,1, 1,1,1,1, 1,1,1,1, 1,1,1,1],
+    bass:  [1,0,0,1, 1,0,1,0, 1,1,0,0, 0,1,1,0],
+  },
+  3: { // TERROR — chaotic
+    kick:  [1,0,1,1, 0,0,1,0, 1,1,0,0, 1,0,0,1],
+    snare: [0,1,0,0, 1,0,0,1, 0,0,1,0, 0,1,1,0],
+    hat:   [1,1,0,1, 1,0,1,1, 0,1,1,1, 1,0,1,1],
+    bass:  [1,1,0,1, 0,1,1,0, 1,0,1,1, 0,1,0,1],
+  },
+};
+
+let bpm = 200;
+let playing = false;
+let currentPattern = 0;
+let currentStep = 0;
+let nextTime = 0;
+let schedulerId = null;
+let stepFlash = [];
+
+// ── 사운드 생성 함수 ──
+
+function noise(duration) {
+  const buf = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return buf;
+}
+
+function createKick(t, pattern) {
+  // 디스토션 킥
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const dist = ctx.createWaveShaper();
+
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const x = (i * 2) / 256 - 1;
+    curve[i] = Math.tanh(x * (pattern === 0 ? 8 : 4));
+  }
+  dist.curve = curve;
+
+  const startFreq = pattern === 0 ? 280 : pattern === 3 ? 320 : 220;
+  osc.frequency.setValueAtTime(startFreq, t);
+  osc.frequency.exponentialRampToValueAtTime(35, t + 0.18);
+  osc.type = 'sine';
+
+  gain.gain.setValueAtTime(1.8, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+  osc.connect(dist);
+  dist.connect(gain);
+  gain.connect(masterGain);
+
+  osc.start(t); osc.stop(t + 0.25);
+
+  // 클릭 레이어
+  const click = ctx.createOscillator();
+  const cg = ctx.createGain();
+  click.frequency.value = 2500;
+  cg.gain.setValueAtTime(0.4, t);
+  cg.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
+  click.connect(cg).connect(masterGain);
+  click.start(t); click.stop(t + 0.015);
+}
+
+function createSnare(t) {
+  const nSrc = ctx.createBufferSource();
+  nSrc.buffer = noise(0.18);
+
+  const hpf = ctx.createBiquadFilter();
+  hpf.type = 'highpass';
+  hpf.frequency.value = 1800;
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.9, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+
+  // 톤 레이어
+  const tone = ctx.createOscillator();
+  const tg = ctx.createGain();
+  tone.frequency.value = 200;
+  tg.gain.setValueAtTime(0.5, t);
+  tg.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+  tone.connect(tg).connect(masterGain);
+  tone.start(t); tone.stop(t + 0.1);
+
+  nSrc.connect(hpf).connect(gain).connect(masterGain);
+  nSrc.start(t);
+}
+
+function createHat(t, open = false) {
+  const nSrc = ctx.createBufferSource();
+  nSrc.buffer = noise(open ? 0.12 : 0.04);
+
+  const hpf = ctx.createBiquadFilter();
+  hpf.type = 'highpass';
+  hpf.frequency.value = 7000;
+
+  const gain = ctx.createGain();
+  const dur = open ? 0.1 : 0.025;
+  gain.gain.setValueAtTime(0.35, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+
+  nSrc.connect(hpf).connect(gain).connect(masterGain);
+  nSrc.start(t);
+}
+
+function createBass(t, step, pattern) {
+  const notes = [55, 58, 46, 49, 52, 41, 44]; // MIDI → freq below
+  const freqMap = [55, 58.27, 49, 51.91, 55, 41.2, 43.65];
+  const freq = freqMap[step % freqMap.length];
+
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const filt = ctx.createBiquadFilter();
+  const dist = ctx.createWaveShaper();
+
+  osc1.type = 'sawtooth';
+  osc1.frequency.value = freq;
+  osc2.type = 'square';
+  osc2.frequency.value = freq * 2;
+
+  filt.type = 'lowpass';
+  filt.frequency.setValueAtTime(pattern === 2 ? 800 : 400, t);
+  filt.frequency.exponentialRampToValueAtTime(200, t + 0.1);
+  filt.Q.value = 8;
+
+  const curve = new Float32Array(256);
+  for (let i = 0; i < 256; i++) {
+    const x = (i * 2) / 256 - 1;
+    curve[i] = Math.tanh(x * 3);
+  }
+  dist.curve = curve;
+
+  const stepDur = (60 / bpm / 4);
+  gain.gain.setValueAtTime(0.6, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + stepDur * 0.9);
+
+  osc1.connect(filt);
+  osc2.connect(filt);
+  filt.connect(dist);
+  dist.connect(gain);
+  gain.connect(masterGain);
+
+  osc1.start(t); osc1.stop(t + stepDur);
+  osc2.start(t); osc2.stop(t + stepDur);
+}
+
+// ── 스케줄러 ──
+function schedule() {
+  const stepDur = 60 / bpm / 4;
+  const lookahead = 0.1;
+
+  while (nextTime < ctx.currentTime + lookahead) {
+    const pat = PATTERNS[currentPattern];
+    const s = currentStep;
+
+    if (pat.kick[s])  createKick(nextTime, currentPattern);
+    if (pat.snare[s]) createSnare(nextTime);
+    if (pat.hat[s])   createHat(nextTime, s % 4 === 2);
+    if (pat.bass[s])  createBass(nextTime, s, currentPattern);
+
+    stepFlash[s] = nextTime;
+    currentStep = (currentStep + 1) % 16;
+    nextTime += stepDur;
+  }
+  schedulerId = setTimeout(schedule, 25);
+}
+
+// ── 스텝 그리드 ──
+const grid = document.getElementById('stepGrid');
+for (let i = 0; i < 16; i++) {
+  const el = document.createElement('div');
+  el.className = 'step';
+  el.id = 'step' + i;
+  grid.appendChild(el);
+}
+
+let lastHighlit = -1;
+function updateGrid() {
+  const now = ctx.currentTime;
+  let current = -1;
+  for (let i = 0; i < 16; i++) {
+    if (stepFlash[i] !== undefined && stepFlash[i] <= now && now < stepFlash[i] + (60 / bpm / 4)) {
+      current = i;
+    }
+  }
+  if (current !== lastHighlit) {
+    if (lastHighlit >= 0) document.getElementById('step' + lastHighlit).classList.remove('current');
+    if (current >= 0) {
+      document.getElementById('step' + current).classList.add('current');
+      document.getElementById('bpmDisp').classList.add('kick');
+      setTimeout(() => document.getElementById('bpmDisp').classList.remove('kick'), 60);
+    }
+    lastHighlit = current;
+  }
+  requestAnimationFrame(updateGrid);
+}
+
+// ── 비주얼라이저 ──
+const canvas = document.getElementById('cv');
+const c = canvas.getContext('2d');
+const fData = new Uint8Array(analyser.frequencyBinCount);
+
+function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
+resize();
+window.addEventListener('resize', resize);
+
+function draw() {
+  requestAnimationFrame(draw);
+  analyser.getByteFrequencyData(fData);
+  c.fillStyle = 'rgba(0,0,0,0.25)';
+  c.fillRect(0, 0, canvas.width, canvas.height);
+
+  const bars = fData.length;
+  const bw = canvas.width / bars;
+
+  for (let i = 0; i < bars; i++) {
+    const v = fData[i] / 255;
+    const h = v * canvas.height * 0.7;
+    const r = Math.floor(v * 255);
+    const g = Math.floor((1 - v) * 30);
+    c.fillStyle = `rgb(${r},${g},0)`;
+    c.fillRect(i * bw, canvas.height - h, bw - 1, h);
+  }
+}
+draw();
+
+// ── 컨트롤 ──
+const playBtn = document.getElementById('playBtn');
+const bpmSlider = document.getElementById('bpmSlider');
+const bpmVal = document.getElementById('bpmVal');
+const bpmDisp = document.getElementById('bpmDisp');
+
+bpmSlider.addEventListener('input', () => {
+  bpm = parseInt(bpmSlider.value);
+  bpmVal.textContent = bpm;
+  bpmDisp.textContent = bpm;
+});
+
+playBtn.addEventListener('click', () => {
+  ctx.resume();
+  if (!playing) {
+    playing = true;
+    currentStep = 0;
+    nextTime = ctx.currentTime + 0.05;
+    schedule();
+    updateGrid();
+    playBtn.textContent = 'STOP';
+    playBtn.classList.add('playing');
+    document.getElementById('info').textContent = bpm + ' BPM · ' + ['GABBER','INDUSTRIAL','SPEEDCORE','TERROR'][currentPattern];
+  } else {
+    playing = false;
+    clearTimeout(schedulerId);
+    playBtn.textContent = 'PLAY';
+    playBtn.classList.remove('playing');
+    document.getElementById('info').textContent = '클릭하여 시작';
+  }
+});
+
+document.querySelectorAll('.pat-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.pat-btn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    currentPattern = parseInt(btn.dataset.p);
+    if (playing) document.getElementById('info').textContent = bpm + ' BPM · ' + ['GABBER','INDUSTRIAL','SPEEDCORE','TERROR'][currentPattern];
+  });
+});
+
+updateGrid();
+</script>
+</body>
+</html>
