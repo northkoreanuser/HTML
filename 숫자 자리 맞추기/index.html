@@ -371,6 +371,99 @@
     transform: translateX(18px);
     background: var(--accent);
   }
+
+  /* ── 메모장 ── */
+  #memo {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 240px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    transition: height 0.18s ease;
+  }
+  #memo.collapsed { height: auto; }
+
+  #memo-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    cursor: default;
+    user-select: none;
+    flex-shrink: 0;
+  }
+  #memo-title {
+    font-size: 9px;
+    font-family: var(--font);
+    color: var(--muted2);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  #memo-controls {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
+  .memo-ctrl-btn {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--font);
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.12s;
+    letter-spacing: 0.04em;
+  }
+  .memo-ctrl-btn:hover {
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
+  #memo-body {
+    overflow: hidden;
+    transition: max-height 0.18s ease;
+    max-height: 300px;
+  }
+  #memo.collapsed #memo-body {
+    max-height: 0;
+  }
+  #memo-textarea {
+    width: 100%;
+    height: 180px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 11px;
+    line-height: 1.6;
+    border: none;
+    outline: none;
+    resize: none;
+    padding: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  #memo-textarea::-webkit-scrollbar { width: 3px; }
+  #memo-textarea::-webkit-scrollbar-thumb { background: var(--border); }
+  #memo-textarea::placeholder { color: var(--muted); }
+  #memo-footer {
+    padding: 5px 10px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+  }
+  #memo-charcount {
+    font-size: 9px;
+    color: var(--muted);
+    font-family: var(--font);
+  }
 </style>
 </head>
 <body>
@@ -447,7 +540,22 @@
   </div>
 </div>
 
-<!-- 오디오: Web Audio API로 대체 -->
+<!-- 메모장 -->
+<div id="memo">
+  <div id="memo-header">
+    <span id="memo-title">📝 메모</span>
+    <div id="memo-controls">
+      <button class="memo-ctrl-btn" id="memoClearBtn" title="내용 지우기">CLR</button>
+      <button class="memo-ctrl-btn" id="memoToggleBtn" title="접기/펼치기">▼</button>
+    </div>
+  </div>
+  <div id="memo-body">
+    <textarea id="memo-textarea" placeholder="추리 메모를 남겨보세요...&#10;새로고침 후에도 유지됩니다."></textarea>
+    <div id="memo-footer">
+      <span id="memo-charcount">0자</span>
+    </div>
+  </div>
+</div>
 
 <script>
   // ── 상태 ──
@@ -477,7 +585,6 @@
     return audioCtx;
   }
 
-  // 숫자 입력: 타자기 클릭
   function playNumberSound() {
     const ctx = getCtx(), sr = ctx.sampleRate, now = ctx.currentTime;
     const buf = ctx.createBuffer(1, sr * 0.038, sr);
@@ -491,7 +598,6 @@
     src.start(now);
   }
 
-  // 초기화: 스윕 다운
   function playResetSound() {
     const ctx = getCtx(), now = ctx.currentTime;
     const osc = ctx.createOscillator(), g = ctx.createGain();
@@ -504,7 +610,6 @@
     osc.start(now); osc.stop(now + 0.22);
   }
 
-  // 제출: 확인 투톤 상행
   function playSubmitSound() {
     const ctx = getCtx(), now = ctx.currentTime;
     [[0, 660], [0.11, 990]].forEach(([dt, freq]) => {
@@ -517,7 +622,6 @@
     });
   }
 
-  // 새 게임: 3음 상행 아르페지오
   function playNewGameSound() {
     const ctx = getCtx(), now = ctx.currentTime;
     [523.2, 659.3, 783.9].forEach((freq, i) => {
@@ -530,7 +634,6 @@
     });
   }
 
-  // 정답: 승리 팡파레 (아르페지오 → 코드 홀드)
   function playWinSound() {
     const ctx = getCtx(), now = ctx.currentTime;
     const freqs = [523.2, 659.3, 783.9, 1046.5];
@@ -543,7 +646,6 @@
       osc.connect(g); g.connect(ctx.destination);
       osc.start(now + i * 0.09); osc.stop(now + i * 0.09 + 0.5);
     });
-    // 마지막 코드 홀드
     freqs.forEach(freq => {
       const osc = ctx.createOscillator(), g = ctx.createGain();
       osc.type = 'sine'; osc.frequency.value = freq;
@@ -554,7 +656,6 @@
     });
   }
 
-  // 포기: 하행 2음 (어둡게)
   function playFailSound() {
     const ctx = getCtx(), now = ctx.currentTime;
     [[0, 392], [0.18, 261.6]].forEach(([dt, freq]) => {
@@ -567,7 +668,6 @@
     });
   }
 
-  // ── 배경음악 (Web Audio, A minor ambient ~32초 루프) ──
   function makeReverb(ctx) {
     const conv = ctx.createConvolver();
     const len  = ctx.sampleRate * 2.0;
@@ -626,9 +726,7 @@
       src.start(t);
     }
 
-    // 5섹션 (~31.6초 루프) — A minor ambient
     const sections = [
-      // Sec 0: Intro — 여백, 긴 패드
       {
         ticks: [0, 4, 8, 12],
         bass: [
@@ -644,7 +742,6 @@
           [6.5, N.A3, beat*1.5, 'triangle', 0.11],
         ],
       },
-      // Sec 1: Verse A — 서정적 멜로디
       {
         ticks: [0, 2, 4, 6, 8, 10, 12, 14],
         bass: [
@@ -671,7 +768,6 @@
           [7.5, N.A3, beat*0.30, 'triangle', 0.08],
         ],
       },
-      // Sec 2: Color — F 컬러 (코드 변화)
       {
         ticks: [0, 2, 4, 6, 8, 10, 12, 14],
         bass: [
@@ -699,7 +795,6 @@
           [7.5, N.C4, beat*0.30, 'triangle', 0.08],
         ],
       },
-      // Sec 3: Build — 리드미컬 베이스 + 상행
       {
         ticks: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],
         bass: [
@@ -737,7 +832,6 @@
           [14, N.C4, beat*0.70, 'triangle', 0.13],
         ],
       },
-      // Sec 4: Outro — 고음 여운 후 루프
       {
         ticks: [0, 4, 8, 12],
         bass: [
@@ -787,6 +881,7 @@
   document.addEventListener('DOMContentLoaded', () => {
     loadGameState();
     createNumberButtons();
+    initMemo();
 
     submitBtn.addEventListener('click', submitGuess);
     resetBtn.addEventListener('click', resetCurrentGuess);
@@ -794,12 +889,10 @@
     giveUpBtn.addEventListener('click', handleGiveUp);
     musicToggle.addEventListener('click', toggleMusic);
 
-    // 오버레이는 항상 먼저 표시 — 클릭(유저 제스처)이 있어야 브라우저가 오디오 허용
     startOverlay.addEventListener('click', () => {
       startOverlay.style.display = 'none';
       startBgMusic();
 
-      // 저장된 게임 복원 or 새 게임 생성
       if (answer && answer.length === 4) {
         updateUI();
         if (isGameFinished()) handleFinishedGame();
@@ -811,7 +904,6 @@
     });
   });
 
-  // ── 정답 생성 (순수 함수, 사운드 없음) ──
   function generateAnswer() {
     answer = '';
     while (answer.length < 4) {
@@ -820,7 +912,6 @@
     }
   }
 
-  // ── 새 게임 ──
   function startNewGame() {
     playNewGameSound();
     generateAnswer();
@@ -838,24 +929,20 @@
     saveGameState();
   }
 
-  // ── 포기 / 답 보기 (2-click 확인) ──
   let giveUpPending = false;
   let giveUpTimer   = null;
   function handleGiveUp() {
     if (gameOver) return;
     if (!giveUpPending) {
-      // 1번째 클릭: 경고 상태
       giveUpPending = true;
       giveUpBtn.classList.add('confirm');
       giveUpBtn.textContent = '정말 포기? 한 번 더 클릭';
-      // 3초 후 자동 취소
       giveUpTimer = setTimeout(() => {
         giveUpPending = false;
         giveUpBtn.classList.remove('confirm');
         giveUpBtn.textContent = '답 보기 (포기)';
       }, 3000);
     } else {
-      // 2번째 클릭: 실제 포기
       clearTimeout(giveUpTimer);
       giveUpPending = false;
       gameOver = true;
@@ -867,14 +954,12 @@
       giveUpBtn.textContent = '포기함';
       giveupAnswer.textContent = answer.split('').join(' ');
       giveupMessage.style.display = 'block';
-      // 점수 차감 없이 정답만 공개, localStorage 정리
       localStorage.removeItem('baseballAnswer');
       saveGameState();
       updateUI();
     }
   }
 
-  // ── 저장 / 불러오기 ──
   function saveGameState() {
     localStorage.setItem('baseballAnswer',  answer);
     localStorage.setItem('baseballScore',   score);
@@ -890,7 +975,6 @@
     scoreEl.textContent = score;
   }
 
-  // ── 숫자 버튼 생성 ──
   function createNumberButtons() {
     const grid = document.getElementById('numberButtons');
     grid.innerHTML = '';
@@ -911,7 +995,6 @@
     document.querySelectorAll('.num-btn').forEach(b => b.disabled = true);
   }
 
-  // ── 숫자 입력 ──
   function addNumber(n) {
     if (gameOver || currentGuess.length >= 4) return;
     playNumberSound();
@@ -920,7 +1003,6 @@
     updateUI();
   }
 
-  // ── 초기화 ──
   function resetCurrentGuess() {
     if (gameOver) return;
     playResetSound();
@@ -929,14 +1011,11 @@
     updateUI();
   }
 
-  // ── 제출 ──
   function submitGuess() {
     if (gameOver || currentGuess.length !== 4) return;
     playSubmitSound();
-
     const result = checkAnswer(currentGuess);
     history.push({ guess: currentGuess, ...result });
-
     if (result.strikes === 4) {
       handleCorrectAnswer();
     } else {
@@ -947,7 +1026,6 @@
     }
   }
 
-  // ── 정답 확인 ──
   function checkAnswer(guess) {
     let strikes = 0, balls = 0;
     for (let i = 0; i < 4; i++) {
@@ -957,7 +1035,6 @@
     return { strikes, balls, outs: 4 - strikes - balls };
   }
 
-  // ── 정답 ──
   function handleCorrectAnswer() {
     gameOver = true;
     score++;
@@ -987,9 +1064,7 @@
     winMessage.style.display = 'block';
   }
 
-  // ── UI 업데이트 ──
   function updateUI() {
-    // 슬롯 업데이트
     for (let i = 0; i < 4; i++) {
       const slot = document.getElementById('s' + i);
       slot.className = 'guess-slot';
@@ -1003,11 +1078,8 @@
         slot.textContent = '';
       }
     }
-
-    // 확인 버튼
     submitBtn.disabled = currentGuess.length !== 4 || gameOver;
 
-    // 히스토리
     if (history.length === 0) {
       resultHistory.innerHTML = '<div class="history-empty">아직 시도 없음</div>';
       return;
@@ -1016,18 +1088,14 @@
     history.forEach((item, idx) => {
       const row = document.createElement('div');
       row.className = 'history-item';
-
       const idxEl = document.createElement('span');
       idxEl.className = 'h-idx';
       idxEl.textContent = idx + 1;
-
       const guessEl = document.createElement('span');
       guessEl.className = 'h-guess';
       guessEl.textContent = item.guess.split('').join(' ');
-
       const resEl = document.createElement('span');
       resEl.className = 'h-result';
-
       if (item.strikes === 4) {
         const b = document.createElement('span');
         b.className = 'h-badge badge-win';
@@ -1037,30 +1105,24 @@
         const bs = document.createElement('span');
         bs.className = 'h-badge badge-s';
         bs.textContent = `${item.strikes}S`;
-
         const bb = document.createElement('span');
         bb.className = 'h-badge badge-b';
         bb.textContent = `${item.balls}B`;
-
         const bo = document.createElement('span');
         bo.className = 'h-badge badge-o';
         bo.textContent = `${item.outs}O`;
-
         resEl.appendChild(bs);
         resEl.appendChild(bb);
         resEl.appendChild(bo);
       }
-
       row.appendChild(idxEl);
       row.appendChild(guessEl);
       row.appendChild(resEl);
       resultHistory.appendChild(row);
     });
-
     resultHistory.scrollTop = resultHistory.scrollHeight;
   }
 
-  // ── 음악 토글 ──
   function toggleMusic() {
     musicToggle.classList.toggle('on');
     if (musicToggle.classList.contains('on')) {
@@ -1068,6 +1130,49 @@
     } else {
       stopBgMusic();
     }
+  }
+
+  // ── 메모장 ──
+  function initMemo() {
+    const textarea    = document.getElementById('memo-textarea');
+    const charcount   = document.getElementById('memo-charcount');
+    const toggleBtn   = document.getElementById('memoToggleBtn');
+    const clearBtn    = document.getElementById('memoClearBtn');
+    const memoEl      = document.getElementById('memo');
+
+    // 저장된 내용 불러오기
+    const saved = localStorage.getItem('memoContent') || '';
+    const collapsed = localStorage.getItem('memoCollapsed') === 'true';
+    textarea.value = saved;
+    charcount.textContent = saved.length + '자';
+    if (collapsed) {
+      memoEl.classList.add('collapsed');
+      toggleBtn.textContent = '▲';
+    }
+
+    // 입력 시 저장
+    textarea.addEventListener('input', () => {
+      const val = textarea.value;
+      charcount.textContent = val.length + '자';
+      localStorage.setItem('memoContent', val);
+    });
+
+    // 접기/펼치기
+    toggleBtn.addEventListener('click', () => {
+      const isCollapsed = memoEl.classList.toggle('collapsed');
+      toggleBtn.textContent = isCollapsed ? '▲' : '▼';
+      localStorage.setItem('memoCollapsed', isCollapsed);
+    });
+
+    // 지우기
+    clearBtn.addEventListener('click', () => {
+      if (textarea.value === '') return;
+      if (confirm('메모 내용을 모두 지울까요?')) {
+        textarea.value = '';
+        charcount.textContent = '0자';
+        localStorage.setItem('memoContent', '');
+      }
+    });
   }
 </script>
 </body>
