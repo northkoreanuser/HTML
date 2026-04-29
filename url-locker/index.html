@@ -803,9 +803,9 @@ document.getElementById('decryptKeyInput')?.addEventListener('keydown', e => {
     const hash = new URLSearchParams(window.location.search).get('hash');
     if (hash) {
         document.getElementById('decryptSection').style.display = 'block';
-        document.title = 'URL UNLOCKER 🔓';
+        document.title = 'URL UNLOCK 🔓';
         // 타이틀 업데이트
-        document.querySelector('.logo').innerHTML = 'URL<span>UNLOCKER</span> 🔓';
+        document.querySelector('.logo').innerHTML = 'URL<span>UNLOCK</span> 🔓';
         document.querySelector('.subtitle').textContent = 'Decrypt & access your URL';
     } else {
         document.getElementById('encryptSection').style.display = 'block';
