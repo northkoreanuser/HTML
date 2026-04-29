@@ -14,4 +14,4 @@
 
 [url locker](https://northkoreanuser.github.io/HTML/url-locker)
 
-[url locker](https://northkoreanuser.github.io/HTML/HTML%20Editor)
+[HTML Editor](https://northkoreanuser.github.io/HTML/HTML%20Editor)
