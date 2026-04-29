@@ -12,4 +12,4 @@
 
 </br></br>
 
-[url locker](https://northkoreanuser.github.io/url-locker)
+[url locker](https://northkoreanuser.github.io/HTML/url-locker)
