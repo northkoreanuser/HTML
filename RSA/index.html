@@ -1,0 +1,1228 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>파일 무결성 검사 &amp; RSA 도구</title>
+<!-- RSA 키 아이콘 파비콘 -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230058b0'/><circle cx='11.5' cy='14' r='5' fill='none' stroke='%23fff' stroke-width='2.4'/><circle cx='11.5' cy='14' r='1.8' fill='%23fff'/><path d='M16.5 14 L28 14' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/><path d='M23.5 14 L23.5 18' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/><path d='M27 14 L27 17' stroke='%23fff' stroke-width='2.4' stroke-linecap='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/node-forge@1.3.1/dist/forge.min.js"></script>
+<style>
+:root {
+  --primary:       #0058b0;
+  --primary-dark:  #00408a;
+  --primary-light: #e6f0fb;
+  --accent:        #00a8e8;
+  --success:       #1a7c3e;
+  --success-bg:    #eaf7ef;
+  --error:         #b92d2d;
+  --error-bg:      #fdf0f0;
+  --bg:            #eef2f7;
+  --surface:       #ffffff;
+  --border:        #cdd5e0;
+  --border-focus:  #0058b0;
+  --text:          #1a2332;
+  --text-muted:    #64748b;
+  --mono:          'JetBrains Mono', 'Consolas', monospace;
+  --sans:          'Noto Sans KR', 'Segoe UI', sans-serif;
+  --radius:        6px;
+  --shadow:        0 4px 20px rgba(0,0,0,.09);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 28px 16px 48px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1180px;
+  background: var(--surface);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.app-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  padding: 22px 32px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.app-header svg { flex-shrink: 0; }
+.app-header h1 {
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+.app-header p {
+  color: rgba(255,255,255,.7);
+  font-size: .8rem;
+  margin-top: 2px;
+}
+
+/* ── Tabs ── */
+.tabs-nav {
+  display: flex;
+  border-bottom: 2px solid var(--border);
+  background: #f7f9fc;
+}
+.tabs-nav button {
+  flex: 1;
+  padding: 13px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: .95rem;
+  cursor: pointer;
+  transition: color .2s, background .2s, box-shadow .2s;
+  position: relative;
+}
+.tabs-nav button.active {
+  color: var(--primary);
+  background: var(--surface);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+.tabs-nav button:not(.active):hover { background: #edf2f8; color: var(--text); }
+
+/* ── Tab Panes ── */
+.tab-pane { padding: 28px 32px; }
+.tab-pane.hidden { display: none; }
+.rsa-inner-pane.hidden { display: none; }
+
+/* ── Form elements ── */
+.form-group { margin-bottom: 20px; }
+
+label {
+  display: block;
+  font-weight: 600;
+  font-size: .9rem;
+  margin-bottom: 7px;
+  color: var(--text);
+}
+
+select, textarea, input[type="text"] {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: .88rem;
+  font-family: var(--sans);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color .2s, box-shadow .2s;
+  background: var(--surface);
+  color: var(--text);
+}
+select:focus, textarea:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(0,88,176,.15); }
+
+textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: var(--mono);
+  font-size: .8rem;
+  line-height: 1.6;
+}
+textarea:disabled { background: #f3f5f8; color: var(--text-muted); cursor: not-allowed; }
+
+/* ── Buttons ── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  font-family: var(--sans);
+  font-size: .875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .18s, border-color .18s, opacity .18s, transform .1s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+.btn-primary { background: var(--primary); color: #fff; border-color: var(--primary-dark); }
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+
+.btn-secondary { background: #f0f4fa; color: var(--primary); border-color: var(--border); }
+.btn-secondary:hover:not(:disabled) { background: var(--primary-light); border-color: var(--primary); }
+
+.btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+.btn-ghost:hover:not(:disabled) { background: #f0f4fa; color: var(--text); }
+
+/* ── Controls row ── */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.controls label { margin: 0; font-weight: 500; }
+.controls select { width: auto; }
+
+/* ── File picker ── */
+.file-input-group { display: flex; align-items: center; gap: 10px; }
+.file-name-label {
+  flex: 1;
+  background: #f7f9fc;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .85rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+input[type="file"] { display: none; }
+
+/* ── Result box ── */
+.result-box {
+  margin-top: 18px;
+  font-family: var(--mono);
+  font-size: .82rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #f7f9fc;
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  min-height: 80px;
+  line-height: 1.7;
+  color: var(--text);
+}
+.result-box .status-ok  { color: var(--success); font-weight: 700; }
+.result-box .status-err { color: var(--error);   font-weight: 700; }
+.result-box .label      { color: var(--text-muted); font-weight: 400; }
+
+/* ── RSA Tool ── */
+.rsa-inner-tabs .tabs-nav  { margin-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; }
+.rsa-inner-pane {
+  border: 1px solid var(--border);
+  border-top: none;
+  border-radius: 0 0 var(--radius) var(--radius);
+  padding: 20px 24px 24px;
+  min-height: 460px;
+  overflow-y: auto;
+}
+
+.section-label {
+  font-weight: 600;
+  font-size: .85rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin: 16px 0 6px;
+}
+.section-label:first-child { margin-top: 0; }
+
+.key-row { display: flex; gap: 14px; margin-bottom: 16px; }
+.key-row > div { flex: 1; min-width: 0; }
+.key-row textarea { min-height: 130px; }
+
+.copy-wrap { position: relative; }
+.copy-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 3px 8px;
+  font-size: .75rem;
+  border-radius: 4px;
+  background: rgba(255,255,255,.9);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background .15s;
+  font-family: var(--sans);
+}
+.copy-btn:hover { background: var(--primary-light); color: var(--primary); }
+
+/* ── Key info badge ── */
+.key-info {
+  font-size: .78rem;
+  color: var(--text-muted);
+  font-family: var(--mono);
+  margin-top: 4px;
+  min-height: 1.2em;
+}
+
+/* ── Message overlay ── */
+.msg-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.msg-overlay.active { display: flex; }
+.msg-box {
+  background: var(--surface);
+  padding: 28px 28px 22px;
+  border-radius: 10px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.2);
+  width: 92%;
+  max-width: 400px;
+  text-align: center;
+  border-top: 4px solid var(--primary);
+}
+.msg-box.success { border-top-color: var(--success); }
+.msg-box.error   { border-top-color: var(--error);   }
+.msg-box p { margin-bottom: 20px; font-size: .95rem; line-height: 1.6; }
+.msg-btns { display: flex; justify-content: center; gap: 10px; }
+
+/* ── Spinner ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+
+/* ── Responsive ── */
+@media (max-width: 680px) {
+  .tab-pane { padding: 18px 16px; }
+  .key-row { flex-direction: column; }
+  .app-header { padding: 16px 18px; }
+}
+</style>
+</head>
+<body>
+<div class="app-container">
+
+  <!-- Header -->
+  <div class="app-header">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">
+      <circle cx="13" cy="17" r="7" stroke="rgba(255,255,255,.9)" stroke-width="2.8"/>
+      <circle cx="13" cy="17" r="2.5" fill="rgba(255,255,255,.9)"/>
+      <path d="M20 17h13M27 17v5.5M32 17v4" stroke="rgba(255,255,255,.9)" stroke-width="2.8" stroke-linecap="round"/>
+    </svg>
+    <div>
+      <h1>파일 무결성 검사 &amp; RSA 도구</h1>
+      <p>RSA 전자서명 기반 파일 검증 · 키 생성 · 암호화 · 서명</p>
+    </div>
+  </div>
+
+  <!-- Main tabs -->
+  <div class="tabs-nav" role="tablist">
+    <button class="active" data-tab="tabIntegrity" role="tab" aria-selected="true">🔍 파일 무결성 검사</button>
+    <button data-tab="tabRsa"       role="tab" aria-selected="false">🔐 RSA 도구</button>
+  </div>
+
+  <!-- ── Tab: 무결성 검사 ── -->
+  <div id="tabIntegrity" class="tab-pane" role="tabpanel">
+    <div class="form-group">
+      <label for="integrityFileInput">검증할 파일 선택</label>
+      <div class="file-input-group">
+        <button class="btn btn-primary" id="integrityFileSelectBtn">📂 파일 선택</button>
+        <span class="file-name-label" id="integrityFileNameLabel">선택된 파일 없음</span>
+      </div>
+      <input type="file" id="integrityFileInput">
+    </div>
+    <div class="form-group">
+      <label for="integrityAlgoSelect">해시 알고리즘</label>
+      <select id="integrityAlgoSelect" style="max-width:200px">
+        <option value="CRC32">CRC32</option>
+        <option value="SHA-1">SHA-1</option>
+        <option value="SHA-256">SHA-256</option>
+        <option value="SHA-384">SHA-384</option>
+        <option value="SHA-512" selected>SHA-512</option>
+      </select>
+    </div>
+    <div class="result-box" id="integrityResultBox">결과가 여기에 표시됩니다.</div>
+  </div>
+
+  <!-- ── Tab: RSA 도구 ── -->
+  <div id="tabRsa" class="tab-pane hidden" role="tabpanel">
+
+    <!-- Key controls -->
+    <div class="controls">
+      <label>키 길이
+        <select id="rsaKeySize" style="margin-left:6px">
+          <option value="512">512 bit</option>
+          <option value="1024">1024 bit</option>
+          <option value="2048" selected>2048 bit</option>
+          <option value="3072">3072 bit</option>
+          <option value="4096">4096 bit</option>
+        </select>
+      </label>
+      <button class="btn btn-primary" id="rsaGenerateBtn">⚙️ 키 생성</button>
+      <button class="btn btn-secondary" id="rsaSavePubBtn">🔽 공개키 저장</button>
+      <button class="btn btn-secondary" id="rsaSavePrivBtn">🔽 개인키 저장</button>
+      <button class="btn btn-ghost"    id="rsaLoadKeyBtn">📂 키 불러오기</button>
+      <button class="btn btn-ghost"    id="rsaExtractPubBtn">🔑 개인→공개 추출</button>
+      <input type="file" id="rsaLoadKeyFile" accept=".pem,.key,.txt">
+    </div>
+
+    <!-- Key areas -->
+    <div class="key-row">
+      <div>
+        <div class="section-label">📤 공개키 (PEM)</div>
+        <div class="copy-wrap">
+          <textarea id="rsaPublicKey" placeholder="생성된 공개키가 여기에 표시됩니다." spellcheck="false" autocomplete="off"></textarea>
+          <button class="copy-btn" data-copy="rsaPublicKey">복사</button>
+        </div>
+        <div class="key-info" id="rsaPubInfo"></div>
+      </div>
+      <div>
+        <div class="section-label">📥 개인키 (PEM)</div>
+        <div class="copy-wrap">
+          <textarea id="rsaPrivateKey" placeholder="생성된 개인키가 여기에 표시됩니다." spellcheck="false" autocomplete="off"></textarea>
+          <button class="copy-btn" data-copy="rsaPrivateKey">복사</button>
+        </div>
+        <div class="key-info" id="rsaPrivInfo"></div>
+      </div>
+    </div>
+
+    <!-- RSA inner tabs -->
+    <div class="rsa-inner-tabs">
+      <div class="tabs-nav" role="tablist">
+        <button class="active" data-tab="rsaTabEncrypt" role="tab">🔒 암호화 / 복호화</button>
+        <button data-tab="rsaTabSign"    role="tab">✍️ 전자서명</button>
+      </div>
+
+      <!-- Encrypt/Decrypt -->
+      <div id="rsaTabEncrypt" class="rsa-inner-pane">
+        <div class="section-label">📧 원문 메시지</div>
+        <div class="copy-wrap">
+          <textarea id="rsaPlainText" placeholder="암호화할 메시지를 입력하세요" spellcheck="false"></textarea>
+        </div>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn btn-primary" id="rsaEncryptBtn">🔒 암호화 (공개키)</button>
+          <button class="btn btn-secondary" id="rsaDecryptBtn">🔓 복호화 (개인키)</button>
+        </div>
+
+        <div class="section-label" style="margin-top:20px">📦 암호문 (Base64)</div>
+        <div class="copy-wrap">
+          <textarea id="rsaCipherText" placeholder="암호문이 여기에 표시됩니다" spellcheck="false"></textarea>
+          <button class="copy-btn" data-copy="rsaCipherText">복사</button>
+        </div>
+
+        <div class="section-label" style="margin-top:20px">📜 복호화 결과</div>
+        <div class="copy-wrap">
+          <textarea id="rsaDecryptedText" placeholder="복호화 결과가 여기에 표시됩니다" readonly spellcheck="false"></textarea>
+          <button class="copy-btn" data-copy="rsaDecryptedText">복사</button>
+        </div>
+      </div>
+
+      <!-- Sign/Verify -->
+      <div id="rsaTabSign" class="rsa-inner-pane hidden">
+        <div class="section-label">✍️ 서명할 메시지 (또는 파일 해시)</div>
+        <div class="copy-wrap">
+          <textarea id="rsaSignInput" placeholder="서명할 메시지를 입력하거나, 아래에서 파일을 선택하세요" spellcheck="false"></textarea>
+        </div>
+        <div class="controls" style="margin-top:8px">
+          <button class="btn btn-primary"   id="rsaSignBtn">✍️ 개인키로 서명</button>
+          <button class="btn btn-secondary" id="rsaSignFileBtn">📂 파일 선택</button>
+          <button class="btn btn-ghost"     id="rsaUnloadSignFileBtn" disabled>✖ 파일 해제</button>
+          <div style="margin-left:auto; display:flex; align-items:center; gap:6px">
+            <label style="margin:0; font-size:.85rem">해시</label>
+            <select id="rsaHashAlgo">
+              <option value="md5">MD5</option>
+              <option value="sha1">SHA-1</option>
+              <option value="sha256">SHA-256</option>
+              <option value="sha384">SHA-384</option>
+              <option value="sha512" selected>SHA-512</option>
+            </select>
+          </div>
+        </div>
+        <input type="file" id="rsaSignFileInput">
+
+        <div class="section-label" style="margin-top:18px">🧾 서명 결과 (Base64)</div>
+        <div class="copy-wrap">
+          <textarea id="rsaSignature" placeholder="서명 결과가 여기에 표시됩니다" spellcheck="false"></textarea>
+          <button class="copy-btn" data-copy="rsaSignature">복사</button>
+        </div>
+        <div class="controls" style="margin-top:8px">
+          <button class="btn btn-primary"   id="rsaVerifyBtn">✅ 공개키로 서명 검증</button>
+          <button class="btn btn-secondary" id="rsaSaveSigBtn">🔽 서명 저장</button>
+          <button class="btn btn-ghost"     id="rsaLoadSigBtn">📂 서명 불러오기</button>
+        </div>
+        <input type="file" id="rsaLoadSigFile" accept=".sig,.txt">
+
+        <div class="section-label" style="margin-top:18px">🧪 검증 결과</div>
+        <div class="copy-wrap">
+          <textarea id="rsaVerifyResult" placeholder="검증 결과가 여기에 표시됩니다" readonly spellcheck="false"></textarea>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tabRsa -->
+
+</div><!-- /app-container -->
+
+<!-- Message overlay -->
+<div class="msg-overlay" id="msgOverlay" role="dialog" aria-modal="true">
+  <div class="msg-box" id="msgBox">
+    <p id="msgText"></p>
+    <div class="msg-btns" id="msgBtns"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ──────────────────────────────────────────
+   공통 유틸리티
+────────────────────────────────────────── */
+
+/** 메시지 다이얼로그 */
+const dialog = (() => {
+  const overlay = document.getElementById('msgOverlay');
+  const box     = document.getElementById('msgBox');
+  const textEl  = document.getElementById('msgText');
+  const btnsEl  = document.getElementById('msgBtns');
+
+  const hide = () => { overlay.classList.remove('active'); };
+
+  const show = (html, type = 'info', buttons = [{ label: '확인', action: hide }]) => {
+    textEl.innerHTML = html;
+    box.className = 'msg-box ' + type;
+    btnsEl.innerHTML = '';
+    buttons.forEach(({ label, action, btnClass = 'btn btn-secondary' }) => {
+      const btn = document.createElement('button');
+      btn.className = btnClass;
+      btn.textContent = label;
+      btn.onclick = action;
+      btnsEl.appendChild(btn);
+    });
+    overlay.classList.add('active');
+  };
+
+  return { show, hide };
+})();
+
+/** 파일 다운로드 */
+function downloadText(filename, content) {
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([content], { type: 'text/plain' })),
+    download: filename
+  });
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/** 클립보드 복사 */
+document.querySelectorAll('.copy-btn[data-copy]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const target = document.getElementById(btn.dataset.copy);
+    if (!target || !target.value) return;
+    try {
+      await navigator.clipboard.writeText(target.value);
+      const prev = btn.textContent;
+      btn.textContent = '✓ 복사됨';
+      setTimeout(() => { btn.textContent = prev; }, 1500);
+    } catch {
+      dialog.show('클립보드 복사에 실패했습니다.', 'error');
+    }
+  });
+});
+
+/* ──────────────────────────────────────────
+   메인 탭 전환
+────────────────────────────────────────── */
+const mainTabBtns  = [
+  document.querySelector('.app-container > .tabs-nav > button[data-tab="tabIntegrity"]'),
+  document.querySelector('.app-container > .tabs-nav > button[data-tab="tabRsa"]'),
+];
+const mainTabPanes = [
+  document.getElementById('tabIntegrity'),
+  document.getElementById('tabRsa'),
+];
+
+mainTabBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetId = btn.dataset.tab;
+    mainTabBtns.forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === targetId);
+      b.setAttribute('aria-selected', b.dataset.tab === targetId);
+    });
+    mainTabPanes.forEach(p => {
+      p.classList.toggle('hidden', p.id !== targetId);
+    });
+  });
+});
+
+/* ──────────────────────────────────────────
+   모듈: 파일 무결성 검사
+────────────────────────────────────────── */
+(function integrityModule() {
+
+  const fileInput   = document.getElementById('integrityFileInput');
+  const fileSelBtn  = document.getElementById('integrityFileSelectBtn');
+  const fileLabel   = document.getElementById('integrityFileNameLabel');
+  const algoSelect  = document.getElementById('integrityAlgoSelect');
+  const resultBox   = document.getElementById('integrityResultBox');
+
+  const SIG_DIR     = 'signatures/';
+  const PUBLIC_KEY_URL = 'public_key.pem';
+
+  let publicKeyObj = null;  // CryptoKey (RSASSA-PKCS1-v1_5)
+
+  /** CRC32 테이블 (IEEE 다항식: 0xEDB88320) */
+  function buildCrc32Table() {
+    const table = new Uint32Array(256);
+    for (let i = 0; i < 256; i++) {
+      let c = i;
+      for (let j = 0; j < 8; j++) {
+        c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      }
+      table[i] = c;
+    }
+    return table;
+  }
+  const CRC32_TABLE = buildCrc32Table();
+
+  function crc32Hex(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) {
+      crc = (crc >>> 8) ^ CRC32_TABLE[(crc ^ bytes[i]) & 0xFF];
+    }
+    return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).toUpperCase().padStart(8, '0');
+  }
+
+  /** 파일 → 해시 문자열 */
+  async function hashFile(file, algorithm) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('파일 읽기에 실패했습니다.'));
+      reader.onload  = async () => {
+        const buf = reader.result;
+        if (algorithm === 'CRC32') {
+          resolve(crc32Hex(buf));
+          return;
+        }
+        try {
+          const hashBuf = await crypto.subtle.digest(algorithm, buf);
+          const hex = Array.from(new Uint8Array(hashBuf))
+            .map(b => b.toString(16).padStart(2, '0')).join('');
+          resolve(hex.toUpperCase());
+        } catch (err) {
+          reject(new Error('해시 계산 오류: ' + err.message));
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  /** Base64(또는 PEM) → ArrayBuffer */
+  function b64ToBuffer(input) {
+    const b64 = input.replace(/-----(?:BEGIN|END)[^-]*-----/g, '').replace(/\s+/g, '');
+    const bin = atob(b64);
+    const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    return buf.buffer;
+  }
+
+  /** 서버에서 공개키 로드 */
+  async function loadPublicKey() {
+    const res = await fetch(PUBLIC_KEY_URL);
+    if (!res.ok) throw new Error(`공개키 파일(${PUBLIC_KEY_URL}) 로드 실패 (HTTP ${res.status})`);
+    const pem = await res.text();
+    const keyBuf = b64ToBuffer(pem);
+    return crypto.subtle.importKey(
+      'spki', keyBuf,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+      false, ['verify']
+    );
+  }
+
+  /** RSA 서명 검증: 해시 대소문자 양쪽 시도 */
+  async function verifyFileSignature(hashHex, sigBase64) {
+    if (!publicKeyObj) throw new Error('공개키가 로드되지 않았습니다.');
+    const sigBuf = b64ToBuffer(sigBase64);
+    const enc = new TextEncoder();
+
+    // 대문자 / 소문자 모두 시도 (서명 생성 시 대소문자 차이 허용)
+    for (const candidate of [hashHex.toUpperCase(), hashHex.toLowerCase()]) {
+      const valid = await crypto.subtle.verify(
+        { name: 'RSASSA-PKCS1-v1_5' },
+        publicKeyObj,
+        sigBuf,
+        enc.encode(candidate)
+      );
+      if (valid) return true;
+    }
+    return false;
+  }
+
+  /** 파일 선택 시 처리 */
+  async function processSelectedFile() {
+    const file      = fileInput.files[0];
+    const algorithm = algoSelect.value;
+    if (!file) return;
+
+    resultBox.innerHTML = '⏳ 해시 계산 중...';
+
+    let hashHex;
+    try {
+      hashHex = await hashFile(file, algorithm);
+    } catch (err) {
+      resultBox.innerHTML =
+        `<span class="status-err">❌ 해시 계산 오류</span>\n<span class="label">${err.message}</span>`;
+      return;
+    }
+
+    resultBox.innerHTML =
+      `⏳ 서명 파일 조회 중...\n<span class="label">해시:</span> ${hashHex}`;
+
+    let sigText;
+    try {
+      const sigUrl = `${SIG_DIR}${hashHex}.sig`;
+      const sigRes = await fetch(sigUrl);
+      if (!sigRes.ok) {
+        resultBox.innerHTML =
+          `<span class="status-err">❌ 무결성 검증 실패</span> <span class="label">(서명 파일을 찾을 수 없음)</span>\n` +
+          `<span class="label">알고리즘:</span> ${algorithm}\n` +
+          `<span class="label">해시:</span> ${hashHex}`;
+        return;
+      }
+      sigText = await sigRes.text();
+    } catch (err) {
+      resultBox.innerHTML =
+        `<span class="status-err">❌ 네트워크 오류</span>\n<span class="label">${err.message}</span>`;
+      return;
+    }
+
+    let isValid;
+    try {
+      isValid = await verifyFileSignature(hashHex, sigText.trim());
+    } catch (err) {
+      resultBox.innerHTML =
+        `<span class="status-err">❌ 서명 검증 오류</span>\n<span class="label">${err.message}</span>`;
+      return;
+    }
+
+    if (isValid) {
+      resultBox.innerHTML =
+        `<span class="status-ok">✅ 무결성 검증 성공</span>\n` +
+        `<span class="label">알고리즘:</span> ${algorithm}\n` +
+        `<span class="label">해시:</span> ${hashHex}`;
+    } else {
+      resultBox.innerHTML =
+        `<span class="status-err">❌ 무결성 검증 실패</span> <span class="label">(서명 불일치)</span>\n` +
+        `<span class="label">알고리즘:</span> ${algorithm}\n` +
+        `<span class="label">해시:</span> ${hashHex}`;
+    }
+  }
+
+  /* 이벤트 바인딩 */
+  fileSelBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+      fileLabel.textContent = fileInput.files[0].name;
+      processSelectedFile();
+    } else {
+      fileLabel.textContent = '선택된 파일 없음';
+      resultBox.textContent = '결과가 여기에 표시됩니다.';
+    }
+  });
+
+  algoSelect.addEventListener('change', () => {
+    if (fileInput.files.length > 0) processSelectedFile();
+  });
+
+  /* 초기화: 공개키 로드 */
+  (async function init() {
+    try {
+      publicKeyObj = await loadPublicKey();
+      resultBox.textContent = '✔ 공개키 로드 완료. 검증할 파일을 선택하세요.';
+    } catch (err) {
+      console.error('[integrity] 공개키 로드 실패:', err);
+      resultBox.textContent = '❌ 공개키 로드 실패. 페이지를 새로고침 해주세요.';
+      dialog.show(
+        `<b>공개키 로드 실패</b><br>${err.message}<br><br>페이지를 새로고침 해주세요.`,
+        'error'
+      );
+    }
+  })();
+
+})(); // integrityModule
+
+
+/* ──────────────────────────────────────────
+   모듈: RSA 도구
+────────────────────────────────────────── */
+(function rsaModule() {
+
+  /* DOM 참조 */
+  const el = {
+    keySize:       document.getElementById('rsaKeySize'),
+    generateBtn:   document.getElementById('rsaGenerateBtn'),
+    savePubBtn:    document.getElementById('rsaSavePubBtn'),
+    savePrivBtn:   document.getElementById('rsaSavePrivBtn'),
+    loadKeyBtn:    document.getElementById('rsaLoadKeyBtn'),
+    loadKeyFile:   document.getElementById('rsaLoadKeyFile'),
+    extractPubBtn: document.getElementById('rsaExtractPubBtn'),
+    publicKeyArea: document.getElementById('rsaPublicKey'),
+    privateKeyArea:document.getElementById('rsaPrivateKey'),
+    pubInfo:       document.getElementById('rsaPubInfo'),
+    privInfo:      document.getElementById('rsaPrivInfo'),
+
+    encrypt: {
+      plainText:    document.getElementById('rsaPlainText'),
+      cipherText:   document.getElementById('rsaCipherText'),
+      decryptedText:document.getElementById('rsaDecryptedText'),
+      encryptBtn:   document.getElementById('rsaEncryptBtn'),
+      decryptBtn:   document.getElementById('rsaDecryptBtn'),
+    },
+
+    sign: {
+      signInput:       document.getElementById('rsaSignInput'),
+      signBtn:         document.getElementById('rsaSignBtn'),
+      signFileBtn:     document.getElementById('rsaSignFileBtn'),
+      signFileInput:   document.getElementById('rsaSignFileInput'),
+      unloadFileBtn:   document.getElementById('rsaUnloadSignFileBtn'),
+      hashAlgo:        document.getElementById('rsaHashAlgo'),
+      signature:       document.getElementById('rsaSignature'),
+      verifyResult:    document.getElementById('rsaVerifyResult'),
+      verifyBtn:       document.getElementById('rsaVerifyBtn'),
+      saveSigBtn:      document.getElementById('rsaSaveSigBtn'),
+      loadSigBtn:      document.getElementById('rsaLoadSigBtn'),
+      loadSigFile:     document.getElementById('rsaLoadSigFile'),
+    }
+  };
+
+  let isSignFileLoaded = false;  // 파일 해시가 signInput에 로드된 상태 여부
+
+  /* RSA 내부 탭 전환 */
+  const innerTabBtns  = [
+    document.querySelector('#tabRsa .rsa-inner-tabs .tabs-nav button[data-tab="rsaTabEncrypt"]'),
+    document.querySelector('#tabRsa .rsa-inner-tabs .tabs-nav button[data-tab="rsaTabSign"]'),
+  ];
+  const innerTabPanes = [
+    document.getElementById('rsaTabEncrypt'),
+    document.getElementById('rsaTabSign'),
+  ];
+
+  innerTabBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.tab;
+      innerTabBtns.forEach(b => {
+        b.classList.toggle('active', b.dataset.tab === targetId);
+        b.setAttribute('aria-selected', b.dataset.tab === targetId);
+      });
+      innerTabPanes.forEach(p => {
+        p.classList.toggle('hidden', p.id !== targetId);
+      });
+
+    });
+  });
+
+  /* ── 키 정보 표시 ── */
+  function displayKeyInfo(pemStr) {
+    try {
+      if (pemStr.includes('PUBLIC KEY')) {
+        const key = forge.pki.publicKeyFromPem(pemStr);
+        el.pubInfo.textContent = `RSA-${key.n.bitLength()} bit  ·  e = ${key.e.toString(16).toUpperCase()}`;
+        el.privInfo.textContent = '';
+      } else if (pemStr.includes('PRIVATE KEY')) {
+        const key = forge.pki.privateKeyFromPem(pemStr);
+        el.privInfo.textContent = `RSA-${key.n.bitLength()} bit  ·  e = ${key.e.toString(16).toUpperCase()}`;
+        el.pubInfo.textContent = '';
+      }
+    } catch { /* PEM이 아직 불완전할 수 있으므로 무시 */ }
+  }
+
+  /* ── 키 생성 ── */
+  function generateKeys() {
+    const bits = parseInt(el.keySize.value, 10);
+    el.generateBtn.disabled = true;
+    el.generateBtn.innerHTML = `<span class="spinner"></span> 생성 중... (${bits}bit)`;
+    el.publicKeyArea.value  = '';
+    el.privateKeyArea.value = '';
+    el.pubInfo.textContent  = '';
+    el.privInfo.textContent = '';
+
+    setTimeout(() => {
+      try {
+        const keypair = forge.pki.rsa.generateKeyPair({ bits, e: 0x10001 });
+        el.publicKeyArea.value  = forge.pki.publicKeyToPem(keypair.publicKey);
+        el.privateKeyArea.value = forge.pki.privateKeyToPem(keypair.privateKey);
+        displayKeyInfo(el.privateKeyArea.value);
+        el.privInfo.textContent = `RSA-${bits} bit  ·  e = 10001`;
+        el.pubInfo.textContent  = `RSA-${bits} bit  ·  e = 10001`;
+        dialog.show('키 생성이 완료되었습니다.', 'success');
+      } catch (err) {
+        console.error('[rsaModule] 키 생성 실패:', err);
+        dialog.show('키 생성 실패: ' + err.message, 'error');
+      } finally {
+        el.generateBtn.disabled = false;
+        el.generateBtn.innerHTML = '⚙️ 키 생성';
+      }
+    }, 60);
+  }
+
+  /* ── 키 저장 ── */
+  function saveKey(type) {
+    const pem      = (type === 'public' ? el.publicKeyArea : el.privateKeyArea).value.trim();
+    const label    = type === 'public' ? '공개키' : '개인키';
+    const filename = type === 'public' ? 'public_key.pem' : 'private_key.pem';
+
+    if (!pem) { dialog.show(`${label}가 비어있습니다.`, 'error'); return; }
+
+    try {
+      if (type === 'public')  forge.pki.publicKeyFromPem(pem);
+      else                    forge.pki.privateKeyFromPem(pem);
+      downloadText(filename, pem);
+    } catch (err) {
+      dialog.show(`유효하지 않은 ${label}입니다: ${err.message}`, 'error');
+    }
+  }
+
+  /* ── 키 불러오기 ── */
+  function loadKeyFromFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+
+    reader.onerror = () => {
+      dialog.show('파일 읽기 오류가 발생했습니다.', 'error');
+      el.loadKeyFile.value = '';
+    };
+
+    reader.onload = () => {
+      const pem = reader.result.trim();
+      el.loadKeyFile.value = '';
+
+      if (pem.includes('PUBLIC KEY')) {
+        try {
+          forge.pki.publicKeyFromPem(pem);
+          el.publicKeyArea.value = pem;
+          displayKeyInfo(pem);
+          dialog.show('공개키를 성공적으로 불러왔습니다.', 'success');
+        } catch (err) {
+          dialog.show('공개키 파싱 실패: ' + err.message, 'error');
+        }
+        return;
+      }
+
+      if (pem.includes('PRIVATE KEY')) {
+        try {
+          forge.pki.privateKeyFromPem(pem);
+          el.privateKeyArea.value = pem;
+          displayKeyInfo(pem);
+          dialog.show('개인키를 성공적으로 불러왔습니다.', 'success');
+        } catch (err) {
+          dialog.show('개인키 파싱 실패: ' + err.message, 'error');
+        }
+        return;
+      }
+
+      dialog.show('유효한 PEM 형식의 키 파일이 아닙니다.', 'error');
+    };
+
+    reader.readAsText(file);
+  }
+
+  /* ── 개인키 → 공개키 추출 ── */
+  function extractPublicKey() {
+    const privPem = el.privateKeyArea.value.trim();
+    if (!privPem) { dialog.show('개인키가 비어있습니다.', 'error'); return; }
+
+    try {
+      const privateKey = forge.pki.privateKeyFromPem(privPem);
+      const publicKey  = forge.pki.setRsaPublicKey(privateKey.n, privateKey.e);
+      el.publicKeyArea.value = forge.pki.publicKeyToPem(publicKey);
+      displayKeyInfo(el.publicKeyArea.value);
+      dialog.show('개인키에서 공개키를 성공적으로 추출했습니다.', 'success');
+    } catch (err) {
+      dialog.show('공개키 추출 실패: ' + err.message, 'error');
+    }
+  }
+
+  /* ── 암호화 ── */
+  function encryptMessage() {
+    const pubPem    = el.publicKeyArea.value.trim();
+    const plainText = el.encrypt.plainText.value;
+
+    if (!pubPem)    { dialog.show('공개키를 먼저 로드하거나 생성하세요.', 'error'); return; }
+    if (!plainText) { dialog.show('암호화할 메시지를 입력하세요.', 'error'); return; }
+
+    try {
+      const publicKey   = forge.pki.publicKeyFromPem(pubPem);
+      const encrypted   = publicKey.encrypt(forge.util.encodeUtf8(plainText), 'RSA-OAEP');
+      el.encrypt.cipherText.value = forge.util.encode64(encrypted);
+      dialog.show('암호화가 완료되었습니다.', 'success');
+    } catch (err) {
+      dialog.show('암호화 실패: ' + err.message, 'error');
+    }
+  }
+
+  /* ── 복호화 ── */
+  function decryptMessage() {
+    const privPem    = el.privateKeyArea.value.trim();
+    const cipherText = el.encrypt.cipherText.value.trim();
+
+    if (!privPem)    { dialog.show('개인키를 먼저 로드하거나 생성하세요.', 'error'); return; }
+    if (!cipherText) { dialog.show('복호화할 암호문을 입력하세요.', 'error'); return; }
+
+    try {
+      const privateKey  = forge.pki.privateKeyFromPem(privPem);
+      const decoded     = forge.util.decode64(cipherText);
+      const decrypted   = privateKey.decrypt(decoded, 'RSA-OAEP');
+      el.encrypt.decryptedText.value = forge.util.decodeUtf8(decrypted);
+      dialog.show('복호화가 완료되었습니다.', 'success');
+    } catch (err) {
+      dialog.show('복호화 실패: ' + err.message, 'error');
+    }
+  }
+
+  /* ── 서명 ── */
+  function signMessage() {
+    const privPem    = el.privateKeyArea.value.trim();
+    const message    = el.sign.signInput.value;
+    const hashAlgo   = el.sign.hashAlgo.value;
+
+    if (!privPem)                        { dialog.show('개인키를 먼저 로드하거나 생성하세요.', 'error'); return; }
+    if (!message && !isSignFileLoaded)   { dialog.show('서명할 메시지를 입력하거나 파일을 선택하세요.', 'error'); return; }
+
+    try {
+      const privateKey = forge.pki.privateKeyFromPem(privPem);
+      const md         = forge.md[hashAlgo].create();
+      md.update(message, 'utf8');
+      el.sign.signature.value = forge.util.encode64(privateKey.sign(md));
+      dialog.show('서명이 완료되었습니다.', 'success');
+    } catch (err) {
+      dialog.show('서명 실패: ' + err.message, 'error');
+    }
+  }
+
+  /* ── 서명 검증 ── */
+  function verifyRsaSignature() {
+    const pubPem   = el.publicKeyArea.value.trim();
+    const privPem  = el.privateKeyArea.value.trim();
+    const message  = el.sign.signInput.value.trim();
+    const sigB64   = el.sign.signature.value.trim();
+    const resultEl = el.sign.verifyResult;
+
+    if (!message) { dialog.show('서명할 메시지를 입력하세요.', 'error'); return; }
+    if (!sigB64)  { dialog.show('서명값을 입력하세요.', 'error'); return; }
+
+    let sigBytes;
+    try {
+      sigBytes = forge.util.decode64(sigB64);
+    } catch {
+      dialog.show('서명 형식이 올바르지 않습니다 (유효한 Base64가 아님).', 'error');
+      return;
+    }
+
+    const md = forge.md[el.sign.hashAlgo.value].create();
+    md.update(message, 'utf8');
+    const digest = md.digest().bytes();
+
+    /* 1차: 제공된 공개키로 검증 */
+    if (pubPem) {
+      try {
+        const publicKey = forge.pki.publicKeyFromPem(pubPem);
+        if (publicKey.verify(digest, sigBytes)) {
+          resultEl.value = '✅ 서명 유효 (제공된 공개키)';
+          dialog.show('서명 검증 성공!', 'success');
+          return;
+        }
+        resultEl.value = '⚠️ 1차 검증 실패. 개인키로 공개키 재시도 중...';
+      } catch (err) {
+        console.warn('[rsaModule] 1차 검증 오류:', err.message);
+        resultEl.value = `⚠️ 1차 검증 오류: ${err.message}`;
+      }
+    }
+
+    /* 2차: 개인키에서 공개키 추출 후 재검증 */
+    if (!privPem) {
+      resultEl.value = '❌ 검증 실패 (사용 가능한 공개키 없음)';
+      dialog.show('검증에 실패했습니다. 공개키 또는 개인키가 필요합니다.', 'error');
+      return;
+    }
+
+    try {
+      const privateKey  = forge.pki.privateKeyFromPem(privPem);
+      const derivedPub  = forge.pki.setRsaPublicKey(privateKey.n, privateKey.e);
+
+      // 공개키 영역 자동 업데이트
+      el.publicKeyArea.value = forge.pki.publicKeyToPem(derivedPub);
+      displayKeyInfo(el.publicKeyArea.value);
+
+      if (derivedPub.verify(digest, sigBytes)) {
+        resultEl.value = '✅ 서명 유효 (개인키에서 공개키 자동 추출)';
+        dialog.show('서명 검증 성공! (공개키가 자동으로 업데이트되었습니다)', 'success');
+      } else {
+        resultEl.value = '❌ 서명 불일치 (개인키는 유효하나 서명이 메시지와 맞지 않음)';
+        dialog.show('서명이 메시지와 일치하지 않습니다.', 'error');
+      }
+    } catch (err) {
+      resultEl.value = '❌ 검증 실패 (개인키 오류)';
+      dialog.show('개인키 오류로 2차 검증을 수행할 수 없습니다: ' + err.message, 'error');
+    }
+  }
+
+  /* ── 서명 파일 처리 ── */
+  function handleSignFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+
+    reader.onerror = () => {
+      dialog.show('파일 읽기 오류가 발생했습니다.', 'error');
+      el.sign.signFileInput.value = '';
+    };
+
+    reader.onload = () => {
+      const md = forge.md[el.sign.hashAlgo.value].create();
+      md.update(forge.util.binary.raw.encode(new Uint8Array(reader.result)));
+      const hexHash = md.digest().toHex();
+
+      const applyHash = (uppercase) => {
+        el.sign.signInput.value    = uppercase ? hexHash.toUpperCase() : hexHash.toLowerCase();
+        el.sign.signInput.disabled = true;
+        el.sign.unloadFileBtn.disabled = false;
+        isSignFileLoaded = true;
+        dialog.hide();
+      };
+
+      dialog.show(
+        `파일 해시 계산 완료.<br>서명 입력란에 어떤 형식으로 로드할까요?`,
+        'info',
+        [
+          { label: '대문자',  action: () => applyHash(true),  btnClass: 'btn btn-primary' },
+          { label: '소문자',  action: () => applyHash(false), btnClass: 'btn btn-secondary' },
+          { label: '취소',    action: () => { el.sign.signFileInput.value = ''; dialog.hide(); }, btnClass: 'btn btn-ghost' }
+        ]
+      );
+    };
+
+    reader.readAsArrayBuffer(file);
+  }
+
+  /* ── 서명 파일 해제 ── */
+  function unloadSignFile() {
+    el.sign.signInput.value    = '';
+    el.sign.signInput.disabled = false;
+    el.sign.unloadFileBtn.disabled = true;
+    el.sign.signFileInput.value    = '';
+    isSignFileLoaded = false;
+  }
+
+  /* ── 서명 저장 ── */
+  function saveSignature() {
+    const sigB64   = el.sign.signature.value.trim();
+    const message  = el.sign.signInput.value.trim();
+    const privPem  = el.privateKeyArea.value.trim();
+
+    if (!sigB64)  { dialog.show('서명값이 없습니다.', 'error'); return; }
+    if (!privPem) { dialog.show('개인키가 필요합니다.', 'error'); return; }
+    if (!message) { dialog.show('메시지가 없습니다.', 'error'); return; }
+
+    try {
+      const privateKey = forge.pki.privateKeyFromPem(privPem);
+      const publicKey  = forge.pki.setRsaPublicKey(privateKey.n, privateKey.e);
+      const md         = forge.md[el.sign.hashAlgo.value].create();
+      md.update(message, 'utf8');
+
+      if (!publicKey.verify(md.digest().bytes(), forge.util.decode64(sigB64))) {
+        dialog.show('서명 검증에 실패했습니다. 저장할 수 없습니다.', 'error');
+        return;
+      }
+
+      // 파일 해시 서명인 경우 "{해시}.sig", 일반 메시지면 "signature.sig"
+      const isHashValue = isSignFileLoaded && /^[0-9a-fA-F]{32,}$/.test(message);
+      const filename    = isHashValue ? `${message}.sig` : 'signature.sig';
+
+      downloadText(filename, sigB64);
+      unloadSignFile();
+      el.sign.signature.value = '';
+      dialog.show('서명 파일이 저장되었습니다.', 'success');
+    } catch (err) {
+      dialog.show('저장 오류: ' + err.message, 'error');
+    }
+  }
+
+  /* ── 서명 파일 불러오기 ── */
+  function loadSignatureFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+
+    reader.onerror = () => {
+      dialog.show('파일 읽기 오류가 발생했습니다.', 'error');
+      el.sign.loadSigFile.value = '';
+    };
+
+    reader.onload = () => {
+      const text = reader.result.trim();
+      el.sign.loadSigFile.value = '';
+
+      try { atob(text); } catch {
+        dialog.show('유효한 Base64 서명 파일이 아닙니다.', 'error');
+        return;
+      }
+
+      el.sign.signature.value = text;
+
+      // 개인키가 있으면 공개키 자동 동기화
+      const privPem = el.privateKeyArea.value.trim();
+      if (privPem) {
+        try {
+          const privateKey = forge.pki.privateKeyFromPem(privPem);
+          el.publicKeyArea.value = forge.pki.publicKeyToPem(
+            forge.pki.setRsaPublicKey(privateKey.n, privateKey.e)
+          );
+          displayKeyInfo(el.publicKeyArea.value);
+        } catch (err) {
+          console.warn('[rsaModule] 개인키에서 공개키 추출 실패:', err.message);
+        }
+      }
+
+      dialog.show('서명을 불러왔습니다.', 'info');
+
+      // 메시지와 공개키가 모두 있으면 자동 검증
+      if (el.sign.signInput.value.trim() && el.publicKeyArea.value.trim()) {
+        verifyRsaSignature();
+      }
+    };
+
+    reader.readAsText(file);
+  }
+
+  /* ── 이벤트 바인딩 ── */
+  el.generateBtn  .addEventListener('click', generateKeys);
+  el.savePubBtn   .addEventListener('click', () => saveKey('public'));
+  el.savePrivBtn  .addEventListener('click', () => saveKey('private'));
+  el.loadKeyBtn   .addEventListener('click', () => el.loadKeyFile.click());
+  el.loadKeyFile  .addEventListener('change', e => loadKeyFromFile(e.target.files[0]));
+  el.extractPubBtn.addEventListener('click', extractPublicKey);
+
+  el.encrypt.encryptBtn.addEventListener('click', encryptMessage);
+  el.encrypt.decryptBtn.addEventListener('click', decryptMessage);
+
+  el.sign.signBtn      .addEventListener('click', signMessage);
+  el.sign.verifyBtn    .addEventListener('click', verifyRsaSignature);
+  el.sign.signFileBtn  .addEventListener('click', () => el.sign.signFileInput.click());
+  el.sign.signFileInput.addEventListener('change', e => handleSignFile(e.target.files[0]));
+  el.sign.unloadFileBtn.addEventListener('click', unloadSignFile);
+  el.sign.saveSigBtn   .addEventListener('click', saveSignature);
+  el.sign.loadSigBtn   .addEventListener('click', () => el.sign.loadSigFile.click());
+  el.sign.loadSigFile  .addEventListener('change', e => loadSignatureFile(e.target.files[0]));
+
+})(); // rsaModule
+</script>
+</body>
+</html>
