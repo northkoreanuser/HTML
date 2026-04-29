@@ -87,6 +87,35 @@
   }
   .pw-toggle:hover { color: var(--text); }
 
+  /* 힌트 필드 */
+  .hint-input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 10px 12px;
+    color: var(--text); font-family: var(--font); font-size: 13px;
+    outline: none; transition: border-color 0.15s;
+    resize: none;
+  }
+  .hint-input:focus { border-color: var(--accent); }
+  .hint-input::placeholder { color: var(--muted); }
+  .hint-input[readonly] {
+    border-color: rgba(0,255,136,0.25);
+    color: var(--accent);
+    background: var(--accent-dim);
+    cursor: default;
+  }
+  .hint-badge {
+    display: inline-block;
+    font-size: 10px;
+    color: var(--accent);
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 2px;
+    padding: 1px 5px;
+    margin-left: 6px;
+    vertical-align: middle;
+    letter-spacing: 0.05em;
+  }
+  .hint-badge.hidden { display: none; }
+
   .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 20px; }
   button.btn {
     padding: 11px; border-radius: 3px; font-family: var(--font);
@@ -127,7 +156,7 @@
   <div class="field">
     <label>파일</label>
     <div class="dropzone" id="dropzone">
-      <input type="file" id="fileInput" accept="*/*">
+      <input type="file" id="fileInput">
       <div class="dropzone-icon">📁</div>
       <div class="dropzone-text">클릭하거나 파일을 드래그</div>
       <div class="dropzone-name" id="fileName"></div>
@@ -140,6 +169,14 @@
       <input type="password" id="pwInput" placeholder="비밀번호 입력...">
       <button class="pw-toggle" id="pwToggle" type="button">👁</button>
     </div>
+  </div>
+
+  <div class="field" id="hintField">
+    <label>
+      힌트
+      <span class="hint-badge hidden" id="hintBadge">파일에서 로드됨</span>
+    </label>
+    <input type="text" class="hint-input" id="hintInput" placeholder="비밀번호 힌트 입력 (선택)...">
   </div>
 
   <div class="btn-row">
@@ -157,22 +194,97 @@ const dropzone  = document.getElementById('dropzone');
 const fileName  = document.getElementById('fileName');
 const pwInput   = document.getElementById('pwInput');
 const pwToggle  = document.getElementById('pwToggle');
+const hintInput = document.getElementById('hintInput');
+const hintBadge = document.getElementById('hintBadge');
 const status    = document.getElementById('status');
 const dlWrap    = document.getElementById('dl-wrap');
 const dlBtn     = document.getElementById('dl-btn');
 
-fileInput.addEventListener('change', () => {
-  if (fileInput.files[0]) { fileName.textContent = fileInput.files[0].name; fileName.style.display = 'block'; }
+// 암호화 포맷 매직 바이트: "AESH" (AES with Hint)
+const MAGIC = new Uint8Array([0x41, 0x45, 0x53, 0x48]);
+
+// 힌트 상태 초기화
+function resetHint() {
+  hintInput.value = '';
+  hintInput.readOnly = false;
+  hintInput.placeholder = '비밀번호 힌트 입력 (선택)...';
+  hintBadge.classList.add('hidden');
+}
+
+// .enc 파일 로드 시 힌트 파싱 시도
+async function tryLoadHint(file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const b = new Uint8Array(buf);
+
+    // 매직 바이트 확인
+    if (b[0] === MAGIC[0] && b[1] === MAGIC[1] && b[2] === MAGIC[2] && b[3] === MAGIC[3]) {
+      // 포맷: MAGIC(4) + hintLen(2, uint16 BE) + hintBytes + salt(16) + iv(12) + ciphertext
+      const hintLen = (b[4] << 8) | b[5];
+      if (hintLen > 0 && hintLen <= 500) {
+        const hintBytes = b.slice(6, 6 + hintLen);
+        const hint = new TextDecoder().decode(hintBytes);
+        hintInput.value = hint;
+        hintInput.readOnly = true;
+        hintBadge.classList.remove('hidden');
+      } else {
+        // 힌트 없이 암호화된 경우
+        resetHint();
+      }
+      return true; // 자체 포맷 파일
+    }
+    return false; // 일반 파일 (암호화 대상)
+  } catch {
+    return false;
+  }
+}
+
+fileInput.addEventListener('change', async () => {
+  if (fileInput.files[0]) {
+    const file = fileInput.files[0];
+    fileName.textContent = file.name;
+    fileName.style.display = 'block';
+    dlWrap.style.display = 'none';
+    status.style.display = 'none';
+
+    // .enc 확장자면 힌트 파싱 시도
+    if (file.name.endsWith('.enc')) {
+      await tryLoadHint(file);
+    } else {
+      // 일반 파일 → 힌트 입력 가능 상태
+      resetHint();
+    }
+  } else {
+    // 파일 선택 해제
+    fileName.style.display = 'none';
+    resetHint();
+  }
 });
+
 dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
 dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
-dropzone.addEventListener('drop', e => {
+dropzone.addEventListener('drop', async e => {
   e.preventDefault(); dropzone.classList.remove('dragover');
   if (e.dataTransfer.files[0]) {
+    const file = e.dataTransfer.files[0];
     fileInput.files = e.dataTransfer.files;
-    fileName.textContent = e.dataTransfer.files[0].name;
+    fileName.textContent = file.name;
     fileName.style.display = 'block';
+    dlWrap.style.display = 'none';
+    status.style.display = 'none';
+
+    if (file.name.endsWith('.enc')) {
+      await tryLoadHint(file);
+    } else {
+      resetHint();
+    }
   }
+});
+
+// 파일 선택 영역 클릭 → 새 파일 선택 시 초기화
+fileInput.addEventListener('click', () => {
+  // 기존 파일이 있던 경우 클릭 후 선택 안 하면 change 이벤트 안 뜸
+  // 파일 선택창 열릴 때 상태 유지, change에서 처리
 });
 
 pwToggle.addEventListener('click', () => {
@@ -197,6 +309,27 @@ function validate() {
   return true;
 }
 
+// 작업 완료 후 민감 정보 전부 초기화
+function clearAfterOp() {
+  // 비밀번호 초기화 (메모리에서도 지우기 위해 덮어쓴 뒤 클리어)
+  pwInput.value = ' '.repeat(pwInput.value.length);
+  pwInput.value = '';
+  // 비밀번호 표시 상태가 text였으면 다시 password로
+  if (pwInput.type === 'text') {
+    pwInput.type = 'password';
+    pwToggle.textContent = '👁';
+  }
+
+  // 파일 선택 초기화
+  fileInput.value = '';
+  fileName.textContent = '';
+  fileName.style.display = 'none';
+
+  // 힌트 초기화
+  resetHint();
+}
+
+// 비밀번호 → AES-256 키 (PBKDF2, 200000 iterations)
 async function deriveKey(password, salt) {
   const base = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveKey']
@@ -209,38 +342,75 @@ async function deriveKey(password, salt) {
   );
 }
 
+// 암호화: MAGIC(4) + hintLen(2) + hint(N) + salt(16) + iv(12) + ciphertext
 document.getElementById('btnEnc').addEventListener('click', async () => {
   if (!validate()) return;
   dlWrap.style.display = 'none';
   showStatus('암호화 중...', 'info');
   try {
-    const data = await fileInput.files[0].arrayBuffer();
-    const salt = crypto.getRandomValues(new Uint8Array(16));
-    const iv   = crypto.getRandomValues(new Uint8Array(12));
-    const key  = await deriveKey(pwInput.value, salt);
-    const enc  = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+    const data  = await fileInput.files[0].arrayBuffer();
+    const salt  = crypto.getRandomValues(new Uint8Array(16));
+    const iv    = crypto.getRandomValues(new Uint8Array(12));
+    const key   = await deriveKey(pwInput.value, salt);
+    const enc   = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
 
-    const out = new Uint8Array(28 + enc.byteLength);
-    out.set(salt, 0); out.set(iv, 16); out.set(new Uint8Array(enc), 28);
+    const hintStr   = hintInput.value.trim();
+    const hintBytes = hintStr ? new TextEncoder().encode(hintStr) : new Uint8Array(0);
+    const hintLen   = hintBytes.length;
 
-    setDownload(new Blob([out]), fileInput.files[0].name + '.enc');
-    showStatus('암호화 완료!', 'info');
+    // 헤더: MAGIC(4) + hintLen(2 bytes, BE) + hint + salt(16) + iv(12)
+    const headerSize = 4 + 2 + hintLen + 16 + 12;
+    const out = new Uint8Array(headerSize + enc.byteLength);
+
+    let offset = 0;
+    out.set(MAGIC, offset); offset += 4;
+    out[offset] = (hintLen >> 8) & 0xff; offset++;
+    out[offset] = hintLen & 0xff; offset++;
+    if (hintLen > 0) { out.set(hintBytes, offset); offset += hintLen; }
+    out.set(salt, offset); offset += 16;
+    out.set(iv,   offset); offset += 12;
+    out.set(new Uint8Array(enc), offset);
+
+    const outName = fileInput.files[0].name + '.enc';
+    setDownload(new Blob([out]), outName);
+    showStatus('암호화 완료!' + (hintLen > 0 ? ' (힌트 포함)' : ''), 'info');
+    clearAfterOp();
   } catch (e) { showStatus('오류: ' + e.message, 'error'); }
 });
 
+// 복호화: 포맷 감지 후 분기
 document.getElementById('btnDec').addEventListener('click', async () => {
   if (!validate()) return;
   dlWrap.style.display = 'none';
   showStatus('복호화 중...', 'info');
   try {
     const buf = await fileInput.files[0].arrayBuffer();
-    if (buf.byteLength < 28) throw new Error();
-    const b    = new Uint8Array(buf);
-    const key  = await deriveKey(pwInput.value, b.slice(0, 16));
-    const dec  = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.slice(16, 28) }, key, b.slice(28));
+    const b   = new Uint8Array(buf);
+
+    let salt, iv, ciphertext;
+
+    // 자체 포맷 (매직 바이트 있음)
+    if (b[0] === MAGIC[0] && b[1] === MAGIC[1] && b[2] === MAGIC[2] && b[3] === MAGIC[3]) {
+      const hintLen = (b[4] << 8) | b[5];
+      let offset = 6 + hintLen;
+      salt       = b.slice(offset, offset + 16); offset += 16;
+      iv         = b.slice(offset, offset + 12); offset += 12;
+      ciphertext = b.slice(offset);
+    } else {
+      // 구버전 포맷 호환: salt(16) + iv(12) + ciphertext
+      if (buf.byteLength < 28) throw new Error('파일이 너무 작습니다.');
+      salt       = b.slice(0, 16);
+      iv         = b.slice(16, 28);
+      ciphertext = b.slice(28);
+    }
+
+    const key = await deriveKey(pwInput.value, salt);
+    const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
     const name = fileInput.files[0].name;
-    setDownload(new Blob([dec]), name.endsWith('.enc') ? name.slice(0, -4) : 'decrypted_' + name);
+    const outName = name.endsWith('.enc') ? name.slice(0, -4) : 'decrypted_' + name;
+    setDownload(new Blob([dec]), outName);
     showStatus('복호화 완료!', 'info');
+    clearAfterOp();
   } catch { showStatus('오류: 비밀번호가 틀렸거나 손상된 파일입니다.', 'error'); }
 });
 </script>
