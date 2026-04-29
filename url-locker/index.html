@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL LOCKER🔐</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg: #0d0f14;
+            --surface: #161920;
+            --surface2: #1e2230;
+            --border: #2a2f42;
+            --accent: #4fffb0;
+            --accent-dim: #1a3d2e;
+            --accent-glow: rgba(79, 255, 176, 0.15);
+            --text: #e8ecf4;
+            --text-dim: #6b7394;
+            --red: #ff4f6a;
+            --red-dim: #3d1a22;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'IBM Plex Mono', monospace;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px 80px;
+        }
+
+        /* Subtle grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(var(--border) 1px, transparent 1px),
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 48px 48px;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        .wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 520px;
+            z-index: 1;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .logo {
+            font-family: 'Syne', sans-serif;
+            font-size: 2.2rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--text);
+        }
+
+        .logo span {
+            color: var(--accent);
+        }
+
+        .subtitle {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        /* Card */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 32px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.6;
+        }
+
+        /* Security badge */
+        .security-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(79,255,176,0.3);
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 0.65rem;
+            color: var(--accent);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 28px;
+        }
+
+        .security-badge .dot {
+            width: 6px;
+            height: 6px;
+            background: var(--accent);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Input group */
+        .field {
+            margin-bottom: 20px;
+        }
+
+        .field label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.68rem;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+        }
+
+        .input-wrap {
+            position: relative;
+        }
+
+        .field input {
+            width: 100%;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 13px 16px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text);
+            transition: border-color 0.2s, box-shadow 0.2s;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .field input::placeholder { color: #3a3f58; }
+
+        .field input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+
+        .field input.has-toggle { padding-right: 46px; }
+
+        /* Password toggle */
+        .toggle-vis {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            padding: 2px;
+            font-size: 1rem;
+            line-height: 1;
+            transition: color 0.2s;
+        }
+        .toggle-vis:hover { color: var(--text); }
+
+        /* Strength indicator */
+        .strength-bar {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .strength-bar .seg {
+            flex: 1;
+            height: 3px;
+            background: var(--border);
+            border-radius: 2px;
+            transition: background 0.3s;
+        }
+        .strength-bar.s1 .seg:nth-child(1) { background: var(--red); }
+        .strength-bar.s2 .seg:nth-child(-n+2) { background: #ff9f4f; }
+        .strength-bar.s3 .seg:nth-child(-n+3) { background: #ffe04f; }
+        .strength-bar.s4 .seg { background: var(--accent); }
+
+        .strength-label {
+            font-size: 0.6rem;
+            color: var(--text-dim);
+            margin-top: 4px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        /* KDF info */
+        .kdf-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 0.68rem;
+            color: var(--text-dim);
+            margin-bottom: 24px;
+        }
+        .kdf-info .icon { font-size: 1rem; }
+        .kdf-info strong { color: var(--accent); }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: var(--accent);
+            color: #0a1a12;
+            border: none;
+            border-radius: 10px;
+            font-family: 'Syne', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+        .btn-primary:active:not(:disabled) { transform: scale(0.98); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .btn-secondary {
+            flex: 1;
+            padding: 11px 16px;
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .btn-secondary:hover { border-color: var(--accent); background: var(--accent-dim); }
+
+        /* Loading overlay */
+        .spinner-wrap {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            padding: 20px 0 4px;
+        }
+        .spinner-wrap.active { display: flex; }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .spinner-label {
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .kdf-progress {
+            font-size: 0.68rem;
+            color: var(--accent);
+            margin-top: -6px;
+        }
+
+        /* Result card */
+        .result-card {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+
+        .result-label {
+            font-size: 0.65rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 10px;
+        }
+
+        .result-url {
+            font-size: 0.78rem;
+            color: var(--accent);
+            word-break: break-all;
+            line-height: 1.6;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: 8px;
+            border: 1px solid var(--accent-dim);
+        }
+
+        .result-url a {
+            color: inherit;
+            text-decoration: none;
+        }
+        .result-url a:hover { text-decoration: underline; }
+
+        /* QR */
+        .qr-wrap {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        #qrcode {
+            border-radius: 10px;
+            border: 6px solid white;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        /* Decrypt preview */
+        .decrypt-preview {
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--accent-dim);
+            border: 1px solid rgba(79,255,176,0.25);
+            border-radius: 12px;
+        }
+
+        .decrypt-preview .preview-label {
+            font-size: 0.65rem;
+            color: var(--accent);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .decrypt-preview .preview-url {
+            font-size: 0.82rem;
+            color: var(--text);
+            word-break: break-all;
+            margin-bottom: 14px;
+        }
+
+        /* Shake animation for wrong key */
+        @keyframes shake {
+            0%,100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-6px); }
+            80% { transform: translateX(6px); }
+        }
+        .shake { animation: shake 0.4s ease; }
+
+        /* Error state */
+        .field input.error {
+            border-color: var(--red);
+            box-shadow: 0 0 0 3px rgba(255,79,106,0.15);
+        }
+
+        /* Divider */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0;
+            color: var(--text-dim);
+            font-size: 0.68rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 32px;
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            text-align: center;
+            line-height: 1.8;
+            letter-spacing: 0.06em;
+        }
+        .footer strong { color: var(--accent); }
+
+        /* Fade-in */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card { animation: fadeUp 0.4s ease; }
+
+        /* Copy feedback */
+        .copy-feedback {
+            display: inline-block;
+            transition: transform 0.1s;
+        }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+    <div class="header">
+        <div class="logo">URL<span>LOCKER</span> 🔐</div>
+        <div class="subtitle">Encrypted URL vault</div>
+    </div>
+
+    <div class="card">
+
+        <!-- ── 암호화 모드 ── -->
+        <div id="encryptSection" style="display:none">
+            <div class="security-badge">
+                <span class="dot"></span>
+                AES-256-GCM · PBKDF2 · 600K rounds
+            </div>
+
+            <div class="field">
+                <label>🔗 URL</label>
+                <input type="url" id="urlInput" placeholder="https://example.com/" autocomplete="off">
+            </div>
+
+            <div class="field">
+                <label>🔑 KEY</label>
+                <div class="input-wrap">
+                    <input type="password" id="keyInput" class="has-toggle" placeholder="암호화 키 입력" autocomplete="new-password">
+                    <button class="toggle-vis" onclick="toggleVis('keyInput', this)" tabindex="-1">👁</button>
+                </div>
+                <div class="strength-bar" id="strengthBar">
+                    <span class="seg"></span><span class="seg"></span>
+                    <span class="seg"></span><span class="seg"></span>
+                </div>
+                <div class="strength-label" id="strengthLabel"></div>
+            </div>
+
+            <div class="kdf-info">
+                <span class="icon">🛡</span>
+                <span>키는 <strong>PBKDF2-SHA256 × 600,000</strong>으로 파생 — 브루트포스 저항</span>
+            </div>
+
+            <button class="btn-primary" id="lockBtn" onclick="handleEncrypt()">LOCK IT!</button>
+
+            <div class="spinner-wrap" id="encryptSpinner">
+                <div class="spinner"></div>
+                <div class="spinner-label">키 파생 중</div>
+                <div class="kdf-progress">PBKDF2 · 600,000 iterations...</div>
+            </div>
+        </div>
+
+        <!-- ── 복호화 모드 ── -->
+        <div id="decryptSection" style="display:none">
+            <div class="security-badge">
+                <span class="dot"></span>
+                잠긴 URL 감지됨
+            </div>
+
+            <div class="field">
+                <label>🔑 KEY</label>
+                <div class="input-wrap">
+                    <input type="password" id="decryptKeyInput" class="has-toggle"
+                           placeholder="암호화에 사용한 KEY 입력" autocomplete="current-password">
+                    <button class="toggle-vis" onclick="toggleVis('decryptKeyInput', this)" tabindex="-1">👁</button>
+                </div>
+            </div>
+
+            <button class="btn-primary" id="unlockBtn" onclick="handleDecrypt()">UNLOCK</button>
+
+            <div class="spinner-wrap" id="decryptSpinner">
+                <div class="spinner"></div>
+                <div class="spinner-label">복호화 중</div>
+                <div class="kdf-progress">키 파생 + 인증 확인...</div>
+            </div>
+
+            <!-- 복호화 성공 시 미리보기 -->
+            <div class="decrypt-preview" id="decryptPreview" style="display:none">
+                <div class="preview-label">✅ 복호화 완료 — 이동할 URL</div>
+                <div class="preview-url" id="previewUrl"></div>
+                <div class="btn-row">
+                    <button class="btn-secondary" id="goBtn" onclick="goToUrl()">↗ 이동하기</button>
+                    <button class="btn-secondary" onclick="copyDecrypted()">📋 복사</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── 암호화 결과 ── -->
+        <div id="resultSection" style="display:none">
+            <div class="result-label">🔒 암호화된 URL</div>
+            <div class="result-url" id="encryptedUrlDisplay"></div>
+
+            <div class="qr-wrap">
+                <img id="qrcode" width="180" height="180" alt="QR Code">
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-secondary" onclick="copyEncrypted()">📋 URL 복사</button>
+                <button class="btn-secondary" onclick="downloadQR()">⬇ QR 저장</button>
+                <button class="btn-secondary" onclick="resetAll()">↺ 새로 만들기</button>
+            </div>
+        </div>
+
+    </div><!-- /card -->
+
+    <div class="footer">
+        모든 암호화는 <strong>브라우저 내</strong>에서 처리됩니다.<br>
+        키나 원본 URL은 서버로 전송되지 않습니다.<br>
+        <strong>PBKDF2</strong>(600K rounds) → <strong>AES-256-GCM</strong> (인증된 암호화)
+    </div>
+</div><!-- /wrapper -->
+
+<script>
+// ────────────────────────────────────────────────
+//  설정
+// ────────────────────────────────────────────────
+const PBKDF2_ITERATIONS = 600_000;
+const SALT_LEN  = 16;
+const IV_LEN    = 12; // AES-GCM 권장 12 bytes
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+let _encryptedUrl = '';
+let _decryptedUrl = '';
+
+// ────────────────────────────────────────────────
+//  키 파생: PBKDF2-SHA256
+// ────────────────────────────────────────────────
+async function deriveKey(password, salt) {
+    const keyMaterial = await crypto.subtle.importKey(
+        'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+    );
+    return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+        keyMaterial,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['encrypt', 'decrypt']
+    );
+}
+
+// ────────────────────────────────────────────────
+//  암호화: AES-256-GCM (authenticated)
+//  포맷: salt(16) || iv(12) || ciphertext+tag(n+16)
+// ────────────────────────────────────────────────
+async function encryptAES(plaintext, password) {
+    const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+    const iv   = crypto.getRandomValues(new Uint8Array(IV_LEN));
+    const key  = await deriveKey(password, salt);
+
+    const cipherbuf = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        enc.encode(plaintext)
+    );
+
+    const out = new Uint8Array(SALT_LEN + IV_LEN + cipherbuf.byteLength);
+    out.set(salt, 0);
+    out.set(iv,   SALT_LEN);
+    out.set(new Uint8Array(cipherbuf), SALT_LEN + IV_LEN);
+
+    // URL-safe Base64 (패딩 제거)
+    return btoa(String.fromCharCode(...out))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+// ────────────────────────────────────────────────
+//  복호화: 인증 실패 시 DOMException 발생
+// ────────────────────────────────────────────────
+async function decryptAES(encoded, password) {
+    // URL-safe Base64 → 바이트
+    const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = (4 - b64.length % 4) % 4;
+    const raw = Uint8Array.from(atob(b64 + '='.repeat(pad)), c => c.charCodeAt(0));
+
+    const salt       = raw.slice(0, SALT_LEN);
+    const iv         = raw.slice(SALT_LEN, SALT_LEN + IV_LEN);
+    const ciphertext = raw.slice(SALT_LEN + IV_LEN);
+
+    const key = await deriveKey(password, salt);
+
+    const plainbuf = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv },
+        key,
+        ciphertext
+    ); // 키가 틀리면 여기서 DOMException 발생
+
+    return dec.decode(plainbuf);
+}
+
+// ────────────────────────────────────────────────
+//  UI: 암호화
+// ────────────────────────────────────────────────
+async function handleEncrypt() {
+    const url = document.getElementById('urlInput').value.trim();
+    const key = document.getElementById('keyInput').value;
+
+    if (!url || !key) { alert('URL과 KEY를 모두 입력하세요.'); return; }
+    if (!isValidUrl(url)) { alert('올바른 URL 형식을 입력하세요.'); return; }
+
+    setEncryptLoading(true);
+    try {
+        const aes = await encryptAES(url, key);
+        const base = window.location.href.split('?')[0];
+        _encryptedUrl = `${base}?aes=${aes}`;
+
+        document.getElementById('encryptSection').style.display = 'none';
+        document.getElementById('resultSection').style.display = 'block';
+        document.getElementById('encryptedUrlDisplay').innerHTML =
+            `<a href="${_encryptedUrl}" target="_blank" rel="noopener noreferrer">${_encryptedUrl}</a>`;
+
+        QRCode.toDataURL(_encryptedUrl, { errorCorrectionLevel: 'H', width: 180 }, (err, dataUrl) => {
+            if (!err) document.getElementById('qrcode').src = dataUrl;
+        });
+    } catch (e) {
+        alert('암호화 중 오류가 발생했습니다.');
+    }
+    setEncryptLoading(false);
+}
+
+function setEncryptLoading(on) {
+    const btn = document.getElementById('lockBtn');
+    const sp  = document.getElementById('encryptSpinner');
+    btn.style.display = on ? 'none' : 'block';
+    sp.classList.toggle('active', on);
+}
+
+// ────────────────────────────────────────────────
+//  UI: 복호화
+// ────────────────────────────────────────────────
+async function handleDecrypt() {
+    const key = document.getElementById('decryptKeyInput').value;
+    if (!key) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const hash   = params.get('hash');
+    if (!hash) return;
+
+    setDecryptLoading(true);
+    const keyInput = document.getElementById('decryptKeyInput');
+    keyInput.classList.remove('error');
+
+    try {
+        const decrypted = await decryptAES(hash, key);
+        _decryptedUrl = decrypted;
+
+        const preview = document.getElementById('decryptPreview');
+        document.getElementById('previewUrl').textContent = decrypted;
+        preview.style.display = 'block';
+
+        // 이전 에러 상태 초기화
+        keyInput.classList.remove('error');
+        document.getElementById('unlockBtn').style.display = 'none';
+    } catch (e) {
+        // 키가 틀렸거나 데이터 손상
+        keyInput.classList.add('error');
+        keyInput.classList.remove('shake');
+        void keyInput.offsetWidth; // reflow
+        keyInput.classList.add('shake');
+        keyInput.value = '';
+        setTimeout(() => keyInput.classList.remove('error'), 1500);
+    }
+    setDecryptLoading(false);
+}
+
+function setDecryptLoading(on) {
+    const btn = document.getElementById('unlockBtn');
+    const sp  = document.getElementById('decryptSpinner');
+    btn.style.display = on ? 'none' : 'block';
+    sp.classList.toggle('active', on);
+}
+
+function goToUrl() {
+    if (_decryptedUrl) window.location.href = _decryptedUrl;
+}
+
+function copyDecrypted() {
+    if (_decryptedUrl) {
+        navigator.clipboard.writeText(_decryptedUrl).then(() => {
+            flashBtn(event.target, '✅ 복사됨');
+        });
+    }
+}
+
+// ────────────────────────────────────────────────
+//  기타 UI
+// ────────────────────────────────────────────────
+function copyEncrypted() {
+    navigator.clipboard.writeText(_encryptedUrl).then(() => {
+        flashBtn(event.target, '✅ 복사됨');
+    });
+}
+
+function downloadQR() {
+    const img = document.getElementById('qrcode');
+    if (!img.src) return;
+    const a = document.createElement('a');
+    a.href = img.src;
+    a.download = 'url-locker-qr.png';
+    a.click();
+}
+
+function resetAll() {
+    document.getElementById('resultSection').style.display = 'none';
+    document.getElementById('encryptSection').style.display = 'block';
+    document.getElementById('urlInput').value = '';
+    document.getElementById('keyInput').value = '';
+    document.getElementById('strengthBar').className = 'strength-bar';
+    document.getElementById('strengthLabel').textContent = '';
+    _encryptedUrl = '';
+}
+
+function toggleVis(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const isText = input.type === 'text';
+    input.type = isText ? 'password' : 'text';
+    btn.textContent = isText ? '👁' : '🙈';
+}
+
+function flashBtn(btn, label) {
+    const orig = btn.textContent;
+    btn.textContent = label;
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+}
+
+function isValidUrl(str) {
+    try { return ['http:', 'https:'].includes(new URL(str).protocol); }
+    catch { return false; }
+}
+
+// ────────────────────────────────────────────────
+//  비밀번호 강도
+// ────────────────────────────────────────────────
+function calcStrength(pw) {
+    if (!pw) return 0;
+    let score = 0;
+    if (pw.length >= 8)  score++;
+    if (pw.length >= 14) score++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+    if (/\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)) score++;
+    return Math.min(score, 4);
+}
+
+const labels = ['', '취약', '보통', '양호', '강함'];
+document.getElementById('keyInput').addEventListener('input', function() {
+    const s = calcStrength(this.value);
+    const bar = document.getElementById('strengthBar');
+    const lbl = document.getElementById('strengthLabel');
+    bar.className = 'strength-bar' + (s ? ` s${s}` : '');
+    lbl.textContent = this.value ? labels[s] : '';
+});
+
+// ────────────────────────────────────────────────
+//  엔터 키
+// ────────────────────────────────────────────────
+['urlInput', 'keyInput'].forEach(id => {
+    document.getElementById(id)?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); handleEncrypt(); }
+    });
+});
+document.getElementById('decryptKeyInput')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); handleDecrypt(); }
+});
+
+// ────────────────────────────────────────────────
+//  페이지 초기화: 모드 감지
+// ────────────────────────────────────────────────
+(function init() {
+    const hash = new URLSearchParams(window.location.search).get('hash');
+    if (hash) {
+        document.getElementById('decryptSection').style.display = 'block';
+        document.title = 'URL UNLOCKER 🔓';
+        // 타이틀 업데이트
+        document.querySelector('.logo').innerHTML = 'URL<span>UNLOCKER</span> 🔓';
+        document.querySelector('.subtitle').textContent = 'Decrypt & access your URL';
+    } else {
+        document.getElementById('encryptSection').style.display = 'block';
+    }
+})();
+</script>
+</body>
+</html>
