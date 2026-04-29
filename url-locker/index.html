@@ -674,6 +674,36 @@ function setEncryptLoading(on) {
 // ────────────────────────────────────────────────
 //  UI: 복호화
 // ────────────────────────────────────────────────
+// ────────────────────────────────────────────────
+//  보안 상태
+// ────────────────────────────────────────────────
+let _autoWipeTimer  = null;
+let _urlRevealed    = false;
+let _failCount      = 0;  // 오답 횟수
+
+function _wipePreview() {
+    _decryptedUrl = '';
+    _urlRevealed  = false;
+
+    if (_autoWipeTimer) { clearTimeout(_autoWipeTimer); _autoWipeTimer = null; }
+
+    // DOM 삭제 대신 숨기기 + 내용 비우기 (재사용 가능하게)
+    const el = document.getElementById('decryptPreview');
+    if (el) {
+        el.style.display = 'none';
+        const urlEl = document.getElementById('previewUrl');
+        if (urlEl) urlEl.textContent = '';
+    }
+
+    const keyInput = document.getElementById('decryptKeyInput');
+    if (keyInput) {
+        keyInput.value = '';
+        keyInput.removeEventListener('input', _onKeyInputWhileRevealed);
+    }
+    const btn = document.getElementById('unlockBtn');
+    if (btn) btn.style.display = 'block';
+}
+
 async function handleDecrypt() {
     const key = document.getElementById('decryptKeyInput').value;
     if (!key) return;
@@ -689,24 +719,46 @@ async function handleDecrypt() {
     try {
         const decrypted = await decryptAES(hash, key);
         _decryptedUrl = decrypted;
+        _urlRevealed  = true;
 
         const preview = document.getElementById('decryptPreview');
         document.getElementById('previewUrl').textContent = decrypted;
         preview.style.display = 'block';
-
-        // 이전 에러 상태 초기화
         keyInput.classList.remove('error');
+        keyInput.value = '';  // 맞춰도 KEY 필드 비우기
         document.getElementById('unlockBtn').style.display = 'none';
+
+        // ── 보안 트리거 1: 10초 자동 파기
+        if (_autoWipeTimer) { clearTimeout(_autoWipeTimer); _autoWipeTimer = null; }
+        _autoWipeTimer = setTimeout(() => { if (_urlRevealed) _wipePreview(); }, 10000);
+
+        // ── 보안 트리거 2: KEY 필드에 뭔가 입력되면 즉시 파기 (중복 방지)
+        keyInput.removeEventListener('input', _onKeyInputWhileRevealed);
+        keyInput.addEventListener('input', _onKeyInputWhileRevealed);
+
     } catch (e) {
-        // 키가 틀렸거나 데이터 손상
+        _failCount++;
+        if (_failCount >= 3) {
+            history.replaceState(null, '', window.location.href);
+            window.location.replace('https://example.com');
+            return;
+        }
         keyInput.classList.add('error');
         keyInput.classList.remove('shake');
-        void keyInput.offsetWidth; // reflow
+        void keyInput.offsetWidth;
         keyInput.classList.add('shake');
         keyInput.value = '';
         setTimeout(() => keyInput.classList.remove('error'), 1500);
     }
     setDecryptLoading(false);
+}
+
+function _onKeyInputWhileRevealed() {
+    if (_urlRevealed) {
+        _wipePreview();
+        document.getElementById('decryptKeyInput')
+            ?.removeEventListener('input', _onKeyInputWhileRevealed);
+    }
 }
 
 function setDecryptLoading(on) {
@@ -717,13 +769,19 @@ function setDecryptLoading(on) {
 }
 
 function goToUrl() {
-    if (_decryptedUrl) window.location.href = _decryptedUrl;
+    if (!_decryptedUrl) return;
+    const url = _decryptedUrl;
+    _wipePreview();                      // DOM 먼저 파기
+    // history 조작: 현재 엔트리를 about:blank 로 교체해 뒤로가기로 URL이 복원되지 않게 함
+    history.replaceState(null, '', window.location.href);
+    window.location.replace(url);        // replace → 뒤로가기 스택에 이 페이지 남지 않음
 }
 
 function copyDecrypted() {
     if (_decryptedUrl) {
         navigator.clipboard.writeText(_decryptedUrl).then(() => {
-            flashBtn(event.target, '✅ 복사됨');
+            // 복사 후에도 즉시 파기
+            _wipePreview();
         });
     }
 }
@@ -825,6 +883,11 @@ document.getElementById('decryptKeyInput')?.addEventListener('keydown', e => {
             document.getElementById('hintBox').style.display = 'block';
             document.getElementById('hintText').textContent = hint;
         }
+
+        // ── 보안 트리거 3: 탭 전환 / 브라우저 최소화 시 파기
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && _urlRevealed) _wipePreview();
+        });
     } else {
         document.getElementById('encryptSection').style.display = 'block';
     }
