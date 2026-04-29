@@ -470,6 +470,11 @@
                 <div class="strength-label" id="strengthLabel"></div>
             </div>
 
+            <div class="field">
+                <label>💡 HINT <span style="color:var(--text-dim);font-size:0.6rem;letter-spacing:0.06em;text-transform:none;margin-left:4px;">(선택사항 · 평문 저장)</span></label>
+                <input type="text" id="hintInput" placeholder="키 힌트 입력 (없으면 비워두세요)" autocomplete="off">
+            </div>
+
             <div class="kdf-info">
                 <span class="icon">🛡</span>
                 <span>키는 <strong>PBKDF2-SHA256 × 600,000</strong>으로 파생 — 브루트포스 저항</span>
@@ -489,6 +494,12 @@
             <div class="security-badge">
                 <span class="dot"></span>
                 잠긴 URL 감지됨
+            </div>
+
+            <!-- 힌트 표시 (파라미터 있을 때만) -->
+            <div id="hintBox" style="display:none;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid rgba(79,255,176,0.25);border-radius:10px;">
+                <div style="font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:5px;">💡 HINT</div>
+                <div id="hintText" style="font-size:0.85rem;color:var(--text);word-break:break-all;"></div>
             </div>
 
             <div class="field">
@@ -635,8 +646,9 @@ async function handleEncrypt() {
     setEncryptLoading(true);
     try {
         const hash = await encryptAES(url, key);
+        const hint = document.getElementById('hintInput').value.trim();
         const base = window.location.href.split('?')[0];
-        _encryptedUrl = `${base}?hash=${hash}`;
+        _encryptedUrl = `${base}?hash=${hash}` + (hint ? `&hint=${encodeURIComponent(hint)}` : '');
 
         document.getElementById('encryptSection').style.display = 'none';
         document.getElementById('resultSection').style.display = 'block';
@@ -739,6 +751,7 @@ function resetAll() {
     document.getElementById('encryptSection').style.display = 'block';
     document.getElementById('urlInput').value = '';
     document.getElementById('keyInput').value = '';
+    document.getElementById('hintInput').value = '';
     document.getElementById('strengthBar').className = 'strength-bar';
     document.getElementById('strengthLabel').textContent = '';
     _encryptedUrl = '';
@@ -800,13 +813,18 @@ document.getElementById('decryptKeyInput')?.addEventListener('keydown', e => {
 //  페이지 초기화: 모드 감지
 // ────────────────────────────────────────────────
 (function init() {
-    const hash = new URLSearchParams(window.location.search).get('hash');
+    const params = new URLSearchParams(window.location.search);
+    const hash = params.get('hash');
+    const hint = params.get('hint');
     if (hash) {
         document.getElementById('decryptSection').style.display = 'block';
-        document.title = 'URL UNLOCK 🔓';
-        // 타이틀 업데이트
-        document.querySelector('.logo').innerHTML = 'URL<span>UNLOCK</span> 🔓';
+        document.title = 'URL UNLOCKER 🔓';
+        document.querySelector('.logo').innerHTML = 'URL<span>UNLOCKER</span> 🔓';
         document.querySelector('.subtitle').textContent = 'Decrypt & access your URL';
+        if (hint) {
+            document.getElementById('hintBox').style.display = 'block';
+            document.getElementById('hintText').textContent = hint;
+        }
     } else {
         document.getElementById('encryptSection').style.display = 'block';
     }
