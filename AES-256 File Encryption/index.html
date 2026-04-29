@@ -154,9 +154,9 @@
   </div>
 
   <div class="field">
-    <label>파일</label>
-    <div class="dropzone" id="dropzone">
-      <input type="file" id="fileInput" accept="*/*">
+    <label style="display:block;font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">파일</label>
+    <div class="dropzone" id="dropzone" role="button" tabindex="0">
+      <input type="file" id="fileInput" style="display:none;">
       <div class="dropzone-icon">📁</div>
       <div class="dropzone-text">클릭하거나 파일을 드래그</div>
       <div class="dropzone-name" id="fileName"></div>
@@ -239,52 +239,72 @@ async function tryLoadHint(file) {
   }
 }
 
-fileInput.addEventListener('change', async () => {
-  if (fileInput.files[0]) {
-    const file = fileInput.files[0];
-    fileName.textContent = file.name;
-    fileName.style.display = 'block';
-    dlWrap.style.display = 'none';
-    status.style.display = 'none';
+// 선택된 파일 저장
+let selectedFile = null;
 
-    // .enc 확장자면 힌트 파싱 시도
-    if (file.name.endsWith('.enc')) {
-      await tryLoadHint(file);
-    } else {
-      // 일반 파일 → 힌트 입력 가능 상태
-      resetHint();
+async function pickFile() {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+  // 1. 데스크톱용 (기존 유지)
+  if (!isMobile && window.showOpenFilePicker) {
+    try {
+      const [handle] = await window.showOpenFilePicker({ multiple: false });
+      return await handle.getFile();
+    } catch (e) {
+      if (e.name === 'AbortError') return null;
     }
+  }
+
+  // 2. 모바일/안드로이드용 (완전 새 태그 생성 방식)
+  return new Promise(resolve => {
+    // 메모리상에 임시 input 생성 (HTML에 있는 기존 fileInput을 무시)
+    const tmpInput = document.createElement('input');
+    tmpInput.type = 'file';
+    
+    // 중요: accept를 아예 설정하지 않거나, 아래처럼 범용적으로 설정
+    // 갤럭시에서 '파일' 앱을 띄우기 위해 가장 깨끗한 상태 유지
+    tmpInput.accept = ".enc, .txt, .zip, application/octet-stream";
+
+    tmpInput.onchange = () => {
+      if (tmpInput.files.length > 0) {
+        resolve(tmpInput.files[0]);
+      } else {
+        resolve(null);
+      }
+    };
+
+    // 안드로이드 시스템에 신호를 보냄
+    tmpInput.click();
+  });
+}
+
+function setFile(file) {
+  if (!file) return;
+  selectedFile = file;
+  fileName.textContent = file.name;
+  fileName.style.display = 'block';
+  dlWrap.style.display = 'none';
+  status.style.display = 'none';
+  if (file.name.endsWith('.enc')) {
+    tryLoadHint(file);
   } else {
-    // 파일 선택 해제
-    fileName.style.display = 'none';
     resetHint();
   }
+}
+
+dropzone.addEventListener('click', async () => {
+  const file = await pickFile();
+  if (file) setFile(file);
+});
+dropzone.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') dropzone.click();
 });
 
 dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
 dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
 dropzone.addEventListener('drop', async e => {
   e.preventDefault(); dropzone.classList.remove('dragover');
-  if (e.dataTransfer.files[0]) {
-    const file = e.dataTransfer.files[0];
-    fileInput.files = e.dataTransfer.files;
-    fileName.textContent = file.name;
-    fileName.style.display = 'block';
-    dlWrap.style.display = 'none';
-    status.style.display = 'none';
-
-    if (file.name.endsWith('.enc')) {
-      await tryLoadHint(file);
-    } else {
-      resetHint();
-    }
-  }
-});
-
-// 파일 선택 영역 클릭 → 새 파일 선택 시 초기화
-fileInput.addEventListener('click', () => {
-  // 기존 파일이 있던 경우 클릭 후 선택 안 하면 change 이벤트 안 뜸
-  // 파일 선택창 열릴 때 상태 유지, change에서 처리
+  if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
 });
 
 pwToggle.addEventListener('click', () => {
@@ -304,8 +324,8 @@ function setDownload(blob, name) {
   dlBtn.onclick = () => setTimeout(() => URL.revokeObjectURL(url), 1500);
 }
 function validate() {
-  if (!fileInput.files[0]) { showStatus('파일을 선택해주세요.', 'error'); return false; }
-  if (!pwInput.value)       { showStatus('비밀번호를 입력해주세요.', 'error'); return false; }
+  if (!selectedFile)    { showStatus('파일을 선택해주세요.', 'error'); return false; }
+  if (!pwInput.value)   { showStatus('비밀번호를 입력해주세요.', 'error'); return false; }
   return true;
 }
 
@@ -320,10 +340,7 @@ function clearAfterOp() {
     pwToggle.textContent = '👁';
   }
 
-  // 파일 선택 초기화
-  fileInput.value = '';
-  fileName.textContent = '';
-  fileName.style.display = 'none';
+  selectedFile = null;
 
   // 힌트 초기화
   resetHint();
@@ -348,7 +365,7 @@ document.getElementById('btnEnc').addEventListener('click', async () => {
   dlWrap.style.display = 'none';
   showStatus('암호화 중...', 'info');
   try {
-    const data  = await fileInput.files[0].arrayBuffer();
+    const data  = await selectedFile.arrayBuffer();
     const salt  = crypto.getRandomValues(new Uint8Array(16));
     const iv    = crypto.getRandomValues(new Uint8Array(12));
     const key   = await deriveKey(pwInput.value, salt);
@@ -371,7 +388,7 @@ document.getElementById('btnEnc').addEventListener('click', async () => {
     out.set(iv,   offset); offset += 12;
     out.set(new Uint8Array(enc), offset);
 
-    const outName = fileInput.files[0].name + '.enc';
+    const outName = selectedFile.name + '.enc';
     setDownload(new Blob([out]), outName);
     showStatus('암호화 완료!' + (hintLen > 0 ? ' (힌트 포함)' : ''), 'info');
     clearAfterOp();
@@ -384,7 +401,7 @@ document.getElementById('btnDec').addEventListener('click', async () => {
   dlWrap.style.display = 'none';
   showStatus('복호화 중...', 'info');
   try {
-    const buf = await fileInput.files[0].arrayBuffer();
+    const buf = await selectedFile.arrayBuffer();
     const b   = new Uint8Array(buf);
 
     let salt, iv, ciphertext;
@@ -406,7 +423,7 @@ document.getElementById('btnDec').addEventListener('click', async () => {
 
     const key = await deriveKey(pwInput.value, salt);
     const dec = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
-    const name = fileInput.files[0].name;
+    const name = selectedFile.name;
     const outName = name.endsWith('.enc') ? name.slice(0, -4) : 'decrypted_' + name;
     setDownload(new Blob([dec]), outName);
     showStatus('복호화 완료!', 'info');
