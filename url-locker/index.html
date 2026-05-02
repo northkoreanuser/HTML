@@ -36,7 +36,6 @@
             padding: 40px 20px 80px;
         }
 
-        /* Subtle grid background */
         body::before {
             content: '';
             position: fixed;
@@ -56,7 +55,6 @@
             z-index: 1;
         }
 
-        /* Header */
         .header {
             text-align: center;
             margin-bottom: 48px;
@@ -70,9 +68,7 @@
             color: var(--text);
         }
 
-        .logo span {
-            color: var(--accent);
-        }
+        .logo span { color: var(--accent); }
 
         .subtitle {
             font-size: 0.72rem;
@@ -82,7 +78,6 @@
             margin-top: 6px;
         }
 
-        /* Card */
         .card {
             background: var(--surface);
             border: 1px solid var(--border);
@@ -101,7 +96,6 @@
             opacity: 0.6;
         }
 
-        /* Security badge */
         .security-badge {
             display: inline-flex;
             align-items: center;
@@ -130,10 +124,7 @@
             50% { opacity: 0.3; }
         }
 
-        /* Input group */
-        .field {
-            margin-bottom: 20px;
-        }
+        .field { margin-bottom: 20px; }
 
         .field label {
             display: flex;
@@ -146,9 +137,7 @@
             margin-bottom: 8px;
         }
 
-        .input-wrap {
-            position: relative;
-        }
+        .input-wrap { position: relative; }
 
         .field input {
             width: 100%;
@@ -173,7 +162,6 @@
 
         .field input.has-toggle { padding-right: 46px; }
 
-        /* Password toggle */
         .toggle-vis {
             position: absolute;
             right: 14px;
@@ -190,7 +178,6 @@
         }
         .toggle-vis:hover { color: var(--text); }
 
-        /* Strength indicator */
         .strength-bar {
             display: flex;
             gap: 4px;
@@ -216,7 +203,6 @@
             text-transform: uppercase;
         }
 
-        /* KDF info */
         .kdf-info {
             display: flex;
             align-items: center;
@@ -232,7 +218,6 @@
         .kdf-info .icon { font-size: 1rem; }
         .kdf-info strong { color: var(--accent); }
 
-        /* Buttons */
         .btn-primary {
             width: 100%;
             padding: 14px;
@@ -268,7 +253,6 @@
         }
         .btn-secondary:hover { border-color: var(--accent); background: var(--accent-dim); }
 
-        /* Loading overlay */
         .spinner-wrap {
             display: none;
             flex-direction: column;
@@ -301,7 +285,6 @@
             margin-top: -6px;
         }
 
-        /* Result card */
         .result-card {
             background: var(--surface2);
             border: 1px solid var(--border);
@@ -335,7 +318,6 @@
         }
         .result-url a:hover { text-decoration: underline; }
 
-        /* QR */
         .qr-wrap {
             display: flex;
             justify-content: center;
@@ -353,7 +335,7 @@
             margin-top: 16px;
         }
 
-        /* Decrypt preview */
+        /* ── 복호화 성공 미리보기: URL 숨김 ── */
         .decrypt-preview {
             margin-top: 24px;
             padding: 16px;
@@ -370,14 +352,11 @@
             margin-bottom: 8px;
         }
 
+        /* URL 텍스트 표시 안 함 — hidden 처리 */
         .decrypt-preview .preview-url {
-            font-size: 0.82rem;
-            color: var(--text);
-            word-break: break-all;
-            margin-bottom: 14px;
+            display: none;
         }
 
-        /* Shake animation for wrong key */
         @keyframes shake {
             0%,100% { transform: translateX(0); }
             20% { transform: translateX(-8px); }
@@ -387,13 +366,11 @@
         }
         .shake { animation: shake 0.4s ease; }
 
-        /* Error state */
         .field input.error {
             border-color: var(--red);
             box-shadow: 0 0 0 3px rgba(255,79,106,0.15);
         }
 
-        /* Divider */
         .divider {
             display: flex;
             align-items: center;
@@ -411,7 +388,6 @@
             background: var(--border);
         }
 
-        /* Footer */
         .footer {
             margin-top: 32px;
             font-size: 0.65rem;
@@ -422,14 +398,12 @@
         }
         .footer strong { color: var(--accent); }
 
-        /* Fade-in */
         @keyframes fadeUp {
             from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
         }
         .card { animation: fadeUp 0.4s ease; }
 
-        /* Copy feedback */
         .copy-feedback {
             display: inline-block;
             transition: transform 0.1s;
@@ -496,7 +470,6 @@
                 잠긴 URL 감지됨
             </div>
 
-            <!-- 힌트 표시 (파라미터 있을 때만) -->
             <div id="hintBox" style="display:none;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid rgba(79,255,176,0.25);border-radius:10px;">
                 <div style="font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:5px;">💡 HINT</div>
                 <div id="hintText" style="font-size:0.85rem;color:var(--text);word-break:break-all;"></div>
@@ -517,16 +490,6 @@
                 <div class="spinner"></div>
                 <div class="spinner-label">복호화 중</div>
                 <div class="kdf-progress">키 파생 + 인증 확인...</div>
-            </div>
-
-            <!-- 복호화 성공 시 미리보기 -->
-            <div class="decrypt-preview" id="decryptPreview" style="display:none">
-                <div class="preview-label">✅ 복호화 완료 — 이동할 URL</div>
-                <div class="preview-url" id="previewUrl"></div>
-                <div class="btn-row">
-                    <button class="btn-secondary" id="goBtn" onclick="goToUrl()">↗ 이동하기</button>
-                    <button class="btn-secondary" onclick="copyDecrypted()">📋 복사</button>
-                </div>
             </div>
         </div>
 
@@ -561,12 +524,14 @@
 // ────────────────────────────────────────────────
 const PBKDF2_ITERATIONS = 600_000;
 const SALT_LEN  = 16;
-const IV_LEN    = 12; // AES-GCM 권장 12 bytes
+const IV_LEN    = 12;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
+// 복호화 후 리다이렉트할 페이지 (잠금 마커 감지 시에도 동일)
+const FALLBACK_URL = 'https://example.com';
+
 let _encryptedUrl = '';
-let _decryptedUrl = '';
 
 // ────────────────────────────────────────────────
 //  키 파생: PBKDF2-SHA256
@@ -585,8 +550,8 @@ async function deriveKey(password, salt) {
 }
 
 // ────────────────────────────────────────────────
-//  암호화: AES-256-GCM (authenticated)
-//  포맷: salt(16) || iv(12) || ciphertext+tag(n+16)
+//  암호화: AES-256-GCM
+//  포맷: salt(16) || iv(12) || ciphertext+tag
 // ────────────────────────────────────────────────
 async function encryptAES(plaintext, password) {
     const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
@@ -604,16 +569,14 @@ async function encryptAES(plaintext, password) {
     out.set(iv,   SALT_LEN);
     out.set(new Uint8Array(cipherbuf), SALT_LEN + IV_LEN);
 
-    // URL-safe Base64 (패딩 제거)
     return btoa(String.fromCharCode(...out))
         .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 // ────────────────────────────────────────────────
-//  복호화: 인증 실패 시 DOMException 발생
+//  복호화
 // ────────────────────────────────────────────────
 async function decryptAES(encoded, password) {
-    // URL-safe Base64 → 바이트
     const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
     const pad = (4 - b64.length % 4) % 4;
     const raw = Uint8Array.from(atob(b64 + '='.repeat(pad)), c => c.charCodeAt(0));
@@ -628,7 +591,7 @@ async function decryptAES(encoded, password) {
         { name: 'AES-GCM', iv },
         key,
         ciphertext
-    ); // 키가 틀리면 여기서 DOMException 발생
+    );
 
     return dec.decode(plainbuf);
 }
@@ -672,75 +635,43 @@ function setEncryptLoading(on) {
 }
 
 // ────────────────────────────────────────────────
-//  UI: 복호화
-// ────────────────────────────────────────────────
-// ────────────────────────────────────────────────
 //  보안 상태
 // ────────────────────────────────────────────────
-let _autoWipeTimer  = null;
-let _urlRevealed    = false;
-let _failCount      = 0;  // 오답 횟수
+let _failCount = 0;
 
-function _wipePreview() {
-    _decryptedUrl = '';
-    _urlRevealed  = false;
-
-    if (_autoWipeTimer) { clearTimeout(_autoWipeTimer); _autoWipeTimer = null; }
-
-    // DOM 삭제 대신 숨기기 + 내용 비우기 (재사용 가능하게)
-    const el = document.getElementById('decryptPreview');
-    if (el) {
-        el.style.display = 'none';
-        const urlEl = document.getElementById('previewUrl');
-        if (urlEl) urlEl.textContent = '';
-    }
-
-    const keyInput = document.getElementById('decryptKeyInput');
-    if (keyInput) {
-        keyInput.value = '';
-        keyInput.removeEventListener('input', _onKeyInputWhileRevealed);
-    }
-    const btn = document.getElementById('unlockBtn');
-    if (btn) btn.style.display = 'block';
+// 파기 + example.com 으로 즉시 추방 (뒤로가기 없음)
+// guard: blur/visibilitychange 등 동시 발화해도 1회만 실행
+let _blasting = false;
+function _blastOff() {
+    if (_blasting) return;
+    _blasting = true;
+    history.replaceState(null, '', window.location.pathname);
+    window.location.replace(FALLBACK_URL);
 }
 
+// ────────────────────────────────────────────────
+//  UI: 복호화
+// ────────────────────────────────────────────────
 async function handleDecrypt() {
     const key = document.getElementById('decryptKeyInput').value;
     if (!key) return;
 
-    const params = new URLSearchParams(window.location.search);
-    const hash   = params.get('hash');
-    if (!hash) return;
+    // 파라미터는 init() 에서 이미 날렸으므로 저장된 해시 사용
+    if (!_savedHash) return;
 
     setDecryptLoading(true);
     const keyInput = document.getElementById('decryptKeyInput');
     keyInput.classList.remove('error');
 
     try {
-        const decrypted = await decryptAES(hash, key);
-        _decryptedUrl = decrypted;
-        _urlRevealed  = true;
-
-        const preview = document.getElementById('decryptPreview');
-        document.getElementById('previewUrl').textContent = decrypted;
-        preview.style.display = 'block';
-        keyInput.classList.remove('error');
-        keyInput.value = '';  // 맞춰도 KEY 필드 비우기
-        document.getElementById('unlockBtn').style.display = 'none';
-
-        // ── 보안 트리거 1: 10초 자동 파기
-        if (_autoWipeTimer) { clearTimeout(_autoWipeTimer); _autoWipeTimer = null; }
-        _autoWipeTimer = setTimeout(() => { if (_urlRevealed) _wipePreview(); }, 10000);
-
-        // ── 보안 트리거 2: KEY 필드에 뭔가 입력되면 즉시 파기 (중복 방지)
-        keyInput.removeEventListener('input', _onKeyInputWhileRevealed);
-        keyInput.addEventListener('input', _onKeyInputWhileRevealed);
+        const decrypted = await decryptAES(_savedHash, key);
+        history.replaceState(null, '', window.location.pathname);
+        window.location.replace(decrypted);
 
     } catch (e) {
         _failCount++;
-        if (_failCount >= 3) {
-            history.replaceState(null, '', window.location.href);
-            window.location.replace('https://example.com');
+        if (_failCount >= 1) {
+            _blastOff();
             return;
         }
         keyInput.classList.add('error');
@@ -753,37 +684,11 @@ async function handleDecrypt() {
     setDecryptLoading(false);
 }
 
-function _onKeyInputWhileRevealed() {
-    if (_urlRevealed) {
-        _wipePreview();
-        document.getElementById('decryptKeyInput')
-            ?.removeEventListener('input', _onKeyInputWhileRevealed);
-    }
-}
-
 function setDecryptLoading(on) {
     const btn = document.getElementById('unlockBtn');
     const sp  = document.getElementById('decryptSpinner');
     btn.style.display = on ? 'none' : 'block';
     sp.classList.toggle('active', on);
-}
-
-function goToUrl() {
-    if (!_decryptedUrl) return;
-    const url = _decryptedUrl;
-    _wipePreview();                      // DOM 먼저 파기
-    // history 조작: 현재 엔트리를 about:blank 로 교체해 뒤로가기로 URL이 복원되지 않게 함
-    history.replaceState(null, '', window.location.href);
-    window.location.replace(url);        // replace → 뒤로가기 스택에 이 페이지 남지 않음
-}
-
-function copyDecrypted() {
-    if (_decryptedUrl) {
-        navigator.clipboard.writeText(_decryptedUrl).then(() => {
-            // 복사 후에도 즉시 파기
-            _wipePreview();
-        });
-    }
 }
 
 // ────────────────────────────────────────────────
@@ -870,25 +775,104 @@ document.getElementById('decryptKeyInput')?.addEventListener('keydown', e => {
 // ────────────────────────────────────────────────
 //  페이지 초기화: 모드 감지
 // ────────────────────────────────────────────────
+
+// handleDecrypt() 에서 사용할 해시 (파라미터 날린 후에도 유지)
+let _savedHash = null;
+
 (function init() {
     const params = new URLSearchParams(window.location.search);
-    const hash = params.get('hash');
-    const hint = params.get('hint');
+    const hash   = params.get('hash');
+    const hint   = params.get('hint');
+    const marker = params.get('v'); // 내부 마커 (의미 없는 키)
+
+    // ── [F5 감지] 마커 파라미터가 있으면 → example.com 으로 뒤로가기 없이 이동
+    if (marker === '1') {
+        history.replaceState(null, '', window.location.pathname);
+        window.location.replace(FALLBACK_URL);
+        return;
+    }
+
     if (hash) {
+        // ── hash 파라미터 보존 후 URL에서 제거 → 마커 파라미터로 교체
+        _savedHash = hash;
+
+        // 파라미터 날리고 ?unlocked=1 마커 삽입 (replaceState → 뒤로가기에 hash URL 안 남음)
+        history.replaceState(null, '', '?v=1');
+
+        // 복호화 UI 표시
         document.getElementById('decryptSection').style.display = 'block';
         document.title = 'URL UNLOCKER 🔓';
         document.querySelector('.logo').innerHTML = 'URL<span>UNLOCKER</span> 🔓';
         document.querySelector('.subtitle').textContent = 'Decrypt & access your URL';
+
         if (hint) {
             document.getElementById('hintBox').style.display = 'block';
             document.getElementById('hintText').textContent = hint;
         }
 
-        // ── 보안 트리거 3: 탭 전환 / 브라우저 최소화 시 파기
+        // ── 보안 트리거 3: 탭 전환 / 최소화
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden && _urlRevealed) _wipePreview();
+            if (document.hidden) _blastOff();
         });
+
+        // ── 보안 트리거 4: 창 포커스 이탈 (alt탭, 주소창 F6, 개발자도구 등)
+        window.addEventListener('blur', () => _blastOff());
+
+        // ── 보안 트리거 5: 우클릭 차단
+        document.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            e.stopPropagation();
+            _blastOff();
+        });
+
+        // ── 보안 트리거 6: 키보드 단축키 차단
+        document.addEventListener('keydown', e => {
+            const c = e.key.toUpperCase();
+            const ctrl = e.ctrlKey || e.metaKey;
+
+            // 개발자 도구 열기
+            if (e.key === 'F12') { e.preventDefault(); _blastOff(); return; }
+            if (ctrl && e.shiftKey && ['I','J','C','K','E'].includes(c)) { e.preventDefault(); _blastOff(); return; }
+
+            // 소스 보기 / 저장 / 인쇄
+            if (ctrl && ['U','S','P'].includes(c)) { e.preventDefault(); _blastOff(); return; }
+
+            // 전체 선택 / 찾기
+            if (ctrl && ['A','F'].includes(c)) { e.preventDefault(); return; }
+
+            // 주소창 포커스
+            if (['F6'].includes(e.key)) { e.preventDefault(); _blastOff(); return; }
+        }, true); // capture 단계에서 먼저 낚아채기
+
+        // ── 보안 트리거 7: 텍스트 선택 / 드래그 방지
+        document.addEventListener('selectstart', e => e.preventDefault());
+        document.addEventListener('dragstart',   e => e.preventDefault());
+
+        // ── 보안 트리거 8: 개발자 도구 사이즈 감지 (도킹 시 창 크기 변화)
+        const _devtoolsCheck = setInterval(() => {
+            const widthDiff  = window.outerWidth  - window.innerWidth;
+            const heightDiff = window.outerHeight - window.innerHeight;
+            // 도구창이 옆/아래에 붙으면 160px 이상 차이남
+            if (widthDiff > 160 || heightDiff > 160) {
+                clearInterval(_devtoolsCheck);
+                _blastOff();
+            }
+        }, 500);
+
+        // ── 보안 트리거 9: debugger 타이밍 감지 (개발자 도구 열려있으면 느려짐)
+        (function _devtoolsTiming() {
+            const start = performance.now();
+            // eslint-disable-next-line no-debugger
+            debugger;
+            if (performance.now() - start > 100) {
+                _blastOff();
+                return;
+            }
+            setTimeout(_devtoolsTiming, 1000);
+        })();
+
     } else {
+        // 일반 암호화 모드
         document.getElementById('encryptSection').style.display = 'block';
     }
 })();
