@@ -529,7 +529,7 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 // 복호화 후 리다이렉트할 페이지 (잠금 마커 감지 시에도 동일)
-const FALLBACK_URL = 'https://example.com';
+const FALLBACK_URL = 'https://www.youtube.com/watch?v=TWQmDGwWU5E';
 
 let _encryptedUrl = '';
 
@@ -779,27 +779,78 @@ document.getElementById('decryptKeyInput')?.addEventListener('keydown', e => {
 // handleDecrypt() 에서 사용할 해시 (파라미터 날린 후에도 유지)
 let _savedHash = null;
 
+// ────────────────────────────────────────────────
+//  보안 리스너 (잠금/복호화 모드 공통)
+// ────────────────────────────────────────────────
+function _attachSecurityListeners() {
+    // 탭 전환 / 최소화
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) _blastOff();
+    });
+
+    // 창 포커스 이탈 (alt탭, F6, 개발자도구 등)
+    window.addEventListener('blur', () => _blastOff());
+
+    // 우클릭 차단
+    document.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        _blastOff();
+    });
+
+    // 키보드 단축키 차단 (capture 단계)
+    document.addEventListener('keydown', e => {
+        const c    = e.key.toUpperCase();
+        const ctrl = e.ctrlKey || e.metaKey;
+
+        if (e.key === 'F12') { e.preventDefault(); _blastOff(); return; }
+        if (ctrl && e.shiftKey && ['I','J','C','K','E'].includes(c)) { e.preventDefault(); _blastOff(); return; }
+        if (ctrl && ['U','S','P'].includes(c)) { e.preventDefault(); _blastOff(); return; }
+        if (ctrl && ['A','F'].includes(c))     { e.preventDefault(); return; }
+        if (e.key === 'F6')                    { e.preventDefault(); _blastOff(); return; }
+    }, true);
+
+    // 텍스트 선택 / 드래그 방지
+    document.addEventListener('selectstart', e => e.preventDefault());
+    document.addEventListener('dragstart',   e => e.preventDefault());
+
+    // 개발자 도구 사이즈 감지
+    const _devtoolsCheck = setInterval(() => {
+        if (window.outerWidth  - window.innerWidth  > 160 ||
+            window.outerHeight - window.innerHeight > 160) {
+            clearInterval(_devtoolsCheck);
+            _blastOff();
+        }
+    }, 500);
+
+    // debugger 타이밍 감지
+    (function _devtoolsTiming() {
+        const start = performance.now();
+        debugger; // eslint-disable-line no-debugger
+        if (performance.now() - start > 100) { _blastOff(); return; }
+        setTimeout(_devtoolsTiming, 1000);
+    })();
+}
+
 (function init() {
     const params = new URLSearchParams(window.location.search);
     const hash   = params.get('hash');
     const hint   = params.get('hint');
-    const marker = params.get('v'); // 내부 마커 (의미 없는 키)
+    const marker = params.get('v');   // 복호화 내부 마커
+    const lock   = params.get('lock'); // 잠금 모드 진입 키
 
-    // ── [F5 감지] 마커 파라미터가 있으면 → example.com 으로 뒤로가기 없이 이동
+    // ── [F5 감지] 마커 파라미터 → example.com 으로 추방
     if (marker === '1') {
         history.replaceState(null, '', window.location.pathname);
         window.location.replace(FALLBACK_URL);
         return;
     }
 
+    // ── 복호화 모드: ?hash=...
     if (hash) {
-        // ── hash 파라미터 보존 후 URL에서 제거 → 마커 파라미터로 교체
         _savedHash = hash;
-
-        // 파라미터 날리고 ?unlocked=1 마커 삽입 (replaceState → 뒤로가기에 hash URL 안 남음)
         history.replaceState(null, '', '?v=1');
 
-        // 복호화 UI 표시
         document.getElementById('decryptSection').style.display = 'block';
         document.title = 'URL UNLOCKER 🔓';
         document.querySelector('.logo').innerHTML = 'URL<span>UNLOCKER</span> 🔓';
@@ -810,71 +861,19 @@ let _savedHash = null;
             document.getElementById('hintText').textContent = hint;
         }
 
-        // ── 보안 트리거 3: 탭 전환 / 최소화
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) _blastOff();
-        });
-
-        // ── 보안 트리거 4: 창 포커스 이탈 (alt탭, 주소창 F6, 개발자도구 등)
-        window.addEventListener('blur', () => _blastOff());
-
-        // ── 보안 트리거 5: 우클릭 차단
-        document.addEventListener('contextmenu', e => {
-            e.preventDefault();
-            e.stopPropagation();
-            _blastOff();
-        });
-
-        // ── 보안 트리거 6: 키보드 단축키 차단
-        document.addEventListener('keydown', e => {
-            const c = e.key.toUpperCase();
-            const ctrl = e.ctrlKey || e.metaKey;
-
-            // 개발자 도구 열기
-            if (e.key === 'F12') { e.preventDefault(); _blastOff(); return; }
-            if (ctrl && e.shiftKey && ['I','J','C','K','E'].includes(c)) { e.preventDefault(); _blastOff(); return; }
-
-            // 소스 보기 / 저장 / 인쇄
-            if (ctrl && ['U','S','P'].includes(c)) { e.preventDefault(); _blastOff(); return; }
-
-            // 전체 선택 / 찾기
-            if (ctrl && ['A','F'].includes(c)) { e.preventDefault(); return; }
-
-            // 주소창 포커스
-            if (['F6'].includes(e.key)) { e.preventDefault(); _blastOff(); return; }
-        }, true); // capture 단계에서 먼저 낚아채기
-
-        // ── 보안 트리거 7: 텍스트 선택 / 드래그 방지
-        document.addEventListener('selectstart', e => e.preventDefault());
-        document.addEventListener('dragstart',   e => e.preventDefault());
-
-        // ── 보안 트리거 8: 개발자 도구 사이즈 감지 (도킹 시 창 크기 변화)
-        const _devtoolsCheck = setInterval(() => {
-            const widthDiff  = window.outerWidth  - window.innerWidth;
-            const heightDiff = window.outerHeight - window.innerHeight;
-            // 도구창이 옆/아래에 붙으면 160px 이상 차이남
-            if (widthDiff > 160 || heightDiff > 160) {
-                clearInterval(_devtoolsCheck);
-                _blastOff();
-            }
-        }, 500);
-
-        // ── 보안 트리거 9: debugger 타이밍 감지 (개발자 도구 열려있으면 느려짐)
-        (function _devtoolsTiming() {
-            const start = performance.now();
-            // eslint-disable-next-line no-debugger
-            debugger;
-            if (performance.now() - start > 100) {
-                _blastOff();
-                return;
-            }
-            setTimeout(_devtoolsTiming, 1000);
-        })();
-
-    } else {
-        // 일반 암호화 모드
-        document.getElementById('encryptSection').style.display = 'block';
+        _attachSecurityListeners();
+        return;
     }
+
+    // ── 잠금 모드: ?lock=1 필수 — 없으면 추방
+    if (lock === '1') {
+        history.replaceState(null, '', '?lock=1');
+        document.getElementById('encryptSection').style.display = 'block';
+        return;
+    }
+
+    // ── 파라미터 없음 → 추방
+    _blastOff();
 })();
 </script>
 </body>
