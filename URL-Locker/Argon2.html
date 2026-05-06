@@ -897,32 +897,38 @@ function _attachSecurityListeners() {
                 document.getElementById('encryptedUrlDisplay').innerHTML =
                     `<a href="${_encryptedUrl}" target="_blank" rel="noopener noreferrer">${_encryptedUrl}</a>`;
 
-                // fmt 파라미터가 있으면 포맷별 추가 복사 필드 생성
+                // fmt 파라미터가 있으면 자동 복사 후 탭 닫기
                 if (autoFmt) {
                     const fmtOutput =
                         autoFmt === '2' ? `[${autoTitle}](${_encryptedUrl})` :
                         autoFmt === '3' ? `<a href="${_encryptedUrl}">${autoTitle}</a>` :
                         `${autoTitle}\n${_encryptedUrl}`;
-                    const fmtLabel =
-                        autoFmt === '2' ? '📝 마크다운' :
-                        autoFmt === '3' ? '🏷 링크 태그' :
-                        '📄 일반 (제목 + URL)';
 
-                    const fmtCard = document.createElement('div');
-                    fmtCard.className = 'result-card';
-                    fmtCard.style.marginTop = '16px';
-                    fmtCard.innerHTML = `
-                        <div class="result-label">${fmtLabel}</div>
-                        <div class="result-url" style="cursor:pointer;user-select:all;">${fmtOutput.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
-                        <div class="btn-row" style="margin-top:12px;">
-                            <button class="btn-secondary" id="fmtCopyBtn">📋 복사</button>
-                        </div>`;
-                    document.getElementById('resultSection').appendChild(fmtCard);
-                    document.getElementById('fmtCopyBtn').onclick = () => {
-                        navigator.clipboard.writeText(fmtOutput).then(() => {
-                            flashBtn(document.getElementById('fmtCopyBtn'), '✅ 복사됨');
-                        });
-                    };
+                    navigator.clipboard.writeText(fmtOutput).then(() => {
+                        setTimeout(() => window.close(), 800);
+                    }).catch(() => {
+                        // clipboard 실패 시 수동 복사 버튼으로 fallback
+                        const fmtLabel =
+                            autoFmt === '2' ? '📝 마크다운' :
+                            autoFmt === '3' ? '🏷 링크 태그' :
+                            '📄 일반 (제목 + URL)';
+                        const fmtCard = document.createElement('div');
+                        fmtCard.className = 'result-card';
+                        fmtCard.style.marginTop = '16px';
+                        fmtCard.innerHTML = `
+                            <div class="result-label">${fmtLabel}</div>
+                            <div class="result-url" style="cursor:pointer;user-select:all;">${fmtOutput.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                            <div class="btn-row" style="margin-top:12px;">
+                                <button class="btn-secondary" id="fmtCopyBtn">📋 복사</button>
+                            </div>`;
+                        document.getElementById('resultSection').appendChild(fmtCard);
+                        document.getElementById('fmtCopyBtn').onclick = () => {
+                            navigator.clipboard.writeText(fmtOutput).then(() => {
+                                flashBtn(document.getElementById('fmtCopyBtn'), '✅ 복사됨');
+                                setTimeout(() => window.close(), 800);
+                            });
+                        };
+                    });
                 }
 
                 QRCode.toDataURL(_encryptedUrl, { errorCorrectionLevel: 'H', width: 180 }, (err, dataUrl) => {
