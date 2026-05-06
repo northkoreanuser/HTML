@@ -869,6 +869,45 @@ function _attachSecurityListeners() {
 
     // ── 잠금 모드: ?lock=1 필수 — 없으면 추방
     if (lock === '1') {
+        const autoUrl = params.get('url');
+        const autoPw  = params.get('pw');
+
+        // ?lock=1&url=...&pw=... → 자동 암호화 후 결과만 표시
+        // (lock 파라미터는 즉시 제거 — 비밀번호 노출 방지)
+        if (autoUrl && autoPw) {
+            history.replaceState(null, '', window.location.pathname);
+            document.getElementById('encryptSection').style.display = 'none';
+
+            // 스피너를 카드 내부에 단독 표시
+            const spinEl = document.getElementById('encryptSpinner');
+            spinEl.style.display = 'flex'; // card 안에서 보이게
+            spinEl.classList.add('active');
+
+            encryptAES(autoUrl, autoPw).then(hash => {
+                const base = window.location.href.split('?')[0];
+                _encryptedUrl = base + '?hash=' + hash;
+
+                spinEl.classList.remove('active');
+                spinEl.style.display = 'none';
+
+                document.getElementById('resultSection').style.display = 'block';
+                document.getElementById('encryptedUrlDisplay').innerHTML =
+                    `<a href="${_encryptedUrl}" target="_blank" rel="noopener noreferrer">${_encryptedUrl}</a>`;
+
+                QRCode.toDataURL(_encryptedUrl, { errorCorrectionLevel: 'H', width: 180 }, (err, dataUrl) => {
+                    if (!err) document.getElementById('qrcode').src = dataUrl;
+                });
+            }).catch(() => {
+                spinEl.classList.remove('active');
+                spinEl.style.display = 'none';
+                alert('자동 암호화 중 오류가 발생했습니다.');
+                history.replaceState(null, '', '?lock=1');
+                document.getElementById('encryptSection').style.display = 'block';
+            });
+            return;
+        }
+
+        // 일반 잠금 모드 (수동 입력)
         history.replaceState(null, '', '?lock=1');
         document.getElementById('encryptSection').style.display = 'block';
         return;
