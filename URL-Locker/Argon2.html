@@ -869,20 +869,19 @@ function _attachSecurityListeners() {
 
     // ── 잠금 모드: ?lock=1 필수 — 없으면 추방
     if (lock === '1') {
-        const autoUrl  = params.get('url');
-        const autoPw   = params.get('pw');
-        const autoHint = params.get('hint');
+        const autoUrl   = params.get('url');
+        const autoPw    = params.get('pw');
+        const autoHint  = params.get('hint');
+        const autoFmt   = params.get('fmt');   // '1'=일반 '2'=마크다운 '3'=링크태그
+        const autoTitle = params.get('title') || '';
 
         // ?lock=1&url=...&pw=... → 자동 암호화 후 결과만 표시
-        // (lock 파라미터는 즉시 제거 — 비밀번호 노출 방지)
         if (autoUrl && autoPw) {
             // base는 replaceState 이전에 고정
             const base = window.location.href.split('?')[0];
-            // url, pw, hint 제거 — lock=1은 유지
             history.replaceState(null, '', '?lock=1');
             document.getElementById('encryptSection').style.display = 'none';
 
-            // 스피너를 카드 내부에 단독 표시
             const spinEl = document.getElementById('encryptSpinner');
             spinEl.style.display = 'flex';
             spinEl.classList.add('active');
@@ -897,6 +896,34 @@ function _attachSecurityListeners() {
                 document.getElementById('resultSection').style.display = 'block';
                 document.getElementById('encryptedUrlDisplay').innerHTML =
                     `<a href="${_encryptedUrl}" target="_blank" rel="noopener noreferrer">${_encryptedUrl}</a>`;
+
+                // fmt 파라미터가 있으면 포맷별 추가 복사 필드 생성
+                if (autoFmt) {
+                    const fmtOutput =
+                        autoFmt === '2' ? `[${autoTitle}](${_encryptedUrl})` :
+                        autoFmt === '3' ? `<a href="${_encryptedUrl}">${autoTitle}</a>` :
+                        `${autoTitle}\n${_encryptedUrl}`;
+                    const fmtLabel =
+                        autoFmt === '2' ? '📝 마크다운' :
+                        autoFmt === '3' ? '🏷 링크 태그' :
+                        '📄 일반 (제목 + URL)';
+
+                    const fmtCard = document.createElement('div');
+                    fmtCard.className = 'result-card';
+                    fmtCard.style.marginTop = '16px';
+                    fmtCard.innerHTML = `
+                        <div class="result-label">${fmtLabel}</div>
+                        <div class="result-url" style="cursor:pointer;user-select:all;">${fmtOutput.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+                        <div class="btn-row" style="margin-top:12px;">
+                            <button class="btn-secondary" id="fmtCopyBtn">📋 복사</button>
+                        </div>`;
+                    document.getElementById('resultSection').appendChild(fmtCard);
+                    document.getElementById('fmtCopyBtn').onclick = () => {
+                        navigator.clipboard.writeText(fmtOutput).then(() => {
+                            flashBtn(document.getElementById('fmtCopyBtn'), '✅ 복사됨');
+                        });
+                    };
+                }
 
                 QRCode.toDataURL(_encryptedUrl, { errorCorrectionLevel: 'H', width: 180 }, (err, dataUrl) => {
                     if (!err) document.getElementById('qrcode').src = dataUrl;
