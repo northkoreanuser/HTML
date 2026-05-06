@@ -875,8 +875,7 @@ function _attachSecurityListeners() {
         // ?lock=1&url=...&pw=... → 자동 암호화 후 결과만 표시
         // (lock 파라미터는 즉시 제거 — 비밀번호 노출 방지)
         if (autoUrl && autoPw) {
-            // url, pw 파라미터만 제거 — lock=1은 유지해야 새로고침 시 추방 안 됨
-            history.replaceState(null, '', '?lock=1');
+            history.replaceState(null, '', window.location.pathname);
             document.getElementById('encryptSection').style.display = 'none';
 
             // 스피너를 카드 내부에 단독 표시
