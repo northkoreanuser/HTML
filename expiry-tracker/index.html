@@ -1,0 +1,2343 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>유통기한 관리</title>
+<style>
+:root{
+  --bg:#f2f2f7;--card:#fff;--border:#e0e0e5;--text:#111;--sub:#6e6e73;
+  --red:#c0392b;--orange:#e67e22;--green:#27ae60;--blue:#2471a3;--purple:#8e44ad;--gray:#7f8c8d;
+  --radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.wrap{max-width:640px;margin:0 auto;padding:0 0 80px}
+
+/* ── 헤더 ── */
+.top-bar{
+  position:sticky;top:0;z-index:100;
+  background:rgba(242,242,247,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:10px 16px 8px;
+}
+.top-bar h1{font-size:17px;font-weight:700;letter-spacing:-.3px;margin-bottom:8px}
+
+/* ── 배터리 ── */
+.top-title-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.top-title-row h1{font-size:17px;font-weight:700;letter-spacing:-.3px;margin:0}
+#battery-wrap{display:flex;align-items:center;gap:6px}
+#battery-pct{font-size:12px;font-weight:600;color:var(--sub);min-width:34px;text-align:right}
+.bat-shell{
+  position:relative;width:28px;height:14px;
+  border:2px solid var(--sub);border-radius:3px;
+}
+.bat-shell::after{
+  content:'';position:absolute;top:50%;right:-5px;transform:translateY(-50%);
+  width:3px;height:6px;background:var(--sub);border-radius:0 2px 2px 0;
+}
+#battery-fill{
+  position:absolute;inset:0;border-radius:1px;
+  background:var(--green);transition:width .6s ease,background .4s;
+}
+.bat-charging{color:#f39c12}
+.top-controls{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.ctrl-pill{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--sub);
+  background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 10px}
+.ctrl-pill select,.ctrl-pill input[type=number]{
+  font-size:12px;border:none;background:transparent;outline:none;
+  font-family:inherit;width:36px;color:var(--text);padding:0}
+.top-btn-group{display:flex;gap:5px;margin-left:auto}
+.icon-btn{display:flex;align-items:center;gap:4px;font-size:12px;font-family:inherit;
+  cursor:pointer;border:1px solid var(--border);background:var(--card);
+  border-radius:20px;padding:4px 10px;color:var(--blue);white-space:nowrap}
+.icon-btn:active{background:#eaf2f8}
+
+/* ── 주기 타이머 바 ── */
+#timer-bar{margin:8px -16px -8px;height:3px;background:var(--border);overflow:hidden}
+#timer-bar-fill{height:100%;width:0%;background:var(--blue);transition:width .9s linear}
+
+/* ── 경보 배너 ── */
+#alarm-banner{
+  display:none;position:fixed;top:50%;left:50%;
+  transform:translate(-50%,-50%);z-index:9999;
+  background:var(--red);color:#fff;
+  padding:20px 32px;border-radius:var(--radius);
+  cursor:pointer;text-align:center;
+  font-size:16px;font-weight:700;letter-spacing:-.2px;
+  box-shadow:0 6px 32px rgba(0,0,0,.45);
+  white-space:nowrap;animation:blink 1s step-start infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* ── 등록 항목 하이라이트 ── */
+@keyframes item-focus-glow{
+  0%,100%{box-shadow:none;background:var(--card)}
+  20%,60%{box-shadow:0 0 0 3px #27ae60;background:#eafaf1}
+  40%,80%{box-shadow:0 0 0 5px #27ae6044;background:#d5f5e3}
+}
+.item-focus{animation:item-focus-glow .55s ease 3;}
+
+/* ── 통계 카드 ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:12px 16px 0}
+.stat{background:var(--card);border-radius:var(--radius-sm);padding:10px 6px;text-align:center;border:1px solid var(--border)}
+.stat-num{font-size:24px;font-weight:700;line-height:1}
+.stat-label{font-size:10px;color:var(--sub);margin-top:3px}
+
+/* ── 알림 메시지 ── */
+.msg{font-size:13px;margin:8px 16px;padding:10px 12px;border-radius:var(--radius-sm);border-left:3px solid;display:none}
+.msg.error{color:var(--red);background:#fdecea;border-color:var(--red);display:block}
+.msg.notice{color:#1a6e3c;background:#eafaf1;border-color:var(--green);display:block}
+.msg.warn{color:#7d6608;background:#fffbe6;border-color:#d4ac0d;display:block}
+.msg.hidden{display:none!important}
+
+/* ── 덮어쓰기 확인 ── */
+.confirm-box{background:#fffbe6;border:1px solid #d4ac0d;border-radius:var(--radius-sm);
+  padding:14px 16px;margin:8px 16px;display:none}
+.confirm-box p{font-size:13px;line-height:1.7;margin-bottom:12px}
+.confirm-box .btns{display:flex;gap:8px}
+
+/* ── 공통 액션 시트 모달 (내보내기/가져오기) ── */
+#export-modal,#import-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200}
+#export-modal.open,#import-modal.open{display:block}
+.action-sheet{position:absolute;bottom:0;left:0;right:0;margin:0 auto;
+  background:var(--card);border-radius:var(--radius) var(--radius) 0 0;
+  padding:20px 20px 36px;max-width:640px}
+.action-sheet h3{font-size:15px;font-weight:700;margin-bottom:4px;text-align:center}
+.action-sheet .sheet-desc{font-size:12px;color:var(--sub);margin-bottom:16px;text-align:center;line-height:1.5}
+.action-sheet-close{position:absolute;top:14px;right:16px;background:var(--border);border:none;
+  width:28px;height:28px;border-radius:50%;font-size:13px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.sheet-options{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.sheet-opt{display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:var(--radius-sm);
+  border:1.5px solid var(--border);background:var(--bg);cursor:pointer;font-family:inherit;
+  text-align:left;width:100%}
+.sheet-opt:active{filter:brightness(.93)}
+.sheet-opt-icon{font-size:22px;flex-shrink:0}
+.sheet-opt-text{display:flex;flex-direction:column;gap:2px}
+.sheet-opt-label{font-size:14px;font-weight:700;color:var(--text)}
+.sheet-opt-sub{font-size:11px;color:var(--sub)}
+.sheet-opt.opt-items .sheet-opt-label{color:var(--blue)}
+.sheet-opt.opt-names .sheet-opt-label{color:var(--green)}
+.sheet-opt.opt-ow    .sheet-opt-label{color:var(--red)}
+.sheet-opt.opt-mg    .sheet-opt-label{color:var(--blue)}
+.sheet-opt.opt-cfg   .sheet-opt-label{color:var(--purple)}
+.sheet-cancel{width:100%;padding:12px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--bg);font-size:14px;font-family:inherit;cursor:pointer;color:var(--sub);font-weight:500}
+.sheet-cancel:active{background:var(--border)}
+.sheet-options.row2{flex-direction:row;gap:10px}
+.sheet-options.row2 .sheet-opt{flex:1}
+
+/* ── 등록 폼 ── */
+.add-box{background:var(--card);border-bottom:1px solid var(--border);padding:14px 16px;margin-top:10px}
+.add-hint{font-size:11px;color:var(--sub);margin-bottom:10px;line-height:1.5}
+.bc-row{display:flex;gap:8px;margin-bottom:10px}
+.bc-row input{flex:1;font-size:16px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 12px;font-family:inherit;background:var(--bg)}
+.bc-row input:focus{outline:none;border-color:var(--blue)}
+.scan-btn{flex-shrink:0;font-size:14px;font-family:inherit;cursor:pointer;
+  border:none;background:var(--blue);color:#fff;border-radius:var(--radius-sm);
+  padding:10px 16px;font-weight:600;display:none}
+.scan-btn:active{opacity:.8}
+.lookup-btn{flex-shrink:0;font-size:14px;font-family:inherit;cursor:pointer;
+  border:none;background:var(--green);color:#fff;border-radius:var(--radius-sm);
+  padding:10px 14px;font-weight:600}
+.lookup-btn:active{opacity:.8}
+
+/* ── 복원 선택 모달 ── */
+#restore-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1100;
+  align-items:center;justify-content:center;padding:24px}
+#restore-modal.open{display:flex}
+#restore-inner{background:var(--card);border-radius:var(--radius);padding:24px 20px 20px;
+  width:100%;max-width:340px;text-align:center;position:relative}
+#restore-inner h3{font-size:16px;font-weight:700;margin-bottom:10px}
+#restore-desc{font-size:13px;color:var(--sub);margin-bottom:18px;line-height:1.6}
+.restore-btns{display:flex;gap:10px;margin-bottom:12px}
+.restore-btn{flex:1;padding:14px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--bg);cursor:pointer;font-family:inherit;font-size:14px;font-weight:600;
+  display:flex;flex-direction:column;align-items:center;gap:4px}
+.restore-btn span{font-size:11px;font-weight:400;color:var(--sub)}
+.restore-btn:active{filter:brightness(.93)}
+.restore-full{border-color:var(--green);color:var(--green)}
+.restore-temp{border-color:var(--purple);color:var(--purple)}
+.restore-cancel{width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--bg);font-size:13px;font-family:inherit;cursor:pointer;color:var(--sub)}
+
+/* ── 가져오기 모드 선택 모달 ── */
+#import-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1200;
+  align-items:center;justify-content:center;padding:24px}
+#import-modal.open{display:flex}
+#import-inner{background:var(--card);border-radius:var(--radius);padding:24px 20px 20px;
+  width:100%;max-width:320px;text-align:center;position:relative}
+#import-inner h3{font-size:16px;font-weight:700;margin-bottom:6px}
+#import-inner p{font-size:12px;color:var(--sub);margin-bottom:18px;line-height:1.6}
+.import-btns{display:flex;gap:10px;margin-bottom:12px}
+.import-btn{flex:1;padding:14px 8px;border-radius:var(--radius-sm);border:1.5px solid var(--border);
+  background:var(--bg);cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;
+  display:flex;flex-direction:column;align-items:center;gap:5px}
+.import-btn span{font-size:10px;font-weight:400;color:var(--sub);line-height:1.4}
+.import-btn:active{filter:brightness(.93)}
+.import-btn-ow{border-color:var(--red);color:var(--red)}
+.import-btn-mg{border-color:var(--blue);color:var(--blue)}
+.import-cancel{width:100%;padding:10px;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--bg);font-size:13px;font-family:inherit;cursor:pointer;color:var(--sub)}
+#import-close{position:absolute;top:10px;right:12px;background:var(--border);border:none;
+  width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+#restore-close{position:absolute;top:10px;right:12px;background:var(--border);border:none;
+  width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.date-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:10px}
+.date-field{display:flex;flex-direction:column;gap:3px}
+.date-field label{font-size:10px;color:var(--sub);text-align:center}
+.date-field input{border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:8px 2px;font-family:inherit;font-size:14px;text-align:center;
+  background:var(--bg);width:100%}
+.date-field input:focus{outline:none;border-color:var(--blue)}
+.date-field input:disabled{opacity:.35;background:var(--border);cursor:not-allowed;color:var(--sub)}
+.add-submit{width:100%;padding:12px;font-size:15px;font-weight:600;font-family:inherit;
+  cursor:pointer;border:none;background:var(--text);color:#fff;border-radius:var(--radius-sm)}
+.add-submit:active{opacity:.8}
+
+/* ── 필터 탭 ── */
+.filter-row{display:flex;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  border-bottom:1px solid var(--border);background:var(--card);padding:0 8px;
+  scrollbar-width:none}
+.filter-row::-webkit-scrollbar{display:none}
+.filter-row a{
+  flex-shrink:0;text-decoration:none;color:var(--sub);
+  padding:10px 12px;font-size:13px;white-space:nowrap;
+  border-bottom:2px solid transparent;margin-bottom:-1px;font-weight:500}
+.filter-row a.active{color:var(--text);border-bottom-color:var(--text);font-weight:700}
+.filter-row a.f-temp-link{color:var(--purple)}
+.filter-row a.f-temp-link.active{border-bottom-color:var(--purple)}
+.filter-row a.f-trash-link{color:var(--gray)}
+.filter-row a.f-trash-link.active{border-bottom-color:var(--gray)}
+.filter-row a.f-marked-link{color:var(--green)}
+.filter-row a.f-marked-link.active{border-bottom-color:var(--green)}
+
+/* ── 목록: 카드형 ── */
+#list-wrap{padding:8px 0}
+/* ── 페이지 네비 ── */
+.page-nav{display:flex;gap:4px;justify-content:center;align-items:center;padding:14px 16px 6px;flex-wrap:wrap}
+.page-btn{min-width:34px;height:34px;border:1px solid var(--border);background:var(--card);
+  border-radius:var(--radius-sm);font-size:13px;cursor:pointer;font-family:inherit;color:var(--text)}
+.page-btn.on{background:var(--blue);color:#fff;border-color:var(--blue);font-weight:700}
+.page-btn:active{filter:brightness(.88)}
+.page-btn:disabled{opacity:.35;cursor:default}
+
+.item-card{background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;
+  display:flex;flex-direction:column;gap:6px}
+.item-card.row-expired{border-left:3px solid var(--red)}
+.item-card.row-warning{border-left:3px solid var(--orange)}
+.item-card.row-temp{border-left:3px solid var(--purple)}
+.item-card.row-trash{opacity:.65}
+.item-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.item-barcode{flex:1;min-width:0}
+.item-barcode svg{max-width:100%;height:auto}
+.item-meta{flex-shrink:0;text-align:right}
+.badge{display:inline-block;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:600}
+.tag-fresh{display:inline-block;font-size:10px;padding:2px 6px;background:#e8f8e8;
+  color:#1a7a1a;border:1px solid #a0d8a0;border-radius:10px;margin-left:4px;vertical-align:middle}
+.item-exp{font-size:14px;font-weight:600;margin-top:2px}
+.item-diff{font-size:12px;color:var(--sub);margin-top:1px}
+.item-added{font-size:11px;color:var(--sub)}
+.item-actions{display:flex;gap:6px;flex-wrap:wrap}
+.act-btn{flex:1;min-width:80px;padding:8px 4px;font-size:13px;font-family:inherit;
+  cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);
+  background:var(--bg);font-weight:500;text-align:center}
+.act-btn:active{filter:brightness(.93)}
+.act-btn.del{border-color:var(--red);color:var(--red)}
+.act-btn.ok{border-color:var(--green);color:var(--green)}
+.act-btn.temp{border-color:var(--purple);color:var(--purple)}
+
+/* ── 빈 목록 ── */
+.empty{text-align:center;padding:48px 16px;color:var(--sub);font-size:14px}
+
+/* ── 등록 토글 행 ── */
+.toggle-row{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.toggle-pill{font-size:11px;padding:4px 10px;border-radius:20px;
+  border:1.5px solid var(--border);background:var(--bg);color:var(--sub);
+  cursor:pointer;font-family:inherit;white-space:nowrap;transition:background .15s,color .15s,border-color .15s}
+.toggle-pill:active{filter:brightness(.93)}
+/* OFF 상태: 색 없음 / ON 상태: 타입별 색 */
+.toggle-pill#tg-enter-gen.on  {background:var(--text);color:#fff;border-color:var(--text)}
+.toggle-pill#tg-enter-fresh.on{background:var(--green);color:#fff;border-color:var(--green)}
+.toggle-pill#tg-ow-gen.on     {background:var(--orange);color:#fff;border-color:var(--orange)}
+.toggle-pill#tg-ow-fresh.on   {background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ── 스캐너 모달 ── */
+#scanner-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:999;
+  align-items:flex-end;justify-content:center}
+#scanner-modal.open{display:flex}
+#scanner-inner{background:var(--card);border-radius:var(--radius) var(--radius) 0 0;
+  padding:20px 16px 32px;width:100%;max-width:640px;position:relative}
+#scanner-inner h3{font-size:16px;font-weight:700;margin-bottom:12px;text-align:center}
+#scanner-video{width:100%;max-height:280px;background:#000;border-radius:var(--radius-sm);display:block}
+#scanner-close{position:absolute;top:16px;right:16px;background:var(--border);border:none;
+  font-size:16px;cursor:pointer;padding:0;width:30px;height:30px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center}
+#scanner-status{font-size:12px;color:var(--sub);margin-top:8px;text-align:center;min-height:16px}
+#scanner-https-warn{font-size:13px;color:var(--red);margin-top:8px;text-align:center;display:none}
+
+/* ── 바코드 확대 모달 ── */
+#bc-zoom-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;
+  align-items:center;justify-content:center;padding:24px}
+#bc-zoom-modal.open{display:flex}
+#bc-zoom-inner{background:#fff;border-radius:var(--radius);padding:24px 20px 20px;
+  width:100%;max-width:480px;text-align:center;position:relative}
+#bc-zoom-inner svg{width:100%;height:auto}
+#bc-zoom-memo{width:100%;margin-top:10px;font-size:13px;font-family:inherit;border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 10px;resize:vertical;color:var(--text);background:var(--bg);line-height:1.5}
+#bc-zoom-memo:focus{outline:none;border-color:var(--blue)}
+#bc-zoom-save-row{display:flex;align-items:center;gap:8px;margin-top:6px}
+#bc-zoom-save{font-size:12px;font-family:inherit;padding:5px 14px;border-radius:20px;border:1px solid var(--green);color:var(--green);background:var(--bg);cursor:pointer}
+#bc-zoom-save:active{background:#eafaf1}
+#bc-zoom-saved{font-size:11px;color:var(--green)}
+#bc-zoom-close{position:absolute;top:10px;right:12px;background:var(--border);border:none;
+  width:28px;height:28px;border-radius:50%;font-size:14px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.item-barcode{cursor:zoom-in}
+
+/* ── 정렬 헤더 (숨김 → 필터 탭으로 대체) ── */
+.sort-bar{display:flex;gap:6px;padding:8px 16px;overflow-x:auto;scrollbar-width:none;background:var(--bg)}
+.sort-bar::-webkit-scrollbar{display:none}
+.sort-chip{flex-shrink:0;font-size:12px;padding:4px 10px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);background:var(--card);color:var(--sub);font-family:inherit}
+.sort-chip.active{background:var(--text);color:#fff;border-color:var(--text)}
+
+/* ── 프로그래스바 ── */
+.item-progress{margin:2px 0 1px}
+.progress-track{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .4s ease}
+.progress-fill.pf-ok{background:var(--green)}
+.progress-fill.pf-warn{background:var(--orange)}
+.progress-fill.pf-expired{background:var(--red)}
+
+/* ── 카운트다운 텍스트 ── */
+.item-countdown{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums;letter-spacing:-.2px}
+.item-countdown.cd-expired{color:var(--red)}
+.item-countdown.cd-warn{color:var(--orange)}
+
+/* ── 일괄 작업 버튼 행 ── */
+.bulk-row{display:flex;gap:6px;padding:8px 16px;background:var(--bg);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.bulk-btn{font-size:12px;padding:5px 10px;border-radius:20px;border:1px solid var(--border);
+  background:var(--card);cursor:pointer;font-family:inherit;white-space:nowrap}
+.bulk-btn:active{filter:brightness(.92)}
+.bulk-btn.bulk-del{border-color:var(--red);color:var(--red)}
+.bulk-btn.bulk-ok{border-color:var(--green);color:var(--green)}
+.bulk-btn.bulk-temp{border-color:var(--purple);color:var(--purple)}
+
+/* ── 공통 버튼 (레거시 호환) ── */
+button{font-family:inherit;cursor:pointer}
+button:disabled{opacity:.45;cursor:default}
+
+/* ── 기억 (영구 초록 테두리) ── */
+.item-marked{box-shadow:0 0 0 3px #27ae60!important;background:#eafaf1!important}
+
+/* ── 삭제모드 토글 ── */
+.toggle-pill#tg-delete-mode.on{background:var(--red);color:#fff;border-color:var(--red)}
+
+/* ── 임시모드 토글 ── */
+.toggle-pill#tg-temp-mode.on{background:var(--purple);color:#fff;border-color:var(--purple)}
+
+/* ── 조회모드 토글 ── */
+.toggle-pill#tg-lookup-mode.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+/* ── 상품명 / 메모 표시 태그 ── */
+.item-name-tag{font-size:12px;font-weight:600;color:var(--text);margin-bottom:1px}
+.item-memo-badge{display:inline-block;font-size:10px;padding:2px 7px;
+  background:#fff8e1;color:#7d6608;border:1px solid #d4ac0d;border-radius:10px;margin-left:4px;vertical-align:middle}
+
+/* ── 상품명/메모 입력 행 ── */
+.memo-row{display:flex;gap:8px;margin-bottom:10px}
+.memo-row input,.memo-row textarea{flex:1;font-size:14px;border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:9px 12px;font-family:inherit;background:var(--bg);color:var(--text);resize:none}
+.memo-row input:focus,.memo-row textarea:focus{outline:none;border-color:var(--blue)}
+#cancel-edit-btn{flex-shrink:0;font-size:12px;font-family:inherit;padding:6px 10px;border-radius:var(--radius-sm);
+  border:1px solid var(--red);color:var(--red);background:var(--bg);cursor:pointer;white-space:nowrap}
+#cancel-edit-btn:active{background:#fdecea}
+</style>
+<script src="https://unpkg.com/dexie@4/dist/dexie.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+
+  <!-- 헤더 -->
+  <div class="top-bar">
+    <div class="top-title-row">
+      <h1>유통기한 관리</h1>
+      <div id="battery-wrap">
+        <span id="battery-pct">100%</span>
+        <div class="bat-shell"><div id="battery-fill" style="width:100%"></div></div>
+      </div>
+    </div>
+    <div class="top-controls">
+      <div class="ctrl-pill">
+        임박 <select id="warnDays">
+          <option value="1" selected>1일</option><option value="2">2일</option><option value="3">3일</option>
+          <option value="4">4일</option><option value="5">5일</option><option value="6">6일</option>
+          <option value="7">7일</option>
+        </select>
+      </div>
+      <div class="ctrl-pill">
+        주기 <input type="number" id="timerMin" min="1" max="60" value="1" oninput="if(this.value!=='')this.value=Math.min(60,Math.max(1,+this.value))" onblur="if(this.value==='')this.value=1;saveCfg()" onkeydown="if(event.key==='Enter'){if(this.value==='')this.value=1;saveCfg()}">분
+      </div>
+      <div class="top-btn-group">
+        <button class="icon-btn" onclick="openExportModal()">📤 내보내기</button>
+        <button class="icon-btn" onclick="openImportModal()">📥 가져오기</button>
+        <input type="file" id="import-file-all"   accept=".json" style="display:none" onchange="importFileSelected(this,'all')">
+        <input type="file" id="import-file-items" accept=".json" style="display:none" onchange="importFileSelected(this,'items')">
+        <input type="file" id="import-file-names" accept=".json" style="display:none" onchange="importFileSelected(this,'names')">
+        <input type="file" id="import-file-cfg"   accept=".json" style="display:none" onchange="importFileSelected(this,'cfg')">
+      </div>
+    </div>
+    <div id="timer-bar"><div id="timer-bar-fill"></div></div>
+  </div>
+
+  <div id="alarm-banner" onclick="triggerAlarmNow()">⚠️ 만료된 항목이 있습니다</div>
+
+  <!-- 통계 (활성 항목만) -->
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="s-total">0</div><div class="stat-label">전체(활성)</div></div>
+    <div class="stat"><div class="stat-num" style="color:#c0392b" id="s-exp">0</div><div class="stat-label">만료</div></div>
+    <div class="stat"><div class="stat-num" style="color:#e67e22" id="s-warn">0</div><div class="stat-label" id="s-warn-label">7일 이내</div></div>
+    <div class="stat"><div class="stat-num" style="color:#27ae60" id="s-ok">0</div><div class="stat-label">정상</div></div>
+  </div>
+
+  <!-- 알림 -->
+  <div class="msg hidden" id="msg-box"></div>
+
+  <!-- 덮어쓰기 / 재등록 확인 -->
+
+  <!-- 등록 폼 -->
+  <div class="add-box">
+    <p class="add-hint">※ 18자리(신선식품) 입력 시 유통기한 자동 추출</p>
+    <div class="toggle-row">
+      <button class="toggle-pill" id="tg-enter-gen"   onclick="toggleCfgBool('enterGeneral')">⌨ 일반 엔터등록</button>
+      <button class="toggle-pill" id="tg-enter-fresh" onclick="toggleCfgBool('enterFresh')">⌨ 신선 엔터등록</button>
+      <button class="toggle-pill" id="tg-ow-gen"      onclick="toggleCfgBool('overwriteGeneral')">↑ 일반 덮어쓰기</button>
+      <button class="toggle-pill" id="tg-ow-fresh"    onclick="toggleCfgBool('overwriteFresh')">↑ 신선 덮어쓰기</button>
+      <button class="toggle-pill" id="tg-temp-mode"   onclick="toggleCfgBool('tempMode')">📋 임시모드</button>
+      <button class="toggle-pill" id="tg-delete-mode" onclick="toggleCfgBool('deleteMode')">🗑 삭제모드</button>
+      <button class="toggle-pill" id="tg-lookup-mode" onclick="toggleCfgBool('lookupMode')">🔍 조회모드</button>
+    </div>
+    <div class="bc-row">
+      <input type="text" id="bc" maxlength="18" placeholder="바코드 13 또는 18자리" autocomplete="off" inputmode="numeric">
+      <button class="scan-btn" id="scan-btn" onclick="openScanner()">📷 스캔</button>
+    </div>
+    <div class="memo-row">
+      <input type="text" id="f-name" maxlength="40" placeholder="상품명 (비워도 됨)" autocomplete="off">
+      <textarea id="f-memo" maxlength="400" placeholder="메모 (비워도 됨)" autocomplete="off" rows="1"></textarea>
+      <button id="cancel-edit-btn" onclick="cancelEditMode()" style="display:none" title="수정 취소">✕ 수정취소</button>
+    </div>
+    <div class="date-grid">
+      <div class="date-field"><label>년</label><input type="number" id="fy" min="2020" max="2099" inputmode="numeric" oninput="clampDay()"></div>
+      <div class="date-field"><label>월</label><input type="number" id="fm" min="1" max="12" inputmode="numeric" oninput="clampDay()"></div>
+      <div class="date-field"><label>일</label><input type="number" id="fd" min="1" max="31" inputmode="numeric" oninput="clampDay()"></div>
+      <div class="date-field"><label>시</label><input type="number" id="fh" min="0" max="23" placeholder="23" inputmode="numeric"></div>
+      <div class="date-field"><label>분</label><input type="number" id="fmi" min="0" max="59" placeholder="59" inputmode="numeric"></div>
+      <div class="date-field"><label>초</label><input type="number" id="fs" min="0" max="59" placeholder="59" inputmode="numeric"></div>
+      <div class="date-field"><label>&nbsp;</label><button class="add-submit" onclick="submitAdd()" style="height:100%;font-size:13px;padding:4px 2px">등록</button></div>
+    </div>
+  </div>
+
+  <!-- 필터 탭 -->
+  <div class="filter-row">
+    <a href="#" id="f-all"     class="active"      onclick="return setFilter('all',this)">전체 <span id="fc-all">0</span></a>
+    <a href="#" id="f-expired"                      onclick="return setFilter('expired',this)">만료 <span id="fc-exp">0</span></a>
+    <a href="#" id="f-warning"                      onclick="return setFilter('warning',this)">임박 <span id="fc-warn">0</span></a>
+    <a href="#" id="f-ok"                           onclick="return setFilter('ok',this)">정상 <span id="fc-ok">0</span></a>
+    <a href="#" id="f-temp"   class="f-temp-link"  onclick="return setFilter('temp',this)">임시 <span id="fc-temp">0</span></a>
+    <a href="#" id="f-trash"  class="f-trash-link"  onclick="return setFilter('trash',this)">휴지통 <span id="fc-trash">0</span></a>
+    <a href="#" id="f-marked" class="f-marked-link" onclick="return setFilter('marked',this)">기억 <span id="fc-marked">0</span></a>
+  </div>
+  <!-- 정렬 칩 -->
+  <div class="sort-bar" id="sort-bar"></div>
+  <!-- 일괄 작업 -->
+  <div class="bulk-row" id="bulk-row" style="display:none"></div>
+
+  <!-- 목록 -->
+  <div id="list-wrap"></div>
+
+</div><!-- /wrap -->
+
+<!-- 내보내기 모달 -->
+<div id="export-modal" onclick="closeExportModal()">
+  <div class="action-sheet" onclick="event.stopPropagation()">
+    <button class="action-sheet-close" onclick="closeExportModal()">✕</button>
+    <h3>내보내기</h3>
+    <p class="sheet-desc">내보낼 항목을 선택하세요</p>
+    <div class="sheet-options">
+      <button class="sheet-opt opt-all" onclick="doExport('all')">
+        <span class="sheet-opt-icon">📦</span>
+        <span class="sheet-opt-text">
+          <span class="sheet-opt-label">전체 백업</span>
+          <span class="sheet-opt-sub">상품 목록 + 상품명 + 설정을 한 파일로</span>
+        </span>
+      </button>
+      <button class="sheet-opt opt-items" onclick="doExport('items')">
+        <span class="sheet-opt-icon">🏷️</span>
+        <span class="sheet-opt-text">
+          <span class="sheet-opt-label">상품 목록만</span>
+          <span class="sheet-opt-sub">유통기한 데이터만 내보내기</span>
+        </span>
+      </button>
+      <button class="sheet-opt opt-names" onclick="doExport('names')">
+        <span class="sheet-opt-icon">📝</span>
+        <span class="sheet-opt-text">
+          <span class="sheet-opt-label">상품명만</span>
+          <span class="sheet-opt-sub">바코드↔상품명 매핑 데이터만 내보내기</span>
+        </span>
+      </button>
+      <button class="sheet-opt opt-cfg" onclick="doExport('cfg')">
+        <span class="sheet-opt-icon">⚙️</span>
+        <span class="sheet-opt-text">
+          <span class="sheet-opt-label">설정만</span>
+          <span class="sheet-opt-sub">경보 주기·엔터 토글 등 설정값만 내보내기</span>
+        </span>
+      </button>
+    </div>
+    <button class="sheet-cancel" onclick="closeExportModal()">취소</button>
+  </div>
+</div>
+
+<!-- 가져오기 모달 (2단계) -->
+<div id="import-modal" onclick="cancelImport()">
+  <div class="action-sheet" onclick="event.stopPropagation()">
+    <button class="action-sheet-close" onclick="cancelImport()">✕</button>
+    <div id="import-step1">
+      <h3>가져오기</h3>
+      <p class="sheet-desc">가져올 항목을 선택하세요</p>
+      <div class="sheet-options">
+        <button class="sheet-opt opt-all" onclick="selectImportType('all')">
+          <span class="sheet-opt-icon">📦</span>
+          <span class="sheet-opt-text">
+            <span class="sheet-opt-label">전체</span>
+            <span class="sheet-opt-sub">상품 목록 + 상품명 + 설정</span>
+          </span>
+        </button>
+        <button class="sheet-opt opt-items" onclick="selectImportType('items')">
+          <span class="sheet-opt-icon">🏷️</span>
+          <span class="sheet-opt-text">
+            <span class="sheet-opt-label">상품 목록만</span>
+            <span class="sheet-opt-sub">유통기한 데이터만 가져오기</span>
+          </span>
+        </button>
+        <button class="sheet-opt opt-names" onclick="selectImportType('names')">
+          <span class="sheet-opt-icon">📝</span>
+          <span class="sheet-opt-text">
+            <span class="sheet-opt-label">상품명만</span>
+            <span class="sheet-opt-sub">바코드↔상품명 매핑 데이터만 가져오기</span>
+          </span>
+        </button>
+        <button class="sheet-opt opt-cfg" onclick="selectImportType('cfg')">
+          <span class="sheet-opt-icon">⚙️</span>
+          <span class="sheet-opt-text">
+            <span class="sheet-opt-label">설정만</span>
+            <span class="sheet-opt-sub">경보 주기·엔터 토글 등 설정값만 가져오기</span>
+          </span>
+        </button>
+      </div>
+      <button class="sheet-cancel" onclick="cancelImport()">취소</button>
+    </div>
+    <div id="import-step2" style="display:none">
+      <h3>가져오기 방식</h3>
+      <p class="sheet-desc" id="import-step2-desc"></p>
+      <div class="sheet-options row2">
+        <button class="sheet-opt opt-ow" onclick="doImport('overwrite')">
+          <span class="sheet-opt-icon">🗑️</span>
+          <span class="sheet-opt-text">
+            <span class="sheet-opt-label">덮어쓰기</span>
+            <span class="sheet-opt-sub">기존 데이터 삭제 후 교체</span>
+          </span>
+        </button>
+        <button class="sheet-opt opt-mg" onclick="doImport('merge')">
+          <span class="sheet-opt-icon">🔀</span>
+          <span class="sheet-opt-text">
+            <span class="sheet-opt-label">병합</span>
+            <span class="sheet-opt-sub">기존 데이터와 합치기</span>
+          </span>
+        </button>
+      </div>
+      <button class="sheet-cancel" onclick="cancelImport()">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- 스캐너 모달 -->
+<div id="scanner-modal">
+  <div id="scanner-inner">
+    <button id="scanner-close" onclick="closeScanner()">✕</button>
+    <h3>바코드 스캔</h3>
+    <video id="scanner-video" playsinline muted></video>
+    <div id="scanner-status">카메라 초기화 중...</div>
+    <div id="scanner-https-warn">⚠️ HTTP 환경에서는 카메라를 사용할 수 없습니다. HTTPS로 접속하거나 바코드를 직접 입력하세요.</div>
+  </div>
+</div>
+
+<!-- 바코드 확대 모달 -->
+<div id="bc-zoom-modal" onclick="closeBcZoom()">
+  <div id="bc-zoom-inner" onclick="event.stopPropagation()">
+    <button id="bc-zoom-close" onclick="closeBcZoom()">✕</button>
+    <div id="bc-zoom-svg"></div>
+    <textarea id="bc-zoom-memo" placeholder="메모 없음" rows="3"></textarea>
+    <div id="bc-zoom-save-row"><button id="bc-zoom-save" onclick="saveBcZoomMemo()">메모 저장</button><span id="bc-zoom-saved"></span></div>
+  </div>
+</div>
+
+<!-- 복원 선택 모달 -->
+<div id="restore-modal" onclick="closeRestoreModal()">
+  <div id="restore-inner" onclick="event.stopPropagation()">
+    <button id="restore-close" onclick="closeRestoreModal()">✕</button>
+    <h3 id="restore-modal-title">복원 방식 선택</h3>
+    <p id="restore-desc"></p>
+    <div class="restore-btns">
+      <button class="restore-btn restore-full" onclick="doRestore('active')">✅ 복원<span>활성 상태로 복원</span></button>
+      <button class="restore-btn restore-temp" onclick="doRestore('temp')">📋 임시 복원<span>임시 탭으로 복원</span></button>
+    </div>
+    <button class="restore-cancel" onclick="closeRestoreModal()">취소</button>
+  </div>
+</div>
+
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// EAN-13 바코드 생성 (JS)
+// ══════════════════════════════════════════════════════════════
+const EAN_L={'0':'0001101','1':'0011001','2':'0010011','3':'0111101','4':'0100011','5':'0110001','6':'0101111','7':'0111011','8':'0110111','9':'0001011'};
+const EAN_G={'0':'0100111','1':'0110011','2':'0011011','3':'0100001','4':'0011101','5':'0111001','6':'0000101','7':'0010001','8':'0001001','9':'0010111'};
+const EAN_R={'0':'1110010','1':'1100110','2':'1101100','3':'1000010','4':'1011100','5':'1001110','6':'1010000','7':'1000100','8':'1001000','9':'1110100'};
+const EAN_PAR={'0':'LLLLLL','1':'LLGLGG','2':'LLGGLG','3':'LLGGGL','4':'LGLLGG','5':'LGGLLG','6':'LGGGLL','7':'LGLGLG','8':'LGLGGL','9':'LGGLGL'};
+const EAN_MAPS={L:EAN_L,G:EAN_G,R:EAN_R};
+
+function eanCheckDigit(d12){
+  let so=0,se=0;
+  for(let i=0;i<12;i++){const v=+d12[i];(i%2===0)?so+=v:se+=v;}
+  return(10-((so+se*3)%10))%10;
+}
+
+function genBarcodeSVG(ean13,scale=1){
+  if(!ean13||ean13.length!==13)return'';
+  const fd=ean13[0],lh=ean13.slice(1,7),rh=ean13.slice(7,13);
+  let pat='101';
+  const ps=EAN_PAR[fd];
+  for(let i=0;i<6;i++)pat+=EAN_MAPS[ps[i]][lh[i]];
+  pat+='01010';
+  for(let i=0;i<6;i++)pat+=EAN_R[rh[i]];
+  pat+='101';
+  const BW=1.5*scale,H=46*scale,TH=13*scale,W=pat.length;
+  const svgW=W*BW+20*scale,svgH=H+TH+2;
+  let bars='';
+  for(let i=0;i<W;i++)if(pat[i]==='1')bars+=`<rect x="${10*scale+i*BW}" y="2" width="${BW}" height="${H}" fill="#111"/>`;
+  return`<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">${bars}<text x="${svgW/2}" y="${svgH-1}" text-anchor="middle" font-family="monospace" font-size="${10*scale}" fill="#333">${ean13}</text></svg>`;
+}
+
+let _bcZoomEan13=null;
+function openBcZoom(ean13){
+  _bcZoomEan13=ean13;
+  document.getElementById('bc-zoom-svg').innerHTML=genBarcodeSVG(ean13,3);
+  const item=items.find(i=>i.ean13===ean13);
+  document.getElementById('bc-zoom-memo').value=item&&item.memo?(item.memo).replace(/\\n/g,'\n'):'';
+  document.getElementById('bc-zoom-saved').textContent='';
+  document.getElementById('bc-zoom-modal').classList.add('open');
+}
+function saveBcZoomMemo(){
+  if(!_bcZoomEan13) return;
+  const idx=items.findIndex(i=>i.ean13===_bcZoomEan13);
+  if(idx===-1) return;
+  const memo=document.getElementById('bc-zoom-memo').value.trim().replace(/\n/g,'\\n');
+  if(memo) items[idx].memo=memo; else delete items[idx].memo;
+  saveItem(items[idx]); render();
+  document.getElementById('bc-zoom-saved').textContent='저장됨 ✓';
+  setTimeout(()=>{ const el=document.getElementById('bc-zoom-saved'); if(el) el.textContent=''; },2000);
+}
+function closeBcZoom(){
+  document.getElementById('bc-zoom-modal').classList.remove('open');
+}
+
+// ══════════════════════════════════════════════════════════════
+// Dexie.js (IndexedDB) 설정
+// ══════════════════════════════════════════════════════════════
+const db = new Dexie('유통기한DB');
+db.version(1).stores({
+  items: 'id, ean13, exp_ts, status, added_ts',
+  names: 'ean13',
+  cfg:   'key'
+});
+
+// ── localStorage → IndexedDB 마이그레이션 (최초 1회) ──
+async function migrateFromLocalStorage(){
+  try{
+    const lsItems = localStorage.getItem('exp_items');
+    const lsNames = localStorage.getItem('exp_names');
+    const lsCfg   = localStorage.getItem('exp_cfg');
+    if(!lsItems && !lsNames && !lsCfg) return;
+    const dbCount = await db.items.count();
+    if(dbCount > 0){ // 이미 DB에 데이터 있으면 스킵
+      localStorage.removeItem('exp_items');
+      localStorage.removeItem('exp_names');
+      localStorage.removeItem('exp_cfg');
+      return;
+    }
+    if(lsItems){
+      const parsed=JSON.parse(lsItems);
+      if(Array.isArray(parsed)&&parsed.length>0)
+        await db.items.bulkPut(parsed.map(i=>({status:'active',...i})));
+    }
+    if(lsNames){
+      const parsed=JSON.parse(lsNames);
+      const rows=Object.entries(parsed).map(([ean13,name])=>({ean13,name}));
+      if(rows.length>0) await db.names.bulkPut(rows);
+    }
+    if(lsCfg){
+      const parsed=JSON.parse(lsCfg);
+      await db.cfg.put({key:'main',value:parsed});
+    }
+    localStorage.removeItem('exp_items');
+    localStorage.removeItem('exp_names');
+    localStorage.removeItem('exp_cfg');
+    console.log('✅ localStorage → IndexedDB 마이그레이션 완료');
+  }catch(e){ console.warn('마이그레이션 오류:', e); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 상품명 저장소
+// ══════════════════════════════════════════════════════════════
+let names = {};
+async function loadNames(){
+  const rows = await db.names.toArray();
+  names = {};
+  rows.forEach(r=>{ names[r.ean13]=r.name; });
+}
+// 전체 동기화 (가져오기 등 대량 변경 시)
+function saveNames(){
+  const rows=Object.entries(names).map(([ean13,name])=>({ean13,name}));
+  db.transaction('rw',db.names,async()=>{
+    await db.names.clear();
+    if(rows.length) await db.names.bulkPut(rows);
+  }).catch(e=>console.error('saveNames 오류:',e));
+}
+// 단건 저장 (빠른 경로)
+function saveName(ean13, nameVal){
+  if(nameVal) db.names.put({ean13,name:nameVal}).catch(console.error);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 설정
+// ══════════════════════════════════════════════════════════════
+let cfg = { warnDays:1, timerMin:1, sortCol:'exp_ts', sortDir:'asc', enterGeneral:false, enterFresh:false, overwriteGeneral:false, overwriteFresh:false, deleteMode:false, tempMode:false, lookupMode:false };
+
+async function loadCfg(){
+  try{
+    const row=await db.cfg.get('main');
+    if(row&&row.value) cfg={...cfg,...row.value,deleteMode:false,tempMode:false,lookupMode:false};
+  }catch(e){}
+  applyCfgToUI();
+}
+
+function applyCfgToUI(){
+  document.getElementById('warnDays').value = cfg.warnDays;
+  document.getElementById('timerMin').value = cfg.timerMin;
+  document.getElementById('s-warn-label').textContent = cfg.warnDays+'일 이내';
+  applyToggleUI();
+}
+
+function saveCfg(){
+  cfg.warnDays = +document.getElementById('warnDays').value;
+  cfg.timerMin = Math.min(60,Math.max(1,+document.getElementById('timerMin').value));
+  document.getElementById('timerMin').value = cfg.timerMin;
+  _saveCfgLocal();
+  applyCfgToUI();
+  restartTimer();
+  render();
+}
+
+function _saveCfgLocal(){
+  db.cfg.put({key:'main',value:cfg}).catch(e=>console.error('saveCfg 오류:',e));
+}
+
+document.getElementById('warnDays').addEventListener('change', saveCfg);
+
+// ══════════════════════════════════════════════════════════════
+// 내보내기 / 가져오기 (모달 기반 통합)
+// ══════════════════════════════════════════════════════════════
+function _downloadJSON(obj, filename){
+  const blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=filename;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+// ── 내보내기 모달 ──
+function openExportModal(){
+  document.getElementById('export-modal').classList.add('open');
+}
+function closeExportModal(){
+  document.getElementById('export-modal').classList.remove('open');
+}
+function doExport(type){
+  closeExportModal();
+  const ts=new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
+  if(type==='all'){
+    _downloadJSON({items,names,cfg}, `유통기한_전체백업_${ts}.json`);
+    showMsg('전체 백업 파일을 내보냈습니다','notice');
+  } else if(type==='items'){
+    _downloadJSON(items, `유통기한_상품_${ts}.json`);
+    showMsg('상품 목록을 내보냈습니다 ('+items.length+'건)','notice');
+  } else if(type==='names'){
+    _downloadJSON(names, `유통기한_상품명_${ts}.json`);
+    showMsg('상품명을 내보냈습니다 ('+Object.keys(names).length+'건)','notice');
+  } else if(type==='cfg'){
+    _downloadJSON(cfg, `유통기한_설정_${ts}.json`);
+    showMsg('설정을 내보냈습니다','notice');
+  }
+}
+
+// ── 가져오기 모달 ──
+let _importPending = null;
+let _importType    = null; // 'all' | 'items' | 'names'
+
+function openImportModal(){
+  _showImportStep(1);
+  document.getElementById('import-modal').classList.add('open');
+}
+function cancelImport(){
+  document.getElementById('import-modal').classList.remove('open');
+  _importPending=null; _importType=null;
+}
+function _showImportStep(n){
+  document.getElementById('import-step1').style.display = n===1?'':'none';
+  document.getElementById('import-step2').style.display = n===2?'':'none';
+}
+
+// 1단계: 타입 선택 → 파일 picker 열기
+function selectImportType(type){
+  _importType=type;
+  document.getElementById('import-file-'+type).click();
+}
+
+// 파일 선택됨 → 파싱 → 2단계 덮어쓰기/병합 모달
+function importFileSelected(input, type){
+  const file=input.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      // 유효성 검사
+      if(type==='all' && !data.items && !data.names && !data.cfg){
+        showMsg('가져올 데이터가 없습니다','error'); cancelImport(); return;
+      }
+      if(type==='items' && !Array.isArray(data)){
+        showMsg('올바른 상품 파일이 아닙니다','error'); cancelImport(); return;
+      }
+      if(type==='names' && (typeof data!=='object'||Array.isArray(data))){
+        showMsg('올바른 상품명 파일이 아닙니다','error'); cancelImport(); return;
+      }
+      if(type==='cfg' && (typeof data!=='object'||Array.isArray(data))){
+        showMsg('올바른 설정 파일이 아닙니다','error'); cancelImport(); return;
+      }
+      _importPending=data;
+      if(type==='cfg'){
+        // 설정은 덮어쓰기만 의미있으므로 step2 스킵, 바로 적용
+        cfg={...cfg,...data}; _saveCfgLocal(); applyCfgToUI(); restartTimer();
+        cancelImport();
+        showMsg('설정을 가져왔습니다','notice');
+        return;
+      }
+      const typeLabel={'all':'전체','items':'상품 목록','names':'상품명'}[type];
+      document.getElementById('import-step2-desc').textContent=
+        `"${typeLabel}" 가져오기 방식을 선택하세요.\n덮어쓰기는 기존 데이터를 모두 지웁니다.`;
+      _showImportStep(2);
+    }catch(ex){ showMsg('파일 파싱 오류: '+ex.message,'error'); cancelImport(); }
+  };
+  reader.readAsText(file);
+  input.value='';
+}
+
+// 2단계: 덮어쓰기 / 병합 실행
+function doImport(mode){
+  document.getElementById('import-modal').classList.remove('open');
+  const data=_importPending; const type=_importType;
+  _importPending=null; _importType=null;
+  if(!data) return;
+
+  if(type==='all'){
+    if(mode==='overwrite'){
+      if(Array.isArray(data.items)){ items=data.items.map(i=>({status:'active',...i})); saveItems(); }
+      if(data.names&&typeof data.names==='object'){ names={...data.names}; saveNames(); }
+      if(data.cfg&&typeof data.cfg==='object'){ cfg={...cfg,...data.cfg,deleteMode:false,tempMode:false,lookupMode:false}; _saveCfgLocal(); applyCfgToUI(); restartTimer(); }
+    } else {
+      if(Array.isArray(data.items)){ items=mergeInto(items,data.items.map(i=>({status:'active',...i}))); saveItems(); }
+      if(data.names&&typeof data.names==='object'){ names={...data.names,...names}; saveNames(); }
+      if(data.cfg&&typeof data.cfg==='object'){ cfg={...cfg,...data.cfg,deleteMode:false,tempMode:false,lookupMode:false}; _saveCfgLocal(); applyCfgToUI(); restartTimer(); }
+    }
+    render(); showMsg('전체 가져오기 완료 ('+(mode==='overwrite'?'덮어쓰기':'병합')+')','notice');
+
+  } else if(type==='items'){
+    const before=items.length;
+    if(mode==='overwrite'){ items=data.map(i=>({status:'active',...i})); }
+    else { items=mergeInto(items,data.map(i=>({status:'active',...i}))); }
+    saveItems(); render();
+    showMsg(`상품 가져오기 완료 (${before}건 → ${items.length}건, `+(mode==='overwrite'?'덮어쓰기':'병합')+')','notice');
+
+  } else if(type==='names'){
+    const before=Object.keys(names).length;
+    if(mode==='overwrite'){ names={...data}; }
+    else { names={...data,...names}; }
+    saveNames(); render();
+    showMsg(`상품명 가져오기 완료 (${before}건 → ${Object.keys(names).length}건, `+(mode==='overwrite'?'덮어쓰기':'병합')+')','notice');
+  }
+}
+
+// ── 등록 토글 ──
+function applyToggleUI(){
+  const map={enterGeneral:'tg-enter-gen',enterFresh:'tg-enter-fresh',
+             overwriteGeneral:'tg-ow-gen',overwriteFresh:'tg-ow-fresh',
+             deleteMode:'tg-delete-mode',tempMode:'tg-temp-mode',lookupMode:'tg-lookup-mode'};
+  Object.entries(map).forEach(([k,id])=>{
+    const el=document.getElementById(id);
+    if(el) el.classList.toggle('on',!!cfg[k]);
+  });
+}
+
+function toggleCfgBool(key){
+  cfg[key]=!cfg[key];
+  // 삭제모드·임시모드·조회모드 상호 배타
+  if(key==='deleteMode'&&cfg.deleteMode){ cfg.tempMode=false; cfg.lookupMode=false; }
+  if(key==='tempMode'&&cfg.tempMode)    { cfg.deleteMode=false; cfg.lookupMode=false; }
+  if(key==='lookupMode'&&cfg.lookupMode){ cfg.deleteMode=false; cfg.tempMode=false; }
+  _saveCfgLocal();
+  applyToggleUI();
+}
+
+// ── 바코드 입력 필드 Enter 키 → 등록 / 삭제 / 유효성 검사 ──
+document.getElementById('bc').addEventListener('keydown',function(e){
+  if(e.key!=='Enter') return;
+  e.preventDefault();
+  const raw=this.value.trim().replace(/\D/g,'');
+  const len=raw.length;
+
+  // 유효성 검사: 숫자만 아닌 경우
+  if(this.value.trim()!=='' && raw===''){ this.value=''; return; }
+
+  // 길이 검사
+  if(len!==12&&len!==13&&len!==18){ if(len>0) this.value=''; return; }
+
+  // 체크디짓 검사 (13자리)
+  if(len===13){
+    const chk=eanCheckDigit(raw.slice(0,12));
+    if(+raw[12]!==chk){
+      showMsg(`체크디짓 불일치 — 입력값: ${raw[12]}, 계산값: ${chk} (바코드: ${raw})`,'error');
+      this.value=''; return;
+    }
+  }
+  // 체크디짓 검사 (18자리 신선식품: 앞 13자리)
+  if(len===18){
+    const chk=eanCheckDigit(raw.slice(0,12));
+    if(+raw[12]!==chk){
+      showMsg(`체크디짓 불일치 — 입력값: ${raw[12]}, 계산값: ${chk} (바코드: ${raw})`,'error');
+      this.value=''; return;
+    }
+  }
+
+  // 삭제모드 또는 임시모드: 길이/체크디짓 통과한 경우 실행 (엔터 토글 무관)
+  if(cfg.deleteMode||cfg.tempMode){ submitAdd(); return; }
+
+  // 조회모드: 엔터로 조회 실행
+  if(cfg.lookupMode){ lookupBarcode(); return; }
+
+  // 일반 등록 엔터 (토글 확인)
+  if(len===18&&cfg.enterFresh){ submitAdd(); }
+  else if((len===12||len===13)&&cfg.enterGeneral){ submitAdd(); }
+});
+
+// ── 폼 보조 입력 필드 Enter → 등록 차단 ──
+// (일반 엔터등록/신선 엔터등록/임시모드/삭제모드/조회모드 외에는 등록 불가)
+['f-name','fy','fm','fd','fh','fmi','fs'].forEach(function(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('keydown',function(e){
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    // 삭제모드·임시모드: bc 필드에서만 동작, 여기서는 bc로 포커스 이동
+    if(cfg.deleteMode||cfg.tempMode||cfg.lookupMode){
+      document.getElementById('bc').focus();
+      return;
+    }
+    // 엔터등록 토글이 켜진 경우에만 등록
+    const raw=document.getElementById('bc').value.trim().replace(/\D/g,'');
+    const len=raw.length;
+    if(len===18&&cfg.enterFresh){ submitAdd(); }
+    else if((len===12||len===13)&&cfg.enterGeneral){ submitAdd(); }
+    // 그 외에는 bc 필드로 포커스만 이동
+    else { document.getElementById('bc').focus(); }
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// 아이템 로드/저장 (Dexie)
+// ══════════════════════════════════════════════════════════════
+let items = [];
+
+async function loadItems(){
+  items = await db.items.toArray();
+  items = items.map(i=>({status:'active',...i}));
+}
+
+// 전체 동기화 (가져오기 등 대량 변경 시)
+function saveItems(){
+  db.transaction('rw',db.items,async()=>{
+    await db.items.clear();
+    if(items.length) await db.items.bulkPut(items);
+  }).catch(e=>console.error('saveItems 오류:',e));
+}
+// 단건 upsert (빠른 경로)
+function saveItem(item){
+  db.items.put(item).catch(e=>console.error('saveItem 오류:',e));
+}
+// 단건/다건 삭제 (빠른 경로)
+function deleteItems(ids){
+  const arr=Array.isArray(ids)?ids:[ids];
+  db.items.bulkDelete(arr).catch(e=>console.error('deleteItems 오류:',e));
+}
+
+// ══════════════════════════════════════════════════════════════
+// 상태 판단
+// ══════════════════════════════════════════════════════════════
+function getDateStatus(exp_ts){
+  const diff=(exp_ts-Date.now())/86400000;
+  if(diff<0) return 'expired';
+  if(diff<=cfg.warnDays) return 'warning';
+  return 'ok';
+}
+
+// 임시보관/휴지통은 날짜 기반 만료로 취급하지 않음
+function getItemStatus(item){
+  const s=item.status||'active';
+  if(s==='temp'||s==='trash') return s;
+  return getDateStatus(item.exp_ts);
+}
+
+const STATUS_LABEL={expired:'만료',warning:'임박',ok:'정상',temp:'임시보관',trash:'휴지통'};
+const STATUS_COL  ={expired:'#c0392b',warning:'#e67e22',ok:'#27ae60',temp:'#8e44ad',trash:'#7f8c8d'};
+
+// ══════════════════════════════════════════════════════════════
+// 경보음 (사각파, 고음/저음 교대, 진동 포함)
+// 브라우저가 오디오를 차단하면 false 반환
+// ══════════════════════════════════════════════════════════════
+let _alarmPending = false;
+let _alarmHandler = null;
+
+function alarm(){
+  if(navigator.vibrate) navigator.vibrate([500,100,500,100,500,100,500,100,800,200,800,200,800]);
+  try{
+    const ctx=new(window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==='suspended'){ctx.close();return false;}
+
+    const master=ctx.createGain();
+    master.gain.value=1.0;
+    master.connect(ctx.destination);
+
+    // ── 사이렌 레이어: 고저 주파수 스윕 × 3사이클 ──
+    // 경보 사이렌: 650Hz→1200Hz 올라가고 내려오는 패턴
+    for(let i=0;i<3;i++){
+      const oUp=ctx.createOscillator(),gUp=ctx.createGain();
+      oUp.type='sawtooth';
+      const tStart=i*0.9;
+      oUp.frequency.setValueAtTime(550,tStart);
+      oUp.frequency.linearRampToValueAtTime(1250,tStart+0.4);
+      gUp.gain.setValueAtTime(0.9,tStart);
+      gUp.gain.setValueAtTime(0.9,tStart+0.38);
+      gUp.gain.linearRampToValueAtTime(0,tStart+0.42);
+      oUp.connect(gUp);gUp.connect(master);
+      oUp.start(tStart);oUp.stop(tStart+0.45);
+
+      const oDn=ctx.createOscillator(),gDn=ctx.createGain();
+      oDn.type='sawtooth';
+      oDn.frequency.setValueAtTime(1250,tStart+0.45);
+      oDn.frequency.linearRampToValueAtTime(550,tStart+0.85);
+      gDn.gain.setValueAtTime(0.9,tStart+0.45);
+      gDn.gain.setValueAtTime(0.9,tStart+0.83);
+      gDn.gain.linearRampToValueAtTime(0,tStart+0.88);
+      oDn.connect(gDn);gDn.connect(master);
+      oDn.start(tStart+0.45);oDn.stop(tStart+0.9);
+    }
+
+    // ── 피어싱 비프 × 4 (사이렌 끝난 후) ──
+    const beepStart=3.0;
+    for(let i=0;i<4;i++){
+      const ob=ctx.createOscillator(),gb=ctx.createGain();
+      ob.type='square';
+      ob.frequency.value=1800;
+      const bt=beepStart+i*0.22;
+      gb.gain.setValueAtTime(0,bt);
+      gb.gain.linearRampToValueAtTime(1.0,bt+0.01);
+      gb.gain.setValueAtTime(1.0,bt+0.13);
+      gb.gain.linearRampToValueAtTime(0,bt+0.17);
+      ob.connect(gb);gb.connect(master);
+      ob.start(bt);ob.stop(bt+0.2);
+    }
+
+    // ── 낮은 경고음 베이스 (전체 깔림) ──
+    const oBase=ctx.createOscillator(),gBase=ctx.createGain();
+    oBase.type='square';
+    oBase.frequency.value=120;
+    gBase.gain.setValueAtTime(0.35,0);
+    gBase.gain.setValueAtTime(0.35,3.8);
+    gBase.gain.linearRampToValueAtTime(0,4.0);
+    oBase.connect(gBase);gBase.connect(master);
+    oBase.start(0);oBase.stop(4.0);
+
+    return true;
+  }catch(e){return false;}
+}
+
+function triggerAlarmNow(){
+  if(!_alarmPending) return;
+  _alarmPending=false;
+  document.getElementById('alarm-banner').style.display='none';
+  if(_alarmHandler){
+    document.removeEventListener('click',_alarmHandler);
+    document.removeEventListener('keydown',_alarmHandler);
+    _alarmHandler=null;
+  }
+  alarm();
+}
+
+function scheduleAlarmOnInteraction(){
+  if(_alarmPending) return; // 이미 대기 중
+  _alarmPending=true;
+  document.getElementById('alarm-banner').style.display='block';
+  _alarmHandler=function(){
+    if(!_alarmPending) return;
+    _alarmPending=false;
+    document.getElementById('alarm-banner').style.display='none';
+    alarm();
+    document.removeEventListener('click',_alarmHandler);
+    document.removeEventListener('keydown',_alarmHandler);
+    _alarmHandler=null;
+  };
+  document.addEventListener('click',_alarmHandler);
+  document.addEventListener('keydown',_alarmHandler);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 만료 확인 (활성 항목만 체크) + 실시간 만료 감지
+// ══════════════════════════════════════════════════════════════
+// 이전 틱에서 이미 만료됐던 항목 id 세트 (중복 알림 방지)
+let _prevExpiredIds=new Set();
+
+function checkExpired(triggerAlarm=true){
+  const now=Date.now();
+  const activeItems=items.filter(i=>(i.status||'active')==='active');
+  const currentExpiredIds=new Set(activeItems.filter(i=>i.exp_ts<=now).map(i=>i.id));
+  const hasExp=currentExpiredIds.size>0;
+
+  // 이번 틱에 새로 만료된 항목이 있으면 → 탭 이동 + 알림
+  const newlyExpired=[...currentExpiredIds].filter(id=>!_prevExpiredIds.has(id));
+  if(newlyExpired.length>0){
+    // 탭 이동 (임시/휴지통 보는 중이면 유지)
+    if(currentFilter!=='expired'&&currentFilter!=='temp'&&currentFilter!=='trash'){
+      setFilter('expired',document.getElementById('f-expired'));
+    } else {
+      render(); // 탭은 유지하되 카운트 갱신
+    }
+    if(triggerAlarm){
+      const played=alarm();
+      if(!played) scheduleAlarmOnInteraction();
+    }
+    showMsg(`⚠️ ${newlyExpired.length}건이 방금 만료됐습니다!`,'error',8000);
+  } else if(hasExp&&triggerAlarm){
+    // 기존 만료 항목이 있고 주기 알림 시점이면
+    if(currentFilter!=='expired'&&currentFilter!=='temp'&&currentFilter!=='trash'){
+      setFilter('expired',document.getElementById('f-expired'));
+    }
+    const played=alarm();
+    if(!played) scheduleAlarmOnInteraction();
+  }
+
+  _prevExpiredIds=currentExpiredIds;
+}
+
+// ── 절대 시간 기준 알림 주기 스케줄러 ──
+// 규칙: 어떤 주기든 00분에는 무조건 울림.
+// timerMin = N분이면, 1시간 내 울리는 분: {0, N, 2N, ...} (60 미만인 것들)
+let _absTimer=null;
+let _tickStartAt=Date.now();
+let _nextTickAt=Date.now();
+
+function restartTimer(){
+  if(_absTimer) clearTimeout(_absTimer);
+  scheduleNextTick();
+}
+
+function getNextAlarmMs(){
+  const now=new Date();
+  const curMin=now.getMinutes();
+  const curSec=now.getSeconds();
+  const curMs=now.getMilliseconds();
+  const N=Math.max(1,Math.min(60,cfg.timerMin));
+
+  // 이번 시간대에 울려야 할 분 목록: 0, N, 2N, ... (< 60)
+  const slots=[];
+  for(let m=0;m<60;m+=N) slots.push(m);
+  // 00은 항상 포함 (이미 0이 첫 번째이므로 중복 없음)
+
+  // 현재 분보다 큰 슬롯 중 가장 가까운 것
+  const nextMin=slots.find(m=>m>curMin);
+
+  let diffMs;
+  if(nextMin!==undefined){
+    // 같은 시간대, 다음 슬롯
+    diffMs=((nextMin-curMin)*60-curSec)*1000-curMs;
+  } else {
+    // 다음 시간 00분
+    diffMs=((60-curMin)*60-curSec)*1000-curMs;
+  }
+  return Math.max(500,diffMs);
+}
+
+function scheduleNextTick(){
+  const ms=getNextAlarmMs();
+  _tickStartAt=Date.now();
+  _nextTickAt=_tickStartAt+ms;
+  _absTimer=setTimeout(()=>{
+    checkExpired(true);
+    scheduleNextTick();
+  },ms);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 정렬
+// ══════════════════════════════════════════════════════════════
+const STATUS_ORDER={expired:0,warning:1,ok:2,temp:3,trash:4};
+
+function sortShown(arr){
+  const col=cfg.sortCol||'exp_ts';
+  const dir=cfg.sortDir||'asc';
+  return arr.slice().sort((a,b)=>{
+    let va,vb;
+    if(col==='ean13'){
+      return dir==='asc'?a.ean13.localeCompare(b.ean13):b.ean13.localeCompare(a.ean13);
+    } else if(col==='status'){
+      va=STATUS_ORDER[getItemStatus(a)]??9;
+      vb=STATUS_ORDER[getItemStatus(b)]??9;
+    } else { // exp_ts, added_ts
+      va=a[col]||0;vb=b[col]||0;
+    }
+    return dir==='asc'?va-vb:vb-va;
+  });
+}
+
+function setSortCol(col){
+  if(cfg.sortCol===col) cfg.sortDir=cfg.sortDir==='asc'?'desc':'asc';
+  else{cfg.sortCol=col;cfg.sortDir='asc';}
+  _saveCfgLocal();
+  render();
+}
+
+function renderSortBar(){
+  const bar=document.getElementById('sort-bar');
+  if(!bar) return;
+  const cols=[['exp_ts','유통기한'],['ean13','바코드'],['status','상태'],['added_ts','등록일']];
+  bar.innerHTML=cols.map(([col,lbl])=>{
+    const active=cfg.sortCol===col;
+    const ind=active?(cfg.sortDir==='asc'?' ↑':' ↓'):'';
+    return`<button class="sort-chip${active?' active':''}" onclick="setSortCol('${col}')">${lbl}${ind}</button>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// 렌더링
+// ══════════════════════════════════════════════════════════════
+let currentFilter='all';
+const PAGE_SIZE=50;
+let _page=1;
+// 카운트다운 실시간 갱신용 타이머
+let _cdTimer=null;
+
+function render(){
+  document.getElementById('s-warn-label').textContent=cfg.warnDays+'일 이내';
+
+  const active = items.filter(i=>(i.status||'active')==='active');
+  const cExp   = active.filter(i=>getDateStatus(i.exp_ts)==='expired').length;
+  const cWarn  = active.filter(i=>getDateStatus(i.exp_ts)==='warning').length;
+  const cOk    = active.filter(i=>getDateStatus(i.exp_ts)!=='expired').length;
+  const cTemp  = items.filter(i=>i.status==='temp').length;
+  const cTrash  = items.filter(i=>i.status==='trash').length;
+  const cMarked = items.filter(i=>i.marked).length;
+
+  document.getElementById('s-total').textContent = active.length;
+  document.getElementById('s-exp').textContent   = cExp;
+  document.getElementById('s-warn').textContent  = cWarn;
+  document.getElementById('s-ok').textContent    = cOk;
+  document.getElementById('fc-all').textContent  = active.length;
+  document.getElementById('fc-exp').textContent  = cExp;
+  document.getElementById('fc-warn').textContent = cWarn;
+  document.getElementById('fc-ok').textContent   = cOk;
+  document.getElementById('fc-temp').textContent = cTemp;
+  document.getElementById('fc-trash').textContent = cTrash;
+  document.getElementById('fc-marked').textContent= cMarked;
+
+  let shown;
+  if(currentFilter==='all')          shown=active.slice();
+  else if(currentFilter==='temp')    shown=items.filter(i=>i.status==='temp');
+  else if(currentFilter==='trash')   shown=items.filter(i=>i.status==='trash');
+  else if(currentFilter==='marked')  shown=items.filter(i=>i.marked);
+  else if(currentFilter==='ok')      shown=active.filter(i=>getDateStatus(i.exp_ts)!=='expired');
+  else                               shown=active.filter(i=>getDateStatus(i.exp_ts)===currentFilter);
+  shown=sortShown(shown);
+
+  // 일괄 버튼 렌더 (전체 필터 기준)
+  renderBulkRow(shown);
+  // 정렬 칩 렌더
+  renderSortBar();
+
+  const wrap=document.getElementById('list-wrap');
+  if(shown.length===0){
+    wrap.innerHTML='<div class="empty">등록된 항목이 없습니다</div>';
+    stopCdTimer();
+    return;
+  }
+
+  // 페이지네이션 슬라이스
+  const _totalPages=Math.ceil(shown.length/PAGE_SIZE);
+  if(_page>_totalPages) _page=_totalPages;
+  const _pageStart=(_page-1)*PAGE_SIZE;
+  const _pageEnd=_pageStart+PAGE_SIZE;
+  const shownPage=shown.slice(_pageStart,_pageEnd);
+
+  let html='';
+  for(const item of shownPage){
+    const st   = getItemStatus(item);
+    const col  = STATUS_COL[st];
+    const lbl  = STATUS_LABEL[st];
+    const isActive=(item.status||'active')==='active';
+    const expDt=fmtDt(item.exp_ts);
+    const addDt=fmtDate(item.added_ts);
+    const freshTag=item.fresh?'<span class="tag-fresh">신선식품</span>':'';
+    const svg=genBarcodeSVG(item.ean13);
+    const actions=rowActionsCard(item);
+    // 프로그래스바: 활성·임시·휴지통 모두 표시 (유통기한 시각화)
+    const progressHtml=renderProgress(item);
+    // 상품명 태그
+    const itemName=names[item.ean13]||'';
+    const nameHtml=itemName?`<div class="item-name-tag">📦 ${itemName}</div>`:'';
+    // 메모 배지 (있다는 것만 표시)
+    const memoHtml=item.memo?`<span class="item-memo-badge">📝 메모</span>`:'';
+    // 항목 기억 마크 클래스
+    const markedClass=item.marked?' item-marked':'';
+    html+=`<div class="item-card row-${st}${markedClass}" data-id="${item.id}">
+      ${nameHtml}
+      <div class="item-top">
+        <div class="item-barcode" onclick="openBcZoom('${item.ean13}')">${svg}${freshTag}${memoHtml}</div>
+        <div class="item-meta">
+          <span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}55">${lbl}</span>
+          <div class="item-added">${addDt} 등록</div>
+        </div>
+      </div>
+      <div class="item-exp">${expDt}</div>
+      ${progressHtml}
+      <div class="item-actions">${actions}</div>
+    </div>`;
+  }
+  wrap.innerHTML=html+renderPageNav(shown.length,_totalPages);
+  startCdTimer();
+}
+
+// ── 페이지 네비 HTML 생성 ──
+function renderPageNav(total,totalPages){
+  if(totalPages<=1) return '';
+  const group=Math.floor((_page-1)/10);
+  const from=group*10+1;
+  const to=Math.min(from+9,totalPages);
+  let h='<div class="page-nav">';
+  if(group>0)
+    h+=`<button class="page-btn" onclick="setPage(${from-1})">◀</button>`;
+  for(let i=from;i<=to;i++)
+    h+=`<button class="page-btn${i===_page?' on':''}" onclick="setPage(${i})">${i}</button>`;
+  if(to<totalPages)
+    h+=`<button class="page-btn" onclick="setPage(${to+1})">▶</button>`;
+  h+='</div>';
+  return h;
+}
+
+function setPage(n){
+  _page=n;
+  render();
+  document.getElementById('list-wrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── 프로그래스바 + 카운트다운 HTML 생성 ──
+function renderProgress(item){
+  const now=Date.now();
+  const diff=item.exp_ts-now; // ms
+  const diffDays=diff/86400000;
+  const pct=calcProgressPct(item,now);
+  let pfClass,cdClass;
+  if(diff<0){
+    pfClass='pf-expired';cdClass='cd-expired';
+  } else if(diffDays<=cfg.warnDays){
+    pfClass='pf-warn';cdClass='cd-warn';
+  } else {
+    pfClass='pf-ok';cdClass='';
+  }
+  // data-exp 속성으로 실시간 갱신 대상 지정
+  return`<div class="item-progress">
+    <div class="progress-track"><div class="progress-fill ${pfClass}" style="width:${pct}%" data-exp="${item.exp_ts}" data-pf="${pfClass}"></div></div>
+    <div class="item-countdown ${cdClass}" data-exp="${item.exp_ts}">${fmtCountdown(diff)}</div>
+  </div>`;
+}
+
+// 프로그래스 비율 계산
+// 등록일 ~ 만료일 기준 / 1일 이상 남으면 100% / 1일 이내면 점점 줄어듦
+function calcProgressPct(item,now){
+  const diff=item.exp_ts-now;
+  if(diff<=0) return 0;
+  const oneDay=86400000;
+  if(diff>=oneDay) return 100; // 1일 이상 → 풀
+  // 1일 이내: 선형으로 감소
+  return Math.max(0,Math.round((diff/oneDay)*100));
+}
+
+// 카운트다운 텍스트 (남은 시간 / 경과 시간)
+function fmtCountdown(diffMs){
+  const abs=Math.abs(diffMs);
+  const sign=diffMs<0?'-':'';
+  const s=Math.floor(abs/1000);
+  const yy=Math.floor(s/31536000);
+  const mm=Math.floor((s%31536000)/2592000);
+  const dd=Math.floor((s%2592000)/86400);
+  const hh=Math.floor((s%86400)/3600);
+  const mi=Math.floor((s%3600)/60);
+  const sc=s%60;
+  const p=v=>String(v).padStart(2,'0');
+  let parts=[];
+  if(yy>0) parts.push(yy+'년');
+  if(mm>0) parts.push(mm+'개월');
+  if(dd>0) parts.push(dd+'일');
+  parts.push(`${p(hh)}:${p(mi)}:${p(sc)}`);
+  return sign+parts.join(' ')+(diffMs<0?' 경과':' 남음');
+}
+
+// 카운트다운 실시간 갱신 타이머
+function startCdTimer(){
+  stopCdTimer();
+  _cdTimer=setInterval(updateCountdowns,1000);
+}
+function stopCdTimer(){
+  if(_cdTimer){clearInterval(_cdTimer);_cdTimer=null;}
+}
+// 통합: 타이머바 + DOM 업데이트 + 실시간 만료 감지
+function updateCountdowns(){
+  const now=Date.now();
+  // 타이머 진행 바
+  const fill=document.getElementById('timer-bar-fill');
+  if(fill){const span=_nextTickAt-_tickStartAt;fill.style.width=(span>0?Math.min(100,(now-_tickStartAt)/span*100):0)+'%';}
+  // 카운트다운 & 프로그래스 갱신
+  document.querySelectorAll('[data-exp]').forEach(el=>{
+    const exp=+el.dataset.exp,diff=exp-now;
+    if(el.classList.contains('item-countdown')){
+      el.textContent=fmtCountdown(diff);
+      el.className='item-countdown'+(diff<0?' cd-expired':diff/86400000<=cfg.warnDays?' cd-warn':'');
+    } else if(el.classList.contains('progress-fill')){
+      el.style.width=(diff<=0?0:diff>=86400000?100:Math.max(0,Math.round((diff/86400000)*100)))+'%';
+    }
+  });
+  // 실시간 만료 감지 (탭 이동 + 알림)
+  const activeItems=items.filter(i=>(i.status||'active')==='active');
+  const curExp=new Set(activeItems.filter(i=>i.exp_ts<=now).map(i=>i.id));
+  const newlyExp=[...curExp].filter(id=>!_prevExpiredIds.has(id));
+  if(newlyExp.length>0){
+    _prevExpiredIds=curExp;
+    if(currentFilter!=='expired'&&currentFilter!=='temp'&&currentFilter!=='trash')
+      setFilter('expired',document.getElementById('f-expired'));
+    else render();
+    const played=alarm();
+    if(!played) scheduleAlarmOnInteraction();
+    showMsg(`⚠️ ${newlyExp.length}건이 방금 만료됐습니다!`,'error',8000);
+  }
+}
+
+// ── 일괄 작업 버튼 ──
+// shown: 현재 필터·정렬 후 화면에 표시 중인 항목 배열
+let _bulkShownIds=[];  // renderBulkRow 호출 시 저장
+
+function renderBulkRow(shown){
+  const bulkRow=document.getElementById('bulk-row');
+  if(!bulkRow) return;
+  _bulkShownIds=shown.map(i=>i.id);  // 현재 표시 중인 id 스냅샷
+  const f=currentFilter;
+  const cnt=shown.length;
+  let btns='';
+  if(f==='trash'){
+    if(cnt>0){
+      btns+=`<button class="bulk-btn bulk-del" onclick="bulkEmptyTrash()">🗑 휴지통 비우기 (${cnt}건)</button>`;
+      btns+=`<button class="bulk-btn bulk-ok" onclick="bulkRestoreAll()">↩ 전체 복원 (${cnt}건)</button>`;
+    }
+  } else if(f==='temp'){
+    if(cnt>0){
+      btns+=`<button class="bulk-btn bulk-ok" onclick="bulkRestoreAll()">↩ 전체 복원 (${cnt}건)</button>`;
+      btns+=`<button class="bulk-btn bulk-del" onclick="bulkMoveShown('trash')">🗑 전체 휴지통 이동 (${cnt}건)</button>`;
+    }
+  } else if(f==='all'||f==='ok'||f==='warning'||f==='expired'){
+    if(cnt>0){
+      btns+=`<button class="bulk-btn bulk-temp" onclick="bulkMoveShown('temp')">전체 임시보관 (${cnt}건)</button>`;
+      btns+=`<button class="bulk-btn bulk-del" onclick="bulkMoveShown('trash')">전체 휴지통 (${cnt}건)</button>`;
+    }
+  } else if(f==='marked'){
+    if(cnt>0){
+      btns+=`<button class="bulk-btn" onclick="bulkUnmarkAll()">☐ 기억 전부 풀기 (${cnt}건)</button>`;
+    }
+  }
+  bulkRow.innerHTML=btns;
+  bulkRow.style.display=btns?'flex':'none';
+}
+
+
+
+function rowActionsCard(item){
+  const s=item.status||'active';
+  const id=item.id;
+  const markBtn=item.marked
+    ?`<button class="act-btn ok" onclick="toggleMark('${id}')">✅ 기억</button>`
+    :`<button class="act-btn"    onclick="toggleMark('${id}')">☐ 기억</button>`;
+  if(s==='active'){
+    return markBtn+
+           `<button class="act-btn" onclick="fillForm('${id}')">수정</button>`+
+           `<button class="act-btn temp" onclick="moveToTemp('${id}')">임시보관</button>`+
+           `<button class="act-btn del"  onclick="moveToTrash('${id}')">휴지통</button>`;
+  } else if(s==='temp'){
+    return markBtn+
+           `<button class="act-btn" onclick="fillForm('${id}')">수정</button>`+
+           `<button class="act-btn ok"  onclick="restoreItem('${id}')">복원</button>`+
+           `<button class="act-btn del" onclick="moveToTrash('${id}')">휴지통</button>`;
+  } else {
+    return markBtn+
+           `<button class="act-btn" onclick="fillForm('${id}')">수정</button>`+
+           `<button class="act-btn ok"  onclick="restoreItem('${id}')">복원</button>`+
+           `<button class="act-btn del" onclick="permanentDelete('${id}')">영구삭제</button>`;
+  }
+}
+
+// ── 입력폼 자동 채우기 ──
+// 신선식품이면 EAN-13만, 일반은 날짜까지 전부 채움
+function cancelEditMode(){
+  clearForm();
+  showMsg('수정 취소됨','warn',2000);
+}
+
+function fillForm(id){
+  const item=items.find(i=>i.id===id);
+  if(!item) return;
+  const p=v=>String(v).padStart(2,'0');
+  // 바코드
+  document.getElementById('bc').value=item.ean13;
+  if(item.fresh){
+    // 신선식품: 날짜 폼은 비워둠 (18자리 바코드 아니면 직접 입력)
+    ['fy','fm','fd','fh','fmi','fs'].forEach(fid=>document.getElementById(fid).value='');
+  } else {
+    const d=new Date(item.exp_ts);
+    document.getElementById('fy').value=d.getFullYear();
+    document.getElementById('fm').value=d.getMonth()+1;
+    document.getElementById('fd').value=d.getDate();
+    document.getElementById('fh').value=p(d.getHours());
+    document.getElementById('fmi').value=p(d.getMinutes());
+    document.getElementById('fs').value=p(d.getSeconds());
+  }
+  // 상품명 (EAN-13 기준 저장소에서)
+  document.getElementById('f-name').value=names[item.ean13]||'';
+  // 메모 (아이템에 저장된 것) — 저장된 \n을 실제 개행으로
+  document.getElementById('f-memo').value=(item.memo||'').replace(/\\n/g,'\n');
+  document.getElementById('cancel-edit-btn').style.display='';
+  // 폼으로 스크롤 & 바코드 입력창 포커스
+  document.querySelector('.add-box').scrollIntoView({behavior:'smooth',block:'center'});
+  setTimeout(()=>document.getElementById('bc').focus(),300);
+  _isEditMode = true;
+  _editItemId = item.id;
+  _editItemTs = item.exp_ts;
+  _editItemFresh = !!item.fresh;
+  _editOrigName = names[item.ean13]||'';
+  _editOrigMemo = (item.memo||'').replace(/\\n/g,'\n');
+  _isLocked = false; _userDateVals = null;
+  _syncDateLock();
+  showMsg(item.fresh?'신선식품 — 바코드만 채움. 날짜는 18자리 바코드로 입력':'입력폼을 채웠습니다. 수정 후 등록하세요.','notice',4000);
+}
+
+// ── 수정 모드 충돌 방지: 수정 모드일 때만 상품명·메모 입력 시 날짜/시간 비활성화 ──
+const _DATE_FIELDS = ['fy','fm','fd','fh','fmi','fs'];
+let _isEditMode = false;
+let _editItemId = null;  // 수정 중인 item.id
+let _editItemTs = null;
+let _editItemFresh = false;
+let _editOrigName = '';   // fillForm 시점 원본 상품명
+let _editOrigMemo = '';   // fillForm 시점 원본 메모
+let _userDateVals = null;
+let _isLocked = false;
+
+function _snapUserDates(){
+  const vals = {};
+  _DATE_FIELDS.forEach(fid => { vals[fid] = document.getElementById(fid).value; });
+  return vals;
+}
+function _applyDates(vals){
+  _DATE_FIELDS.forEach(fid => { document.getElementById(fid).value = vals[fid]; });
+}
+function _applyOriginalDates(){
+  if(_editItemFresh || _editItemTs === null){
+    _DATE_FIELDS.forEach(fid => { document.getElementById(fid).value = ''; });
+    return;
+  }
+  const d = new Date(_editItemTs), p = v => String(v).padStart(2,'0');
+  document.getElementById('fy').value  = d.getFullYear();
+  document.getElementById('fm').value  = d.getMonth()+1;
+  document.getElementById('fd').value  = d.getDate();
+  document.getElementById('fh').value  = p(d.getHours());
+  document.getElementById('fmi').value = p(d.getMinutes());
+  document.getElementById('fs').value  = p(d.getSeconds());
+}
+function _syncDateLock(){
+  const nameVal = document.getElementById('f-name').value;
+  const memoVal = document.getElementById('f-memo').value;
+  const shouldLock = _isEditMode && (nameVal !== _editOrigName || memoVal !== _editOrigMemo);
+  if(shouldLock && !_isLocked){
+    _userDateVals = _snapUserDates();
+    _applyOriginalDates();
+    _isLocked = true;
+  } else if(!shouldLock && _isLocked){
+    if(_userDateVals) _applyDates(_userDateVals);
+    _userDateVals = null;
+    _isLocked = false;
+  }
+  _DATE_FIELDS.forEach(fid => {
+    const el = document.getElementById(fid);
+    if(!el) return;
+    el.disabled = shouldLock;
+    el.title = shouldLock ? '상품명/메모 입력 중에는 날짜·시간을 변경할 수 없습니다' : '';
+  });
+}
+(function _initDateLock(){
+  ['f-name','f-memo'].forEach(fid => {
+    document.getElementById(fid).addEventListener('input', _syncDateLock);
+  });
+})();
+// f-memo 붙여넣기 시 실제 개행 → \n 문자열로 치환
+document.getElementById('f-memo').addEventListener('paste',function(e){
+  e.preventDefault();
+  const text=(e.clipboardData||window.clipboardData).getData('text');
+  const converted=text.replace(/\r\n|\r|\n/g,'\\n');
+  const el=this;
+  const s=el.selectionStart,en=el.selectionEnd;
+  el.value=el.value.slice(0,s)+converted+el.value.slice(en);
+  el.selectionStart=el.selectionEnd=s+converted.length;
+  _syncDateLock();
+});
+
+function fmtDt(ts){
+  const d=new Date(ts),p=n=>String(n).padStart(2,'0');
+  return`${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function fmtDate(ts){
+  const d=new Date(ts),p=n=>String(n).padStart(2,'0');
+  return`${d.getFullYear()}.${p(d.getMonth()+1)}.${p(d.getDate())}`;
+}
+
+function setFilter(f,el){
+  currentFilter=f;
+  _page=1;
+  document.querySelectorAll('.filter-row a').forEach(a=>a.classList.remove('active'));
+  el.classList.add('active');
+  render();
+  return false;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 알림 메시지
+// ══════════════════════════════════════════════════════════════
+let _msgTimer=null;
+function showMsg(text,type='notice',duration=4000){
+  const el=document.getElementById('msg-box');
+  el.textContent=text;
+  el.className='msg '+type;
+  if(_msgTimer) clearTimeout(_msgTimer);
+  if(duration>0) _msgTimer=setTimeout(()=>el.className='msg hidden',duration);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 항목 상태 변경 (개별/일괄 통합)
+// ══════════════════════════════════════════════════════════════
+function changeStatus(ids, toStatus, skipConfirm=false){
+  // ids: string(단일 id) 또는 string[] (일괄)
+  const idArr=Array.isArray(ids)?ids:[ids];
+  const cnt=idArr.length;
+  const idSet=new Set(idArr);
+
+  const LABEL={temp:'임시보관',trash:'휴지통',active:'복원'};
+  const label=LABEL[toStatus]||toStatus;
+
+  if(toStatus==='delete'){
+    if(!confirm(`${cnt}건을 영구 삭제합니다. 복원할 수 없습니다. 계속하시겠습니까?`)) return;
+    items=items.filter(i=>!idSet.has(i.id));
+    deleteItems(idArr);
+    render();
+    showMsg(`${cnt}건 영구 삭제됨`,'error',3000);
+    return;
+  }
+
+  if(!skipConfirm&&!confirm(`${cnt}건을 ${label==='복원'?'활성 상태로 복원':label+'으로 이동'}하시겠습니까?`)) return;
+  const changed=[];
+  items.filter(i=>idSet.has(i.id)).forEach(i=>{ i.status=toStatus; changed.push(i); });
+  db.items.bulkPut(changed).catch(e=>console.error('changeStatus DB 오류:',e));
+  render();
+  showMsg(`${cnt}건 ${label==='복원'?'복원됨':label+'으로 이동됨'}`,
+    toStatus==='trash'?'warn':toStatus==='temp'?'notice':'notice');
+}
+
+function moveToTemp(id)       { changeStatus(id,'temp'); }
+function moveToTrash(id)      { changeStatus(id,'trash'); }
+function permanentDelete(id)  { changeStatus(id,'delete'); }
+
+// ── 기억 토글 ──
+function toggleMark(id){
+  const item=items.find(i=>i.id===id);
+  if(!item) return;
+  item.marked=!item.marked;
+  saveItem(item);
+  if(currentFilter!=='marked'){
+    render();
+  } else {
+    // 기억 탭: 목록에서 제거하지 않고 카드 상태(테두리+버튼)만 즉시 반영
+    const cMarked=items.filter(i=>i.marked).length;
+    document.getElementById('fc-marked').textContent=cMarked;
+    const card=document.querySelector(`.item-card[data-id="${id}"]`);
+    if(card){
+      card.classList.toggle('item-marked', !!item.marked);
+      const btn=card.querySelector('.act-btn.ok, .act-btn:not(.del):not(.temp):not(.ok)');
+      // 버튼 찾아서 텍스트/클래스 갱신
+      const allBtns=card.querySelectorAll('.act-btn');
+      allBtns.forEach(b=>{
+        if(b.textContent.includes('기억')){
+          b.textContent=item.marked?'✅ 기억':'☐ 기억';
+          b.classList.toggle('ok', !!item.marked);
+        }
+      });
+    }
+  }
+}
+
+// ── 복원 선택 모달 (단건 / 일괄 통합) ──
+let _restoreTargetIds=[];
+
+function restoreItem(id){
+  const item=items.find(i=>i.id===id);
+  if(!item) return;
+  _restoreTargetIds=[id];
+  const label=item.status==='temp'?'임시보관':'휴지통';
+  document.getElementById('restore-modal-title').textContent='복원 방식 선택';
+  document.getElementById('restore-desc').textContent=
+    `[${label}] ${item.ean13} 항목을 어떻게 복원할까요?`;
+  document.getElementById('restore-modal').classList.add('open');
+}
+
+function openBulkRestoreModal(){
+  const ids=_bulkShownIds.filter(id=>items.find(i=>i.id===id));
+  if(!ids.length) return;
+  _restoreTargetIds=ids;
+  const n=ids.length;
+  const label=currentFilter==='trash'?'휴지통':'임시보관';
+  document.getElementById('restore-modal-title').textContent=`복원 방식 선택 (${n}개)`;
+  document.getElementById('restore-desc').textContent=
+    `[${label}] ${n}개 항목을 어떻게 복원할까요?`;
+  document.getElementById('restore-modal').classList.add('open');
+}
+
+function doRestore(toStatus){
+  if(!_restoreTargetIds.length) return;
+  const ids=_restoreTargetIds.slice();
+  closeRestoreModal();
+  changeStatus(ids, toStatus, true); // 모달 자체가 확인이므로 confirm 생략
+}
+
+function closeRestoreModal(){
+  _restoreTargetIds=[];
+  document.getElementById('restore-modal').classList.remove('open');
+}
+
+// ── 바코드 조회 ──
+function lookupBarcode(){
+  let raw=document.getElementById('bc').value.trim().replace(/\D/g,'');
+  if(!raw){showMsg('조회할 바코드를 입력하세요.','error');return;}
+  // 18자리 신선식품 바코드면 앞 13자리(EAN-13)로 변환하여 조회
+  if(raw.length===18) raw=raw.slice(0,13);
+  // 접두사 일치 또는 완전 일치로 검색
+  const matched=items.filter(i=>i.ean13===raw||i.ean13.startsWith(raw));
+  // 바코드 입력창 비우기
+  document.getElementById('bc').value='';
+  if(matched.length===0){
+    showMsg(`바코드 [${raw}] — 등록된 항목이 없습니다.`,'warn',4000);
+    return;
+  }
+  const item=matched[0];
+  const st=getItemStatus(item);
+  // 해당 탭으로 이동
+  let targetFilter,tabEl;
+  if(item.status==='trash'){
+    targetFilter='trash'; tabEl=document.getElementById('f-trash');
+  } else if(item.status==='temp'){
+    targetFilter='temp'; tabEl=document.getElementById('f-temp');
+  } else if(st==='expired'){
+    targetFilter='expired'; tabEl=document.getElementById('f-expired');
+  } else if(st==='warning'){
+    targetFilter='warning'; tabEl=document.getElementById('f-warning');
+  } else {
+    targetFilter='ok'; tabEl=document.getElementById('f-ok');
+  }
+  currentFilter=targetFilter;
+  document.querySelectorAll('.filter-row a').forEach(a=>a.classList.remove('active'));
+  tabEl.classList.add('active');
+
+  // 해당 아이템이 몇 번 페이지에 있는지 계산해서 이동
+  let shown2;
+  if(targetFilter==='trash')       shown2=items.filter(i=>i.status==='trash');
+  else if(targetFilter==='temp')   shown2=items.filter(i=>i.status==='temp');
+  else if(targetFilter==='marked') shown2=items.filter(i=>i.marked);
+  else if(targetFilter==='ok')     shown2=items.filter(i=>(i.status||'active')==='active'&&getDateStatus(i.exp_ts)!=='expired');
+  else if(targetFilter==='all')    shown2=items.filter(i=>(i.status||'active')==='active');
+  else                             shown2=items.filter(i=>(i.status||'active')==='active'&&getDateStatus(i.exp_ts)===targetFilter);
+  shown2=sortShown(shown2);
+  const itemIdx=shown2.findIndex(i=>i.id===item.id);
+  if(itemIdx!==-1) _page=Math.ceil((itemIdx+1)/PAGE_SIZE);
+
+  render();
+  // 강조 효과
+  requestAnimationFrame(()=>{
+    highlightItem(item.id);
+    showMsg(`✅ 바코드 [${item.ean13}] 조회됨 — 상태: ${STATUS_LABEL[st]||STATUS_LABEL[getItemStatus(item)]}`,'notice',4000);
+  });
+}
+
+// ── 일괄 작업 ──
+function bulkEmptyTrash(){
+  const ids=_bulkShownIds.filter(id=>items.find(i=>i.id===id));
+  if(!ids.length) return;
+  changeStatus(ids,'delete');
+}
+function bulkRestoreAll()          { openBulkRestoreModal(); }
+function bulkMoveShown(toStatus)   { if(_bulkShownIds.length) changeStatus(_bulkShownIds,toStatus); }
+function bulkUnmarkAll(){
+  const cnt=_bulkShownIds.length;
+  if(!cnt) return;
+  if(!confirm(`기억 표시된 ${cnt}건을 전부 해제합니다. 계속하시겠습니까?`)) return;
+  const changed=[];
+  _bulkShownIds.forEach(id=>{
+    const item=items.find(i=>i.id===id);
+    if(item){ item.marked=false; changed.push(item); }
+  });
+  db.items.bulkPut(changed).catch(console.error);
+  render();
+  showMsg(`${cnt}건 기억 해제됨`,'notice',3000);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 일수 범위 고정 (해당 월 말일 초과 입력 방지)
+// ══════════════════════════════════════════════════════════════
+function clampDay(){
+  const fdEl=document.getElementById('fd');
+  const val=+fdEl.value;
+  if(!val) return;
+  const n=new Date();
+  const y=+document.getElementById('fy').value||n.getFullYear();
+  const mo=+document.getElementById('fm').value||(n.getMonth()+1);
+  const maxDay=new Date(y,mo,0).getDate(); // mo는 이미 1-indexed이므로 다음달 0일 = 이번달 말일
+  if(val>maxDay) fdEl.value=maxDay;
+  if(val<1) fdEl.value=1;
+}
+
+
+let _pendingConfirm=null;
+
+function clearForm(){
+  document.getElementById('bc').value='';
+  ['fy','fm','fd','fh','fmi','fs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f-name').value='';
+  document.getElementById('f-memo').value='';
+  document.getElementById('cancel-edit-btn').style.display='none';
+  _isEditMode = false; _editItemId = null; _editItemTs = null; _editItemFresh = false;
+  _editOrigName = ''; _editOrigMemo = '';
+  _isLocked = false; _userDateVals = null;
+  _syncDateLock();
+}
+
+function submitAdd(){
+  const raw=document.getElementById('bc').value.trim().replace(/\D/g,'');
+  const len=raw.length;
+
+  // ── 조회모드 ──
+  if(cfg.lookupMode){ lookupBarcode(); return; }
+
+  if(len<12){showMsg('바코드는 12자리 이상 숫자여야 합니다.','error');return;}
+
+  // ── 수정 모드: tryRegister 우회, item 직접 패치 ──
+  if(_isEditMode && _editItemId){
+    const idx=items.findIndex(i=>i.id===_editItemId);
+    if(idx!==-1){
+      const nameVal=document.getElementById('f-name').value.trim();
+      const memoVal=document.getElementById('f-memo').value.trim().replace(/\n/g,'\\n');
+      // 날짜: 잠겨있으면 원본 exp_ts 그대로, 아니면 폼에서 읽기
+      let exp_ts=items[idx].exp_ts;
+      if(!_isLocked){
+        // 신선식품이면 바코드로만 날짜 결정(18자리 경로) → 여기선 폼 날짜 사용
+        const now=new Date();
+        const y=+document.getElementById('fy').value||now.getFullYear();
+        const mo=+document.getElementById('fm').value||(now.getMonth()+1);
+        const d=+document.getElementById('fd').value||now.getDate();
+        const hv=document.getElementById('fh').value;
+        const miv=document.getElementById('fmi').value;
+        const sv=document.getElementById('fs').value;
+        const hEntered=hv!=='';
+        const h=hEntered?+hv:23;
+        const mi=miv!==''?+miv:(hEntered?0:59);
+        const s=sv!==''?+sv:(hEntered?0:59);
+        const dt=new Date(y,mo-1,d,h,mi,s);
+        if(!isNaN(dt.getTime())) exp_ts=dt.getTime();
+      }
+      if(exp_ts !== items[idx].exp_ts){ items[idx].exp_ts=exp_ts; items[idx].added_ts=Date.now(); }
+      if(memoVal) items[idx].memo=memoVal; else delete items[idx].memo;
+      names[items[idx].ean13]=nameVal; saveName(items[idx].ean13, nameVal);
+      saveItem(items[idx]); clearForm(); focusBc(); render();
+      showMsg('수정 완료','notice',3000);
+    }
+    return;
+  }
+
+  // ── 삭제모드 ──
+  if(cfg.deleteMode){
+    deleteByBarcode(raw,len);
+    return;
+  }
+
+  // ── 임시모드 ──
+  if(cfg.tempMode){
+    tempByBarcode(raw,len);
+    return;
+  }
+
+  let ean13,exp_ts,isFresh=false;
+
+  if(len===18){
+    ean13=raw.slice(0,13);
+    const chk=eanCheckDigit(ean13.slice(0,12));
+    if(+ean13[12]!==chk){showMsg(`체크디짓 불일치 (올바른 값: ${chk})`,'error');return;}
+    // raw[13]: 신선식품 판별자 ('4')
+    if(raw[13]!=='4'){showMsg(`신선식품 판별자 오류: [13]번째 자리가 '4'가 아닙니다 (현재: '${raw[13]}')`, 'error');return;}
+    const dd=+raw.slice(14,16),hh=+raw.slice(16,18);
+    if(dd<1||dd>31||hh<0||hh>23){showMsg(`신선식품 코드 오류: 일=${dd}, 시=${hh}`,'error');return;}
+    const now=new Date();
+    // 월 코드가 없는 형식이므로, 현재 날짜 기준으로 월을 결정
+    // 계산된 날짜가 현재보다 10일 이상 과거면 → 1개월 자동 패딩
+    let expY=now.getFullYear(), expM=now.getMonth(); // getMonth(): 0-indexed
+    exp_ts=new Date(expY,expM,dd,hh,0,0).getTime();
+    if(exp_ts < now.getTime() - 10*86400000){
+      // 10일 초과 과거 → 다음 달로 패딩
+      expM+=1;
+      if(expM>11){expM=0;expY+=1;} // 12월(11) → 1월(0), 년도 +1
+      exp_ts=new Date(expY,expM,dd,hh,0,0).getTime();
+    }
+    isFresh=true;
+    showMsg('신선식품 바코드: 유통기한 자동 추출 → '+fmtDt(exp_ts)+' (날짜 입력 무시됨)','notice',6000);
+    tryRegister(ean13,exp_ts,isFresh,raw); // raw = 18자리 신선 고유키
+  } else if(len===12||len===13){
+    const base=raw.slice(0,12);
+    const chk=eanCheckDigit(base);
+    if(len===13&&+raw[12]!==chk){showMsg(`체크디짓 불일치 (올바른 값: ${chk})`,'error');return;}
+    ean13=base+chk;
+    const now=new Date();
+    const y=+document.getElementById('fy').value||now.getFullYear();
+    const mo=+document.getElementById('fm').value||(now.getMonth()+1);
+    const d=+document.getElementById('fd').value||now.getDate();
+    const hv=document.getElementById('fh').value;
+    const miv=document.getElementById('fmi').value;
+    const sv=document.getElementById('fs').value;
+    const hEntered=hv!=='';
+    const h=hEntered?+hv:23;
+    const mi=miv!==''?+miv:(hEntered?0:59);
+    const s=sv!==''?+sv:(hEntered?0:59);
+    const dt=new Date(y,mo-1,d,h,mi,s);
+    if(isNaN(dt.getTime())){showMsg('유효하지 않은 날짜입니다.','error');return;}
+    exp_ts=dt.getTime();
+    tryRegister(ean13,exp_ts,isFresh,null);
+  } else {
+    showMsg(`지원하지 않는 자릿수: ${len}자리`,'error');return;
+  }
+}
+
+function focusBc(){
+  // 약간의 딜레이로 렌더링 완료 후 포커스
+  setTimeout(()=>document.getElementById('bc').focus(),80);
+}
+
+function tryRegister(ean13,exp_ts,fresh=false,freshKey=null){
+  // ── 중복 판정: EAN-13 기준 (신선/일반 무관하게 동일 EAN-13이면 중복)
+  // freshKey가 완전히 동일한 경우를 먼저 체크 (동일 재고 바코드)
+  let dupIdx;
+  if(fresh&&freshKey){
+    dupIdx=items.findIndex(i=>i.freshKey===freshKey);
+    if(dupIdx===-1) dupIdx=items.findIndex(i=>i.ean13===ean13); // EAN-13 겹치면 같은 상품
+  } else {
+    dupIdx=items.findIndex(i=>i.ean13===ean13);
+  }
+
+  // ── 신규 등록 ──
+  if(dupIdx===-1){
+    const newId=uid();
+    const nameVal=document.getElementById('f-name').value.trim();
+    const memoVal=document.getElementById('f-memo').value.trim();
+    const newItem={id:newId,ean13,exp_ts,added_ts:Date.now(),fresh,status:'active'};
+    if(freshKey) newItem.freshKey=freshKey;
+    if(memoVal) newItem.memo=memoVal;
+    if(nameVal){ names[ean13]=nameVal; saveName(ean13, nameVal); }
+    items.push(newItem);
+    saveItem(newItem); clearForm(); focusBc(); render();
+    return;
+  }
+
+  const dup=items[dupIdx];
+  const dupStatus=dup.status||'active';
+
+  // ── 임시/휴지통에 있는 경우: 날짜 검증 무시, 강제 덮어쓰기 ──
+  if(dupStatus==='temp'||dupStatus==='trash'){
+    const label=dupStatus==='temp'?'임시보관':'휴지통';
+    const nameVal=document.getElementById('f-name').value.trim();
+    const memoVal=document.getElementById('f-memo').value.trim();
+    items[dupIdx].exp_ts=exp_ts;
+    items[dupIdx].added_ts=Date.now();
+    items[dupIdx].fresh=dup.fresh||fresh;
+    if(freshKey) items[dupIdx].freshKey=freshKey;
+    if(memoVal) items[dupIdx].memo=memoVal;
+    items[dupIdx].status='active';
+    if(nameVal){ names[ean13]=nameVal; saveName(ean13, nameVal); }
+    saveItem(items[dupIdx]); clearForm(); focusBc();
+    showMsg(`[${label}] 항목 강제 재등록 완료 → 활성으로 복원됨`,'notice',5000);
+    render();
+    return;
+  }
+
+  // ── 활성 항목 중복 ──
+  const existingTs=dup.exp_ts;
+  const effectiveFresh=dup.fresh||fresh;
+
+  // 더 짧거나 동일 → 말 없이 갱신
+  if(exp_ts<=existingTs){
+    const nameVal=document.getElementById('f-name').value.trim();
+    const memoVal=document.getElementById('f-memo').value.trim();
+    items[dupIdx].exp_ts=exp_ts;
+    items[dupIdx].added_ts=Date.now();
+    items[dupIdx].fresh=effectiveFresh;
+    if(freshKey) items[dupIdx].freshKey=freshKey;
+    if(memoVal) items[dupIdx].memo=memoVal;
+    items[dupIdx].status='active';
+    if(nameVal){ names[ean13]=nameVal; saveName(ean13, nameVal); }
+    saveItem(items[dupIdx]); clearForm(); focusBc();
+    showMsg('데이터 갱신됨','notice');
+    render();
+    return;
+  }
+
+  // 더 긴 날짜 → 자동 덮어쓰기 토글 확인
+  const shouldAutoOw=(fresh&&freshKey)?cfg.overwriteFresh:cfg.overwriteGeneral;
+  if(shouldAutoOw){
+    const nameVal=document.getElementById('f-name').value.trim();
+    const memoVal=document.getElementById('f-memo').value.trim();
+    items[dupIdx].exp_ts=exp_ts;
+    items[dupIdx].added_ts=Date.now();
+    items[dupIdx].fresh=effectiveFresh;
+    if(freshKey) items[dupIdx].freshKey=freshKey;
+    if(memoVal) items[dupIdx].memo=memoVal;
+    items[dupIdx].status='active';
+    if(nameVal){ names[ean13]=nameVal; saveName(ean13, nameVal); }
+    saveItem(items[dupIdx]); clearForm(); focusBc();
+    showMsg('↑ 자동 덮어쓰기 완료 (더 늦은 날짜)','notice');
+    render();
+    return;
+  }
+
+  // 수동 확인 박스
+  _pendingConfirm={ean13,exp_ts,dupIdx,fresh:effectiveFresh,freshKey};
+  const freshWarn=effectiveFresh?'<br>⚠️ 신선식품 — 더 짧은 재고 바코드가 있을 수 있습니다.':'';
+  document.getElementById('confirm-text').innerHTML=
+    `<strong>${ean13}</strong> 이(가) 이미 등록되어 있습니다.<br>`+
+    `현재: <strong>${fmtDt(existingTs)}</strong><br>`+
+    `새 값: <strong>${fmtDt(exp_ts)}</strong> ← 더 늦은 날짜${freshWarn}<br><br>`+
+    `기존보다 긴 유통기한으로 덮어쓰시겠습니까?`;
+  document.getElementById('confirm-box').style.display='block';
+}
+
+function doOverwrite(){
+  if(!_pendingConfirm) return;
+  const{ean13,exp_ts,dupIdx,fresh,freshKey}=_pendingConfirm;
+  const nameVal=document.getElementById('f-name').value.trim();
+  const memoVal=document.getElementById('f-memo').value.trim();
+  items[dupIdx].exp_ts=exp_ts;
+  items[dupIdx].added_ts=Date.now();
+  items[dupIdx].fresh=fresh;
+  if(freshKey) items[dupIdx].freshKey=freshKey;
+  if(memoVal) items[dupIdx].memo=memoVal;
+  items[dupIdx].status='active'; // 항상 활성으로 복원
+  if(nameVal){ names[ean13]=nameVal; saveName(ean13, nameVal); }
+  saveItem(items[dupIdx]);
+  cancelConfirm();
+  focusBc();
+  showMsg('덮어쓰기 완료','notice');
+  render();
+}
+
+function cancelConfirm(){
+  _pendingConfirm=null;
+  document.getElementById('confirm-box').style.display='none';
+  clearForm();
+}
+
+// ── 삭제모드: 바코드로 항목 휴지통 이동 ──
+function deleteByBarcode(raw,len){
+  let ean13;
+  if(len===18){ ean13=raw.slice(0,13); }
+  else if(len===12){ ean13=raw+eanCheckDigit(raw); }
+  else { ean13=raw; }
+
+  const item=items.find(i=>i.ean13===ean13);
+  if(!item){
+    showMsg(`[삭제모드] 바코드 [${ean13}] — 등록된 항목 없음`,'warn',4000);
+    clearForm(); focusBc(); return;
+  }
+  const s=item.status||'active';
+  if(s==='trash'){
+    showMsg(`[삭제모드] 이미 휴지통에 있습니다 [${ean13}]`,'warn',4000);
+    clearForm(); focusBc(); return;
+  }
+  // active 또는 temp → 휴지통 이동 가능
+  clearForm();
+  changeStatus(item.id,'trash');
+}
+
+// ── 임시모드: 바코드로 항목 임시보관 이동 ──
+function tempByBarcode(raw,len){
+  let ean13;
+  if(len===18){ ean13=raw.slice(0,13); }
+  else if(len===12){ ean13=raw+eanCheckDigit(raw); }
+  else { ean13=raw; }
+
+  const item=items.find(i=>i.ean13===ean13);
+  if(!item){
+    showMsg(`[임시모드] 바코드 [${ean13}] — 등록된 항목 없음`,'warn',4000);
+    clearForm(); focusBc(); return;
+  }
+  const s=item.status||'active';
+  if(s==='temp'){
+    showMsg(`[임시모드] 이미 임시보관에 있습니다 [${ean13}]`,'warn',4000);
+    clearForm(); focusBc(); return;
+  }
+  // active 또는 trash → 임시보관 이동 가능
+  clearForm();
+  changeStatus(item.id,'temp');
+}
+
+function uid(){
+  return Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+}
+
+// ── 조회 후 항목 강조 + 스크롤 ──
+function highlightItem(id){
+  const card=document.querySelector(`.item-card[data-id="${id}"]`);
+  if(!card) return;
+  card.scrollIntoView({behavior:'smooth',block:'center'});
+  card.classList.remove('item-focus');
+  void card.offsetWidth;
+  card.classList.add('item-focus');
+  setTimeout(()=>card.classList.remove('item-focus'),1800);
+}
+
+// ══════════════════════════════════════════════════════════════
+// 바코드 스캐너 (ZXing, HTTPS 전용)
+// ══════════════════════════════════════════════════════════════
+let _scannerStream = null;
+let _scannerReader = null;
+let _scannerRunning = false;
+
+const IS_SECURE = location.protocol === 'https:';
+if(IS_SECURE) document.getElementById('scan-btn').style.display='block';
+
+function openScanner(){
+  const modal = document.getElementById('scanner-modal');
+  const warn  = document.getElementById('scanner-https-warn');
+  const status= document.getElementById('scanner-status');
+  modal.classList.add('open');
+  if(!IS_SECURE){
+    warn.style.display='block';
+    status.textContent='HTTPS 환경이 아닙니다.';
+    return;
+  }
+  warn.style.display='none';
+  status.textContent='카메라 권한 요청 중...';
+  loadZXingAndScan();
+}
+
+function closeScanner(){
+  document.getElementById('scanner-modal').classList.remove('open');
+  stopScanner();
+}
+
+function stopScanner(){
+  _scannerRunning=false;
+  if(_scannerReader){try{_scannerReader.reset();}catch(e){} _scannerReader=null;}
+  if(_scannerStream){_scannerStream.getTracks().forEach(t=>t.stop());_scannerStream=null;}
+  const v=document.getElementById('scanner-video');
+  v.srcObject=null;
+}
+
+function loadZXingAndScan(){
+  if(window.ZXing){startScan();return;}
+  const status=document.getElementById('scanner-status');
+  status.textContent='ZXing 라이브러리 로드 중...';
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/umd/index.min.js';
+  s.onload=()=>startScan();
+  s.onerror=()=>{status.textContent='라이브러리 로드 실패. 네트워크를 확인하세요.';};
+  document.head.appendChild(s);
+}
+
+async function startScan(){
+  const status=document.getElementById('scanner-status');
+  const video =document.getElementById('scanner-video');
+  try{
+    _scannerStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+    video.srcObject=_scannerStream;
+    await video.play();
+    status.textContent='스캔 중... 바코드를 카메라에 비춰주세요';
+    _scannerRunning=true;
+    const hints=new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.CODE_128,
+    ]);
+    _scannerReader=new ZXing.BrowserMultiFormatReader(hints);
+    _scannerReader.decodeFromVideoElement(video,(result,err)=>{
+      if(!_scannerRunning) return;
+      if(result){
+        const code=result.getText().replace(/\D/g,'');
+        if(code.length>=12){
+          document.getElementById('bc').value=code;
+          status.textContent='스캔 성공: '+code;
+          setTimeout(closeScanner,600);
+        }
+      }
+    });
+  }catch(e){
+    status.textContent='카메라 오류: '+e.message;
+  }
+}
+
+
+// 병합: temp/trash 상태는 active보다 우선 보존
+function mergeInto(base,incoming){
+  const map=new Map(base.map(i=>[i.ean13,{status:'active',...i}]));
+  for(const inc of incoming){
+    const inc_s=inc.status||'active';
+    if(!map.has(inc.ean13)){
+      map.set(inc.ean13,{...inc,status:inc_s});
+    } else {
+      const cur=map.get(inc.ean13);
+      const cur_s=cur.status||'active';
+      const curSp=cur_s!=='active';
+      const incSp=inc_s!=='active';
+      if(curSp&&!incSp){
+        if(inc.exp_ts<cur.exp_ts) map.set(inc.ean13,{...inc,status:cur_s});
+      } else if(!curSp&&incSp){
+        map.set(inc.ean13,{...inc,status:inc_s});
+      } else {
+        if(inc.exp_ts<cur.exp_ts) map.set(inc.ean13,{...inc,status:inc_s});
+      }
+    }
+  }
+  return[...map.values()];
+}
+
+// ══════════════════════════════════════════════════════════════
+// 배터리 상태
+// ══════════════════════════════════════════════════════════════
+function applyBattery(bat){
+  const pctEl=document.getElementById('battery-pct');
+  const fillEl=document.getElementById('battery-fill');
+  if(!pctEl||!fillEl) return;
+  const pct=Math.round(bat.level*100);
+  pctEl.textContent=(bat.charging&&pct<100?'⚡ ':'')+pct+'%';
+  fillEl.style.width=pct+'%';
+  fillEl.style.background=pct<=20?'var(--red)':pct<=40?'var(--orange)':'var(--green)';
+}
+
+function initBattery(){
+  if(!navigator.getBattery){return;} // 미지원(데스크톱 등) → 초기값 100% 유지
+  navigator.getBattery().then(bat=>{
+    applyBattery(bat);
+    bat.addEventListener('levelchange',()=>applyBattery(bat));
+    bat.addEventListener('chargingchange',()=>applyBattery(bat));
+  }).catch(()=>{});
+}
+
+// ══════════════════════════════════════════════════════════════
+// 초기화
+// ══════════════════════════════════════════════════════════════
+(async function init(){
+  // 날짜 입력 placeholder를 오늘 날짜로 (실시간 갱신)
+  (function(){
+    function updateDatePlaceholders(){
+      const n=new Date();
+      const p=v=>String(v).padStart(2,'0');
+      document.getElementById('fy').placeholder=n.getFullYear();
+      document.getElementById('fm').placeholder=p(n.getMonth()+1);
+      document.getElementById('fd').placeholder=p(n.getDate());
+    }
+    function updateTimePlaceholders(){
+      const fh=document.getElementById('fh');
+      // 시가 입력됐으면 분·초 기본=00, 아니면 기본=59
+      const hEntered=fh.value!=='';
+      document.getElementById('fmi').placeholder=hEntered?'00':'59';
+      document.getElementById('fs').placeholder=hEntered?'00':'59';
+    }
+    updateDatePlaceholders();
+    updateTimePlaceholders();
+    // 시간 필드 변경 시에만 분·초 placeholder 갱신
+    document.getElementById('fh').addEventListener('input',updateTimePlaceholders);
+    document.getElementById('fh').addEventListener('change',updateTimePlaceholders);
+    // 자정 넘어갈 때 날짜만 갱신 (분·초 건드리지 않음)
+    setInterval(updateDatePlaceholders,60000);
+  })();
+
+  // DB 열기 확인 후 마이그레이션 → 데이터 로드
+  try{
+    await migrateFromLocalStorage();
+    await loadCfg();
+    await loadItems();
+    await loadNames();
+  }catch(e){
+    console.error('초기화 오류:', e);
+    showMsg('⚠️ 데이터베이스 로드 오류. 페이지를 새로고침 해주세요.', 'error', 0);
+    return;
+  }
+
+  initBattery();
+  // 초기 만료 항목 세트 기록 (페이지 로드 시 이미 만료된 건 신규 만료로 취급 안 함)
+  _prevExpiredIds=new Set(
+    items.filter(i=>(i.status||'active')==='active'&&i.exp_ts<=Date.now()).map(i=>i.id)
+  );
+  render();
+  checkExpired(true);  // 페이지 로드 시 만료 체크 (오디오 차단 시 배너)
+  restartTimer();
+})();
+</script>
+</body>
+</html>
