@@ -12,7 +12,7 @@
 
 </br></br>
 
-[URL-Locker](https://northkoreanuser.github.io/HTML/URL-Locker/PBKDF2.html)
+[URL-Locker](https://northkoreanuser.github.io/HTML/URL-Locker/?lock=1)
 
 [HTML Editor](https://northkoreanuser.github.io/HTML/HTML%20Editor)
 
