@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL LOCKER🔐</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230d0f14'/%3E%3Crect x='8' y='15' width='16' height='12' rx='3' fill='%234fffb0'/%3E%3Cpath d='M11 15v-4a5 5 0 0 1 10 0v4' fill='none' stroke='%234fffb0' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='16' cy='21' r='2' fill='%230d0f14'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bcryptjs@2.4.3/dist/bcrypt.min.js"></script>
+</head>
+<body>
+<div class="wrapper">
+    <div class="header">
+        <div class="logo">URL<span>LOCKER</span> 🔐</div>
+        <div class="subtitle">Encrypted URL vault</div>
+    </div>
+
+    <div class="card">
+
+        <!-- ── 암호화 모드 ── -->
+        <div id="encryptSection" style="display:none">
+            <div class="security-badge">
+                <span class="dot"></span>
+                <span id="badgeText">AES-256-GCM · Argon2id</span>
+            </div>
+
+            <div class="field">
+                <label>🔗 URL</label>
+                <input type="url" id="urlInput" placeholder="https://example.com/" autocomplete="off">
+            </div>
+
+            <div class="field">
+                <label>🔑 KEY</label>
+                <div class="input-wrap">
+                    <input type="password" id="keyInput" class="has-toggle" placeholder="암호화 키 입력" autocomplete="new-password">
+                    <button class="toggle-vis" onclick="toggleVis('keyInput', this)" tabindex="-1">👁</button>
+                </div>
+                <div class="strength-bar" id="strengthBar">
+                    <span class="seg"></span><span class="seg"></span>
+                    <span class="seg"></span><span class="seg"></span>
+                </div>
+                <div class="strength-label" id="strengthLabel"></div>
+            </div>
+
+            <div class="field">
+                <label>💡 HINT <span style="color:var(--text-dim);font-size:0.6rem;letter-spacing:0.06em;text-transform:none;margin-left:4px;">(선택사항 · 평문 저장)</span></label>
+                <input type="text" id="hintInput" placeholder="키 힌트 입력 (없으면 비워두세요)" autocomplete="off">
+            </div>
+
+            <!-- 알고리즘 선택 -->
+            <div class="field">
+                <label>⚙️ ALGORITHM</label>
+                <div class="algo-select-wrap">
+                    <select id="algoSelect" class="algo-select">
+                        <option value="argon2id">Argon2id &nbsp;(권장 · 최강)</option>
+                        <option value="bcrypt">bcrypt &nbsp;(cost 12)</option>
+                        <option value="pbkdf2">PBKDF2-SHA256 &nbsp;(호환성)</option>
+                        <option value="xor">XOR &nbsp;⚠️ (교육용)</option>
+                    </select>
+                    <!-- 보안 레벨 바 -->
+                    <div id="securityLevel" class="security-level">
+                        <span class="sec-seg" style="background:#4fffb0"></span>
+                        <span class="sec-seg" style="background:#4fffb0"></span>
+                        <span class="sec-seg" style="background:#4fffb0"></span>
+                        <span class="sec-seg" style="background:#4fffb0"></span>
+                        <span class="sec-seg" style="background:#4fffb0"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="kdf-info">
+                <span class="icon">🛡</span>
+                <span>키는 <strong>Argon2id</strong>으로 파생 — 브루트포스 저항</span>
+            </div>
+
+            <button class="btn-primary" id="lockBtn" onclick="handleEncrypt()">LOCK IT!</button>
+
+            <div class="spinner-wrap" id="encryptSpinner">
+                <div class="spinner"></div>
+                <div class="spinner-label">키 파생 중</div>
+                <div class="kdf-progress">Argon2id 처리 중...</div>
+            </div>
+        </div>
+
+        <!-- ── 복호화 모드 ── -->
+        <div id="decryptSection" style="display:none">
+            <div class="security-badge">
+                <span class="dot"></span>
+                잠긴 URL 감지됨
+            </div>
+
+            <div id="hintBox" style="display:none;margin-bottom:20px;padding:12px 16px;background:var(--surface2);border:1px solid rgba(79,255,176,0.25);border-radius:10px;">
+                <div style="font-size:0.62rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);margin-bottom:5px;">💡 HINT</div>
+                <div id="hintText" style="font-size:0.85rem;color:var(--text);word-break:break-all;"></div>
+            </div>
+
+            <div class="field">
+                <label>🔑 KEY</label>
+                <div class="input-wrap">
+                    <input type="password" id="decryptKeyInput" class="has-toggle"
+                           placeholder="암호화에 사용한 KEY 입력" autocomplete="current-password">
+                    <button class="toggle-vis" onclick="toggleVis('decryptKeyInput', this)" tabindex="-1">👁</button>
+                </div>
+            </div>
+
+            <!-- 복호화 알고리즘 선택 -->
+            <div class="field" id="decryptAlgoField">
+                <label>⚙️ ALGORITHM
+                    <span id="algoAutoNote" style="display:none;color:var(--accent);font-size:0.6rem;text-transform:none;letter-spacing:0.04em;margin-left:6px;"></span>
+                </label>
+                <select id="decryptAlgoSelect" class="algo-select">
+                    <option value="argon2id">Argon2id</option>
+                    <option value="bcrypt">bcrypt</option>
+                    <option value="pbkdf2">PBKDF2-SHA256</option>
+                    <option value="xor">XOR</option>
+                </select>
+                <div style="font-size:0.6rem;color:var(--text-dim);margin-top:5px;letter-spacing:0.05em;">
+                    ※ 암호화 시 사용한 알고리즘과 일치해야 합니다
+                </div>
+            </div>
+
+            <button class="btn-primary" id="unlockBtn" onclick="handleDecrypt()">UNLOCK</button>
+
+            <div class="spinner-wrap" id="decryptSpinner">
+                <div class="spinner"></div>
+                <div class="spinner-label">복호화 중</div>
+                <div class="kdf-progress">키 파생 + 인증 확인...</div>
+            </div>
+        </div>
+
+        <!-- ── 암호화 결과 ── -->
+        <div id="resultSection" style="display:none">
+            <div class="result-label">🔒 암호화된 URL</div>
+            <div class="result-url" id="encryptedUrlDisplay"></div>
+
+            <div class="qr-wrap">
+                <img id="qrcode" width="180" height="180" alt="QR Code">
+            </div>
+
+            <div class="btn-row">
+                <button class="btn-secondary" onclick="copyEncrypted()">📋 URL 복사</button>
+                <button class="btn-secondary" onclick="downloadQR()">⬇ QR 저장</button>
+                <button class="btn-secondary" onclick="resetAll()">↺ 새로 만들기</button>
+            </div>
+        </div>
+
+    </div><!-- /card -->
+
+    <div class="footer">
+        모든 암호화는 <strong>브라우저 내</strong>에서 처리됩니다.<br>
+        키나 원본 URL은 서버로 전송되지 않습니다.<br>
+        <strong>Argon2id / PBKDF2 / bcrypt / XOR</strong> → <strong>AES-256-GCM</strong> (인증된 암호화)
+    </div>
+</div><!-- /wrapper -->
+
+<script src="argon2.js"></script>
+<script src="pbkdf2.js"></script>
+<script src="bcrypt.js"></script>
+<script src="xor.js"></script>
+<script src="aes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
