@@ -301,6 +301,7 @@ function _renderFmt(fmt, fmtTpl, title, url) {
     switch (fmt) {
         case '2': return `[${title}](${url})`;
         case '3': return `<a href="${url}">${title}</a>`;
+        case '4': return `<a href="${url}"><img src="🔐" alt="${title}"></a>`;
         default:  return title ? `${title}\n${url}` : url;
     }
 }
