@@ -1087,17 +1087,25 @@ function clearSensitive(reason) {
 // 1. 탭 이동 시 초기화 (switchTab 내부에서 직접 처리)
 
 // 2. 윈도우 포커스 이탈
+// 파일 선택 창 열림: click → _filePickerActive=true → blur/visibilitychange 차단
+// 파일 선택 창 닫힘: 반드시 window focus 이벤트가 발생 → 그때 즉시 해제
+// setTimeout 없음: 타이밍 레이스 원천 차단
 let _filePickerActive = false;
+
 document.getElementById('fileInput').addEventListener('click', () => {
   _filePickerActive = true;
 });
+
 window.addEventListener('focus', () => {
-  setTimeout(() => { _filePickerActive = false; }, 300);
+  // 파일 선택 창(OS 네이티브)이 닫히면 반드시 window focus가 옴.
+  // 이 시점에서 즉시 해제 → 이후 발생하는 blur는 진짜 알트탭.
+  _filePickerActive = false;
 });
 
 window.addEventListener('blur', () => {
   if (!_filePickerActive) clearSensitive('다른 창으로 이동');
 });
+
 document.addEventListener('visibilitychange', () => {
   if (document.hidden && !_filePickerActive) clearSensitive('페이지 비활성화');
 });
@@ -1150,9 +1158,13 @@ const _hasInput = () => {
 };
 const _resetIdle = () => {
   clearTimeout(_idleTimer);
-  if (_hasInput()) {
+  if (_hasInput() && !_filePickerActive) {
     _idleTimer = setTimeout(() => {
-      if (_hasInput()) clearSensitive('10초 비활동');
+      // 타이머 만료 시점에도 파일 선택 창이 열려있으면 재예약
+      if (_hasInput()) {
+        if (_filePickerActive) { _resetIdle(); return; }
+        clearSensitive('10초 비활동');
+      }
     }, IDLE_MS);
   }
 };
