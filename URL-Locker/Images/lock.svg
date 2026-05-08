@@ -1,0 +1,130 @@
+<svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 200 260"
+      width="260"
+      height="338"
+      role="img"
+    >
+      <title>자물쇠</title>
+      <desc>금속 재질의 자물쇠 SVG 일러스트레이션</desc>
+
+      <defs>
+        <!-- 몸체 그라디언트 -->
+        <linearGradient id="bodyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%"   stop-color="#f5c842"/>
+          <stop offset="40%"  stop-color="#e6a800"/>
+          <stop offset="100%" stop-color="#b37800"/>
+        </linearGradient>
+
+        <!-- 몸체 하이라이트 -->
+        <linearGradient id="highlightGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%"   stop-color="#fff9c4" stop-opacity="0.55"/>
+          <stop offset="100%" stop-color="#fff9c4" stop-opacity="0"/>
+        </linearGradient>
+
+        <!-- 걸쇠(고리) 그라디언트 -->
+        <linearGradient id="shackleGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"   stop-color="#b0b8c8"/>
+          <stop offset="40%"  stop-color="#e8edf5"/>
+          <stop offset="100%" stop-color="#8090a8"/>
+        </linearGradient>
+
+        <!-- 키홀 그림자 -->
+        <radialGradient id="keyholeShadow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%"   stop-color="#3a2200"/>
+          <stop offset="100%" stop-color="#5c3800"/>
+        </radialGradient>
+
+        <!-- 몸체 음영 -->
+        <linearGradient id="shadowGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%"   stop-color="#000" stop-opacity="0.18"/>
+          <stop offset="50%"  stop-color="#000" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0.22"/>
+        </linearGradient>
+
+        <!-- 클립 (몸체 안에서만 보이도록) -->
+        <clipPath id="bodyClip">
+          <rect x="20" y="110" width="160" height="130" rx="18"/>
+        </clipPath>
+      </defs>
+
+      <!-- ── 걸쇠 (고리) 뒷면 그림자 ── -->
+      <path
+        d="M62 125 Q62 30 100 30 Q138 30 138 125"
+        fill="none"
+        stroke="#3a4a5c"
+        stroke-width="22"
+        stroke-linecap="round"
+      />
+
+      <!-- ── 걸쇠 (고리) 본체 ── -->
+      <path
+        d="M62 125 Q62 30 100 30 Q138 30 138 125"
+        fill="none"
+        stroke="url(#shackleGrad)"
+        stroke-width="16"
+        stroke-linecap="round"
+      />
+
+      <!-- 걸쇠 광택 라인 -->
+      <path
+        d="M67 118 Q67 38 100 38 Q133 38 133 118"
+        fill="none"
+        stroke="#ffffff"
+        stroke-width="3"
+        stroke-linecap="round"
+        stroke-opacity="0.35"
+      />
+
+      <!-- ── 몸체 그림자 ── -->
+      <rect x="24" y="114" width="160" height="130" rx="18" fill="#000" opacity="0.25"/>
+
+      <!-- ── 몸체 메인 ── -->
+      <rect x="20" y="110" width="160" height="130" rx="18" fill="url(#bodyGrad)"/>
+
+      <!-- 몸체 측면 음영 -->
+      <rect x="20" y="110" width="160" height="130" rx="18" fill="url(#shadowGrad)" clip-path="url(#bodyClip)"/>
+
+      <!-- 몸체 상단 하이라이트 -->
+      <rect x="20" y="110" width="160" height="60" rx="18" fill="url(#highlightGrad)" clip-path="url(#bodyClip)"/>
+
+      <!-- 몸체 하단 어두운 면 -->
+      <rect x="20" y="195" width="160" height="45" rx="0" fill="#000" opacity="0.08" clip-path="url(#bodyClip)"/>
+
+      <!-- 몸체 테두리 (약간 진한 선) -->
+      <rect x="20" y="110" width="160" height="130" rx="18"
+            fill="none" stroke="#a06800" stroke-width="1.5"/>
+
+      <!-- 몸체 안쪽 엣지 (emboss 느낌) -->
+      <rect x="26" y="116" width="148" height="118" rx="14"
+            fill="none" stroke="#f7d966" stroke-width="1" stroke-opacity="0.5"/>
+
+      <!-- ── 키홀 원형 ── -->
+      <circle cx="100" cy="163" r="18" fill="url(#keyholeShadow)"/>
+      <circle cx="100" cy="163" r="15" fill="#2a1500"/>
+
+      <!-- 키홀 구멍 위 광택 -->
+      <ellipse cx="95" cy="157" rx="5" ry="3.5"
+               fill="#fff" fill-opacity="0.12" transform="rotate(-20 95 157)"/>
+
+      <!-- 키홀 아래쪽 슬롯 -->
+      <rect x="93" y="176" width="14" height="22" rx="7" fill="#2a1500"/>
+      <!-- 슬롯 하이라이트 -->
+      <rect x="97" y="178" width="4" height="16" rx="2"
+            fill="#fff" fill-opacity="0.07"/>
+
+      <!-- ── 브랜드 리벳 (장식) ── -->
+      <circle cx="44"  cy="155" r="5" fill="#c88800" stroke="#8a5c00" stroke-width="1"/>
+      <circle cx="156" cy="155" r="5" fill="#c88800" stroke="#8a5c00" stroke-width="1"/>
+      <circle cx="44"  cy="155" r="2" fill="#f0c040" fill-opacity="0.6"/>
+      <circle cx="156" cy="155" r="2" fill="#f0c040" fill-opacity="0.6"/>
+
+      <!-- ── 하단 리벳 ── -->
+      <circle cx="44"  cy="220" r="5" fill="#c88800" stroke="#8a5c00" stroke-width="1"/>
+      <circle cx="156" cy="220" r="5" fill="#c88800" stroke="#8a5c00" stroke-width="1"/>
+      <circle cx="44"  cy="220" r="2" fill="#f0c040" fill-opacity="0.6"/>
+      <circle cx="156" cy="220" r="2" fill="#f0c040" fill-opacity="0.6"/>
+
+      <!-- ── 바닥 그림자 타원 ── -->
+      <ellipse cx="100" cy="248" rx="60" ry="7" fill="#000" opacity="0.30"/>
+    </svg>
