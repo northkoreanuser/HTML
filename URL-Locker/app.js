@@ -301,9 +301,9 @@ function _renderFmt(fmt, fmtTpl, title, url) {
     switch (fmt) {
         case '2': return `[${title}](${url})`;
         case '3': return `<a href="${url}">${title}</a>`;
-        case '4': return `<a href="${url}"><button>🔐${title}</button></a>`;
-        case '5': return `<a href="https://example.com" style="text-decoration:none;display:inline-block;animation:v 0.45s ease-in-out infinite alternate"><button style="font-size:18px;padding:16px 32px;border:none;border-radius:12px;background:#222;color:#fff;cursor:pointer">🔒 잠금 해제</button></a><style>@keyframes v{from{transform:translateY(-5px)}to{transform:translateY(5px)}}</style>`;
-        case '6': return `<a href="${url}" target="_blank" title="${title}"><img src="https://raw.githubusercontent.com/northkoreanuser/HTML/refs/heads/main/URL-Locker/Images/lock.svg" width="60" height="78" alt="Locked URL"></a>`;
+		case '4': return `<a href="${url}"><button>🔐${title}</button></a>`;
+		case '5': return `<a href="${url}" style="text-decoration:none;display:inline-block;animation:v 0.45s ease-in-out infinite alternate"><button style="font-size:18px;padding:16px 32px;border:none;border-radius:12px;background:#222;color:#fff;cursor:pointer">🔒${title}</button></a><style>@keyframes v{from{transform:translateY(-5px)}to{transform:translateY(5px)}}</style>`;
+		case '6': return `<a href="${url}" target="_blank" title="${title}"><img src="https://raw.githubusercontent.com/northkoreanuser/HTML/refs/heads/main/URL-Locker/Images/lock.svg" width="60" height="78" alt="Locked URL"></a>`;
         default:  return title ? `${title}\n${url}` : url;
     }
 }
