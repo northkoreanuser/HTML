@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VAULT — Argon2id + AES-256-GCM</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0b0d;
+    --bg2: #111318;
+    --bg3: #181b22;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --accent: #00e5a0;
+    --accent2: #00b87a;
+    --accent-dim: rgba(0,229,160,0.08);
+    --accent-glow: rgba(0,229,160,0.15);
+    --red: #ff4d6a;
+    --red-dim: rgba(255,77,106,0.08);
+    --text: #e8eaf0;
+    --text2: #8b909e;
+    --text3: #555a68;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    width: 100%;
+    max-width: 720px;
+    margin-bottom: 3rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .logo {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 2rem;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+  }
+  .logo span { color: var(--text3); font-weight: 400; }
+  .badge-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+    padding-top: 4px;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    background: var(--bg2);
+  }
+  .badge.green { border-color: var(--accent2); color: var(--accent); background: var(--accent-dim); }
+
+  /* ── MAIN CARD ── */
+  .card {
+    width: 100%;
+    max-width: 720px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg3);
+  }
+  .card-header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .card-header .dot.off { background: var(--text3); }
+  .card-title {
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+  .card-body { padding: 1.5rem; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 1.75rem;
+  }
+  .tab {
+    flex: 1;
+    padding: 9px;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-align: center;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active {
+    background: var(--bg3);
+    color: var(--accent);
+    border: 1px solid var(--border2);
+  }
+
+  /* ── DROP ZONE ── */
+  .drop-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: 10px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 1.5rem;
+    position: relative;
+    background: var(--bg);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent2);
+    background: var(--accent-dim);
+  }
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 2rem; margin-bottom: 0.75rem; color: var(--accent); }
+  .drop-zone .drop-label {
+    font-size: 0.85rem;
+    color: var(--text2);
+    margin-bottom: 0.25rem;
+  }
+  .drop-zone .drop-sub { font-size: 0.72rem; color: var(--text3); }
+  .drop-zone.has-file { border-color: var(--accent2); border-style: solid; background: var(--accent-dim); }
+  .file-info {
+    display: flex; align-items: center; gap: 12px; text-align: left;
+  }
+  .file-icon { font-size: 1.8rem; color: var(--accent); }
+  .file-name { font-size: 0.85rem; color: var(--text); font-weight: 500; word-break: break-all; }
+  .file-size { font-size: 0.72rem; color: var(--text3); margin-top: 2px; }
+
+  /* ── FIELDS ── */
+  .field { margin-bottom: 1.25rem; }
+  .field-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+  .field-label .hint { color: var(--accent2); font-size: 0.68rem; text-transform: none; letter-spacing: 0; }
+
+  input[type="password"], input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="password"]:focus, input[type="text"]:focus {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  /* ── PARAMS ── */
+  .params-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .param-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .param-label { font-size: 0.65rem; color: var(--text3); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 4px; }
+  .param-val { font-size: 1rem; font-weight: 500; color: var(--accent); }
+  .param-val span { font-size: 0.65rem; color: var(--text3); font-weight: 400; }
+
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+    margin-top: 8px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── STRENGTH BAR ── */
+  .strength-row { display: flex; gap: 3px; margin-top: 6px; }
+  .strength-seg {
+    flex: 1; height: 3px; border-radius: 2px;
+    background: var(--border); transition: background 0.2s;
+  }
+  .strength-seg.on { background: var(--accent); }
+  .strength-seg.mid { background: #f0a500; }
+  .strength-seg.low { background: var(--red); }
+
+  /* ── BUTTON ── */
+  .btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn:hover { background: #00ffb0; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { background: var(--bg3); color: var(--text3); cursor: not-allowed; transform: none; }
+  .btn.red { background: var(--red); color: #fff; }
+  .btn.red:hover { background: #ff6b84; }
+
+  /* ── PROGRESS ── */
+  .progress-wrap {
+    display: none;
+    margin-bottom: 1.5rem;
+  }
+  .progress-wrap.visible { display: block; }
+  .progress-track {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+  .progress-label {
+    font-size: 0.72rem;
+    color: var(--text3);
+    display: flex;
+    justify-content: space-between;
+  }
+  .progress-label .status { color: var(--accent2); }
+
+  /* ── LOG ── */
+  .log {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    font-size: 0.72rem;
+    color: var(--text3);
+    line-height: 1.8;
+    max-height: 160px;
+    overflow-y: auto;
+    margin-top: 1.5rem;
+    display: none;
+  }
+  .log.visible { display: block; }
+  .log .l-time { color: var(--text3); }
+  .log .l-ok { color: var(--accent); }
+  .log .l-err { color: var(--red); }
+  .log .l-info { color: #4fc3f7; }
+
+  /* ── FORMAT SPEC ── */
+  .spec-card {
+    width: 100%; max-width: 720px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .spec-body { padding: 1.25rem 1.5rem; }
+  .spec-row {
+    display: grid;
+    grid-template-columns: 80px 80px 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem;
+  }
+  .spec-row:last-child { border-bottom: none; }
+  .spec-bytes { color: var(--accent); font-weight: 500; }
+  .spec-field { color: var(--text2); }
+  .spec-desc { color: var(--text3); }
+
+  /* ── HINT BOX ── */
+  .hint-box {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--accent2);
+    border-radius: 7px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+    display: none;
+  }
+  .hint-box.visible { display: block; }
+  .hint-box .hint-tag {
+    font-size: 0.65rem; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--accent2); margin-bottom: 4px;
+  }
+  .hint-box .hint-content { color: var(--text2); }
+  .hint-box .hint-empty { color: var(--text3); font-style: italic; }
+
+  /* ── PROCESSING OVERLAY ── */
+  .proc-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 999;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background: rgba(10,11,13,0.7);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .proc-overlay.visible { display: flex; }
+  .proc-spinner {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .proc-label {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+  .proc-sub {
+    font-size: 0.72rem;
+    color: var(--text3);
+    margin-top: 4px;
+    text-align: center;
+  }
+  .proc-elapsed {
+    font-size: 0.72rem;
+    color: var(--text3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">VAULT<span>.enc</span></div>
+    <div style="font-size:0.72rem; color:var(--text3); margin-top:4px;">파일 암호화 / 복호화 도구</div>
+  </div>
+  <div class="badge-row">
+    <div class="badge green">Argon2id · WASM</div>
+    <div class="badge">AES-256-GCM</div>
+    <div class="badge">로컬 처리 · 서버 전송 없음</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="dot"></div>
+    <div class="dot off"></div>
+    <div class="dot off"></div>
+    <div class="card-title" style="margin-left:8px">암호화 / 복호화</div>
+  </div>
+  <div class="card-body">
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('encrypt')">🔒 암호화 ENCRYPT</button>
+      <button class="tab" onclick="switchTab('decrypt')">🔓 복호화 DECRYPT</button>
+    </div>
+
+    <!-- DROP ZONE -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" onchange="handleFileSelect(this.files[0])">
+      <div id="dropDefault">
+        <div class="drop-icon">⬆</div>
+        <div class="drop-label">파일을 드래그하거나 클릭하여 선택</div>
+        <div class="drop-sub">모든 파일 형식 지원 · 최대 2GB</div>
+      </div>
+      <div id="dropSelected" style="display:none">
+        <div class="file-info">
+          <div class="file-icon">📄</div>
+          <div>
+            <div class="file-name" id="fileName">—</div>
+            <div class="file-size" id="fileSize">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASSWORD -->
+    <div class="field">
+      <div class="field-label">
+        <span>비밀번호</span>
+        <span class="hint" id="strengthLabel"></span>
+      </div>
+      <input type="password" id="password" placeholder="강력한 비밀번호 입력..." oninput="checkStrength(this.value)">
+      <div class="strength-row" id="strengthBar">
+        <div class="strength-seg" id="s0"></div>
+        <div class="strength-seg" id="s1"></div>
+        <div class="strength-seg" id="s2"></div>
+        <div class="strength-seg" id="s3"></div>
+        <div class="strength-seg" id="s4"></div>
+      </div>
+    </div>
+
+    <!-- HINT (encrypt: input / decrypt: display) -->
+    <div class="field" id="hintInputSection">
+      <div class="field-label">
+        <span>힌트 (선택사항)</span>
+        <span class="hint">파일에 평문 저장됨 — 민감 정보 금지</span>
+      </div>
+      <input type="text" id="hintInput" placeholder="비밀번호 힌트 입력... (최대 255자)" oninput="updateBtn()">
+      <div id="hintWarn" style="display:none; font-size:0.72rem; color:var(--red); margin-top:5px;">⚠ 힌트가 비밀번호와 동일합니다 — 변경하세요</div>
+    </div>
+    <div class="hint-box" id="hintDisplay">
+      <div class="hint-tag">💡 파일에 저장된 힌트</div>
+      <div id="hintContent"></div>
+    </div>
+
+    <!-- ARGON2 PARAMS (encrypt only) -->
+    <div id="paramsSection">
+      <div class="field-label" style="margin-bottom:10px">
+        <span>Argon2id 파라미터</span>
+        <span class="hint">높을수록 느리지만 안전</span>
+      </div>
+      <div class="params-grid">
+        <div class="param-block">
+          <div class="param-label">메모리</div>
+          <div class="param-val" id="memVal">65536 <span>KiB</span></div>
+          <input type="range" id="memSlider" min="0" max="3" step="1" value="1" oninput="updateParams()">
+        </div>
+        <div class="param-block">
+          <div class="param-label">반복 횟수</div>
+          <div class="param-val" id="iterVal">3 <span>iter</span></div>
+          <input type="range" id="iterSlider" min="1" max="10" step="1" value="3" oninput="updateParams()">
+        </div>
+        <div class="param-block">
+          <div class="param-label">병렬성</div>
+          <div class="param-val" id="parallelVal">1 <span>lanes</span></div>
+          <input type="range" id="parallelSlider" min="1" max="4" step="1" value="1" oninput="updateParams()">
+        </div>
+      </div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-label">
+        <span id="progressStatus" class="status">대기 중...</span>
+        <span id="progressPct">0%</span>
+      </div>
+    </div>
+
+    <!-- ACTION BUTTON -->
+    <button class="btn" id="actionBtn" onclick="run()" disabled>
+      <span id="btnIcon">🔒</span>
+      <span id="btnText">파일과 비밀번호를 선택하세요</span>
+    </button>
+
+    <!-- LOG -->
+    <div class="log" id="logBox"></div>
+
+  </div>
+</div>
+
+<!-- FORMAT SPEC -->
+<div class="spec-card">
+  <div class="card-header">
+    <div class="dot off"></div>
+    <div class="card-title" style="margin-left:8px">파일 포맷 명세 (.vault)</div>
+  </div>
+  <div class="spec-body">
+    <div class="spec-row" style="border-bottom:1px solid var(--border2); padding-bottom:10px; margin-bottom:4px">
+      <div style="color:var(--text3); font-size:0.65rem; text-transform:uppercase; letter-spacing:.07em">오프셋</div>
+      <div style="color:var(--text3); font-size:0.65rem; text-transform:uppercase; letter-spacing:.07em">크기</div>
+      <div style="color:var(--text3); font-size:0.65rem; text-transform:uppercase; letter-spacing:.07em">설명</div>
+    </div>
+    <div class="spec-row"><div class="spec-bytes">0x00</div><div class="spec-field">4 B</div><div class="spec-desc">매직 넘버 <code style="color:var(--accent)">56 4C 54 21</code> ("VLT!")</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x04</div><div class="spec-field">1 B</div><div class="spec-desc">포맷 버전 <code style="color:var(--accent)">0x01</code></div></div>
+    <div class="spec-row"><div class="spec-bytes">0x05</div><div class="spec-field">4 B</div><div class="spec-desc">Argon2id m_cost (uint32 LE)</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x09</div><div class="spec-field">4 B</div><div class="spec-desc">Argon2id t_cost (uint32 LE)</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x0D</div><div class="spec-field">4 B</div><div class="spec-desc">Argon2id parallelism (uint32 LE)</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x11</div><div class="spec-field">16 B</div><div class="spec-desc">Argon2id 솔트 (CSPRNG)</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x21</div><div class="spec-field">12 B</div><div class="spec-desc">AES-256-GCM 초기화 벡터 (CSPRNG)</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x2D</div><div class="spec-field">12 B</div><div class="spec-desc">힌트 AES-GCM IV (CSPRNG)</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x39</div><div class="spec-field">2 B</div><div class="spec-desc">힌트 암호문 길이 (uint16 LE, 0이면 없음)</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x3B</div><div class="spec-field">N B</div><div class="spec-desc">힌트 암호문 — HKDF(salt, APP_SECRET) → AES-256-GCM</div></div>
+    <div class="spec-row"><div class="spec-bytes">0x3B+N</div><div class="spec-field">M B</div><div class="spec-desc">AES-256-GCM 암호문 (파일 본문)</div></div>
+    <div class="spec-row"><div class="spec-bytes">끝-16</div><div class="spec-field">16 B</div><div class="spec-desc">AES-256-GCM 인증 태그 (GCM 내장)</div></div>
+  </div>
+</div>
+
+<!-- PROCESSING OVERLAY -->
+<div class="proc-overlay" id="procOverlay">
+  <div class="proc-spinner"></div>
+  <div>
+    <div class="proc-label" id="procLabel">처리 중...</div>
+    <div class="proc-sub" id="procSub"></div>
+  </div>
+  <div class="proc-elapsed" id="procElapsed">0.0s</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/argon2-browser@1.18.0/dist/argon2-bundled.min.js"></script>
+<script>
+// ── STATE ──
+let currentFile = null;
+let currentTab = 'encrypt';
+const MEM_PRESETS = [16384, 65536, 262144, 1048576]; // KiB: 16MB, 64MB, 256MB, 1GB
+
+// ── TAB ──
+function switchTab(tab) {
+  if (tab !== currentTab) clearSensitive('탭 전환');
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0) === (tab==='encrypt')));
+  document.getElementById('paramsSection').style.display = tab === 'encrypt' ? 'block' : 'none';
+  document.getElementById('hintInputSection').style.display = tab === 'encrypt' ? 'block' : 'none';
+  document.getElementById('hintDisplay').classList.remove('visible');
+  document.getElementById('btnIcon').textContent = tab === 'encrypt' ? '🔒' : '🔓';
+  updateBtn();
+  clearLog();
+}
+
+// ── FILE ──
+function handleFileSelect(file) {
+  if (!file) return;
+  currentFile = file;
+  document.getElementById('dropDefault').style.display = 'none';
+  document.getElementById('dropSelected').style.display = 'block';
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = formatBytes(file.size);
+  document.getElementById('dropZone').classList.add('has-file');
+  document.getElementById('hintDisplay').classList.remove('visible');
+
+  if (currentTab === 'decrypt') {
+    const reader = new FileReader();
+    reader.onload = async e => {
+      try {
+        const buf = new Uint8Array(e.target.result);
+        const MAGIC = [0x56, 0x4C, 0x54, 0x21];
+        const valid = MAGIC.every((b, i) => buf[i] === b);
+        if (!valid) return;
+        const view = new DataView(buf.buffer);
+        const salt = buf.slice(17, 33);
+        const hintIv = buf.slice(45, 57);
+        const hintCipherLen = view.getUint16(57, true);
+        const hintBox = document.getElementById('hintDisplay');
+        const hintContent = document.getElementById('hintContent');
+        if (hintCipherLen > 0) {
+          const hintCipher = buf.slice(59, 59 + hintCipherLen);
+          try {
+            const hintText = await decryptHint(hintIv, hintCipher, salt);
+            hintContent.innerHTML = `<span class="hint-content">${escapeHtml(hintText)}</span>`;
+          } catch(e) {
+            hintContent.innerHTML = `<span class="hint-empty">힌트 복호화 실패</span>`;
+          }
+        } else {
+          hintContent.innerHTML = `<span class="hint-empty">힌트 없음</span>`;
+        }
+        hintBox.classList.add('visible');
+      } catch(e) { /* not a vault file, skip */ }
+    };
+    reader.readAsArrayBuffer(file.slice(0, 600));
+  }
+  updateBtn();
+}
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+});
+
+// ── PARAMS ──
+function updateParams() {
+  const m = MEM_PRESETS[document.getElementById('memSlider').value];
+  const t = parseInt(document.getElementById('iterSlider').value);
+  const p = parseInt(document.getElementById('parallelSlider').value);
+  document.getElementById('memVal').innerHTML = formatKiB(m) + ' <span>KiB</span>';
+  document.getElementById('iterVal').innerHTML = t + ' <span>iter</span>';
+  document.getElementById('parallelVal').innerHTML = p + ' <span>lanes</span>';
+}
+updateParams();
+
+function getParams() {
+  return {
+    m: MEM_PRESETS[document.getElementById('memSlider').value],
+    t: parseInt(document.getElementById('iterSlider').value),
+    p: parseInt(document.getElementById('parallelSlider').value)
+  };
+}
+
+// ── PASSWORD STRENGTH ──
+function checkStrength(pw) {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 14) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  const labels = ['매우 약함', '약함', '보통', '강함', '매우 강함'];
+  const colors = ['low','low','mid','on','on'];
+  document.getElementById('strengthLabel').textContent = pw ? labels[Math.min(score,4)] : '';
+
+  for (let i = 0; i < 5; i++) {
+    const seg = document.getElementById('s'+i);
+    seg.className = 'strength-seg' + (i < score ? ' '+colors[Math.min(score-1,4)] : '');
+  }
+  updateBtn();
+}
+
+function updateBtn() {
+  const btn = document.getElementById('actionBtn');
+  const pw = document.getElementById('password').value;
+  const hint = document.getElementById('hintInput').value;
+  const hintSameAsPw = currentTab === 'encrypt' && hint.length > 0 && hint === pw;
+
+  document.getElementById('hintWarn').style.display = hintSameAsPw ? 'block' : 'none';
+  document.getElementById('hintInput').style.borderColor = hintSameAsPw ? 'var(--red)' : '';
+
+  const ready = currentFile && pw.length >= 1 && !hintSameAsPw;
+  btn.disabled = !ready;
+  if (hintSameAsPw) {
+    document.getElementById('btnText').textContent = '힌트를 비밀번호와 다르게 설정하세요';
+  } else if (!ready) {
+    document.getElementById('btnText').textContent = currentFile ? '비밀번호를 입력하세요' : '파일과 비밀번호를 선택하세요';
+  } else {
+    document.getElementById('btnText').textContent = currentTab === 'encrypt' ? '암호화 시작' : '복호화 시작';
+  }
+}
+
+// ── LOG ──
+function log(msg, type='info') {
+  const box = document.getElementById('logBox');
+  box.classList.add('visible');
+  const t = new Date().toLocaleTimeString('ko-KR', {hour12:false});
+  box.innerHTML += `<div><span class="l-time">[${t}]</span> <span class="l-${type}">${msg}</span></div>`;
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+  const box = document.getElementById('logBox');
+  box.classList.remove('visible');
+  box.innerHTML = '';
+}
+
+// ── PROGRESS ──
+function setProgress(pct, status) {
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressStatus').textContent = status;
+  document.getElementById('progressPct').textContent = Math.round(pct) + '%';
+}
+function hideProgress() {
+  document.getElementById('progressWrap').classList.remove('visible');
+}
+
+// ── OVERLAY ──
+let _elapsedTimer = null;
+function showOverlay(label, sub) {
+  document.getElementById('procLabel').textContent = label;
+  document.getElementById('procSub').textContent = sub || '';
+  document.getElementById('procElapsed').textContent = '0.0s';
+  document.getElementById('procOverlay').classList.add('visible');
+  const start = Date.now();
+  _elapsedTimer = setInterval(() => {
+    document.getElementById('procElapsed').textContent = ((Date.now() - start) / 1000).toFixed(1) + 's';
+  }, 100);
+}
+function updateOverlay(label) {
+  document.getElementById('procLabel').textContent = label;
+}
+function hideOverlay() {
+  clearInterval(_elapsedTimer);
+  document.getElementById('procOverlay').classList.remove('visible');
+}
+
+// ── ENTER KEY ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const btn = document.getElementById('actionBtn');
+    if (!btn.disabled) run();
+  }
+});
+
+// ── MAIN ──
+async function run() {
+  if (currentTab === 'encrypt') await encrypt();
+  else await decrypt();
+}
+
+// ── ENCRYPT ──
+async function encrypt() {
+  const pw = document.getElementById('password').value;
+  const hint = document.getElementById('hintInput').value;
+  if (hint.length > 0 && hint === pw) {
+    log('힌트가 비밀번호와 동일합니다. 변경 후 다시 시도하세요.', 'err');
+    return;
+  }
+  const {m, t, p} = getParams();
+  const btn = document.getElementById('actionBtn');
+  btn.disabled = true;
+  clearLog();
+  showOverlay('Argon2id 키 유도 중...', `m=1GB · t=${document.getElementById('iterSlider').value}회 · p=${document.getElementById('parallelSlider').value}lane`);
+
+  try {
+    log(`파일 읽는 중: ${currentFile.name} (${formatBytes(currentFile.size)})`, 'info');
+    setProgress(5, '파일 읽는 중...');
+
+    const plaintext = await readFileAsArrayBuffer(currentFile);
+
+    // Generate random salt (16 bytes) and IV (12 bytes)
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv   = crypto.getRandomValues(new Uint8Array(12));
+
+    log(`솔트 생성: ${toHex(salt)}`, 'info');
+    log(`IV 생성: ${toHex(iv)}`, 'info');
+    log(`Argon2id KDF 시작 (m=${formatKiB(m)}KiB, t=${t}, p=${p})...`, 'info');
+    setProgress(10, 'Argon2id 키 유도 중...');
+
+    // Argon2id key derivation → 32 bytes
+    const argonResult = await argon2.hash({
+      pass: pw,
+      salt: salt,
+      time: t,
+      mem: m,
+      parallelism: p,
+      hashLen: 32,
+      type: argon2.ArgonType.Argon2id,
+    });
+
+    const keyBytes = argonResult.hash; // Uint8Array(32)
+    log(`키 유도 완료: ${toHex(keyBytes).slice(0,32)}...`, 'ok');
+    setProgress(40, 'AES-256-GCM 암호화 중...');
+    updateOverlay('AES-256-GCM 암호화 중...');
+
+    // Import key into WebCrypto
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', keyBytes, {name: 'AES-GCM'}, false, ['encrypt']
+    );
+
+    // Encrypt
+    const cipherBuf = await crypto.subtle.encrypt(
+      {name: 'AES-GCM', iv: iv, tagLength: 128},
+      cryptoKey,
+      plaintext
+    );
+
+    log(`AES-256-GCM 암호화 완료 (${formatBytes(cipherBuf.byteLength)})`, 'ok');
+    setProgress(80, '파일 헤더 작성 중...');
+
+    // Build output: magic(4)+ver(1)+m(4)+t(4)+p(4)+salt(16)+iv(12)+hint_iv(12)+hint_cipher_len(2)+hint_cipher(N)+ciphertext
+    const MAGIC = new Uint8Array([0x56, 0x4C, 0x54, 0x21]); // "VLT!"
+    const VERSION = new Uint8Array([0x01]);
+    const mBuf = uint32LE(m);
+    const tBuf = uint32LE(t);
+    const pBuf = uint32LE(p);
+
+    const hintStr = document.getElementById('hintInput').value.slice(0, 255);
+    const { iv: hintIv, cipher: hintCipher } = await encryptHint(hintStr, salt);
+    const hintCipherLenBuf = new Uint8Array(2);
+    new DataView(hintCipherLenBuf.buffer).setUint16(0, hintCipher.byteLength, true);
+
+    const header = concat([MAGIC, VERSION, mBuf, tBuf, pBuf, salt, iv, hintIv, hintCipherLenBuf, hintCipher]);
+    const cipher = new Uint8Array(cipherBuf);
+    const output = concat([header, cipher]);
+
+    setProgress(95, '다운로드 준비 중...');
+    log(`헤더 크기: ${header.byteLength} bytes | 전체 크기: ${formatBytes(output.byteLength)}`, 'info');
+    if (hintStr) log(`힌트 암호화 저장됨 (${hintCipher.byteLength}B)`, 'info');
+
+    download(output, currentFile.name + '.vault');
+    setProgress(100, '암호화 완료!');
+    log(`✓ 암호화 완료 → ${currentFile.name}.vault`, 'ok');
+
+    // 보안: 암호화 완료 후 민감 정보 즉시 초기화
+    document.getElementById('password').value = '';
+    document.getElementById('hintInput').value = '';
+    document.getElementById('hintWarn').style.display = 'none';
+    document.getElementById('hintInput').style.borderColor = '';
+    for (let i = 0; i < 5; i++) document.getElementById('s'+i).className = 'strength-seg';
+    document.getElementById('strengthLabel').textContent = '';
+    currentFile = null;
+    document.getElementById('dropDefault').style.display = 'block';
+    document.getElementById('dropSelected').style.display = 'none';
+    document.getElementById('dropZone').classList.remove('has-file');
+    document.getElementById('fileInput').value = '';
+
+  } catch(e) {
+    log(`오류: ${e.message}`, 'err');
+    setProgress(0, '오류 발생');
+    console.error(e);
+  } finally {
+    hideOverlay();
+    btn.disabled = false;
+    updateBtn();
+  }
+}
+
+// ── DECRYPT ──
+async function decrypt() {
+  const pw = document.getElementById('password').value;
+  const btn = document.getElementById('actionBtn');
+  btn.disabled = true;
+  clearLog();
+
+  try {
+    log(`파일 읽는 중: ${currentFile.name}`, 'info');
+    setProgress(5, '파일 읽는 중...');
+
+    const buf = new Uint8Array(await readFileAsArrayBuffer(currentFile));
+
+    // Parse header
+    const MAGIC = [0x56, 0x4C, 0x54, 0x21];
+    for (let i = 0; i < 4; i++) {
+      if (buf[i] !== MAGIC[i]) throw new Error('유효하지 않은 .vault 파일 (매직 넘버 불일치)');
+    }
+    const version = buf[4];
+    if (version !== 0x01) throw new Error(`지원하지 않는 버전: ${version}`);
+
+    const view = new DataView(buf.buffer);
+    const m = view.getUint32(5, true);
+    const t = view.getUint32(9, true);
+    const p = view.getUint32(13, true);
+    const salt = buf.slice(17, 33);
+    const iv   = buf.slice(33, 45);
+    const hintIv = buf.slice(45, 57);
+    const hintCipherLen = view.getUint16(57, true);
+    const hintCipher = buf.slice(59, 59 + hintCipherLen);
+    const ciphertext = buf.slice(59 + hintCipherLen);
+
+    log(`포맷 버전: v${version}`, 'info');
+    log(`Argon2id 파라미터: m=${formatKiB(m)}KiB, t=${t}, p=${p}`, 'info');
+    if (hintCipherLen > 0) {
+      try {
+        const hintText = await decryptHint(hintIv, hintCipher, salt);
+        log(`힌트: "${hintText}"`, 'info');
+      } catch(e) { log('힌트 복호화 실패 (무시)', 'info'); }
+    }
+    log(`솔트: ${toHex(salt)}`, 'info');
+    log(`IV: ${toHex(iv)}`, 'info');
+    log(`Argon2id KDF 재현 중...`, 'info');
+    setProgress(10, 'Argon2id 키 유도 중...');
+
+    const argonResult = await argon2.hash({
+      pass: pw, salt, time: t, mem: m,
+      parallelism: p, hashLen: 32,
+      type: argon2.ArgonType.Argon2id,
+    });
+
+    const keyBytes = argonResult.hash;
+    log(`키 유도 완료`, 'ok');
+    setProgress(50, 'AES-256-GCM 복호화 중...');
+
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', keyBytes, {name: 'AES-GCM'}, false, ['decrypt']
+    );
+
+    let plainBuf;
+    try {
+      plainBuf = await crypto.subtle.decrypt(
+        {name: 'AES-GCM', iv, tagLength: 128},
+        cryptoKey,
+        ciphertext
+      );
+    } catch(e) {
+      throw new Error('복호화 실패 — 비밀번호가 틀렸거나 파일이 변조되었습니다');
+    }
+
+    log(`인증 태그 검증 성공 ✓`, 'ok');
+    log(`복호화 완료 (${formatBytes(plainBuf.byteLength)})`, 'ok');
+    setProgress(90, '다운로드 준비 중...');
+
+    // Strip .vault extension if present
+    let outName = currentFile.name;
+    if (outName.endsWith('.vault')) outName = outName.slice(0, -6);
+
+    download(new Uint8Array(plainBuf), outName);
+    setProgress(100, '복호화 완료!');
+    log(`✓ 복호화 완료 → ${outName}`, 'ok');
+
+  } catch(e) {
+    log(`오류: ${e.message}`, 'err');
+    setProgress(0, '오류 발생');
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    updateBtn();
+  }
+}
+
+// ── UTILS ──
+function readFileAsArrayBuffer(file) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(fr.result);
+    fr.onerror = rej;
+    fr.readAsArrayBuffer(file);
+  });
+}
+
+function concat(arrays) {
+  const total = arrays.reduce((s, a) => s + a.byteLength, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(new Uint8Array(a.buffer || a), off); off += a.byteLength; }
+  return out;
+}
+
+// ── HINT ENCRYPTION (HKDF + AES-256-GCM) ──
+// 힌트는 비밀번호 없이 읽을 수 있어야 하므로 별도 키로 암호화.
+// HKDF(ikm=salt, salt=APP_HINT_SECRET, info="vault-hint-v1") → AES-256-GCM 키
+// 헥스 에디터로는 암호화된 바이트만 보이고, 이 앱 코드를 통해서만 복호화 가능.
+const APP_HINT_SECRET = new Uint8Array([
+  0x4e,0x8c,0x1a,0xf2,0x77,0x3b,0xe9,0x05,
+  0xc6,0x2d,0x91,0x58,0xaa,0x04,0x6f,0x3e,
+  0xb7,0x19,0xd4,0x80,0x5c,0xe3,0x27,0x9a,
+  0x61,0xfc,0x0b,0x48,0x33,0x7e,0xd1,0x92
+]);
+const HINT_INFO = new TextEncoder().encode('vault-hint-v1');
+
+async function deriveHintKey(salt) {
+  const ikm = await crypto.subtle.importKey('raw', salt, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: APP_HINT_SECRET, info: HINT_INFO },
+    ikm,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptHint(hintStr, salt) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  if (!hintStr) return { iv, cipher: new Uint8Array(0) };
+  const key = await deriveHintKey(salt);
+  const cipher = new Uint8Array(await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv, tagLength: 128 },
+    key,
+    new TextEncoder().encode(hintStr)
+  ));
+  return { iv, cipher };
+}
+
+async function decryptHint(hintIv, hintCipher, salt) {
+  const key = await deriveHintKey(salt);
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: hintIv, tagLength: 128 },
+    key,
+    hintCipher
+  );
+  return new TextDecoder().decode(plain);
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function uint32LE(n) {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setUint32(0, n, true);
+  return b;
+}
+
+function toHex(arr) {
+  return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function formatBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n/1024).toFixed(1) + ' KB';
+  if (n < 1073741824) return (n/1048576).toFixed(2) + ' MB';
+  return (n/1073741824).toFixed(2) + ' GB';
+}
+
+function formatKiB(kib) {
+  if (kib >= 1048576) return (kib/1048576).toFixed(0) + 'G';
+  if (kib >= 1024) return (kib/1024).toFixed(0) + 'M';
+  return kib;
+}
+
+function download(data, filename) {
+  const blob = new Blob([data], {type: 'application/octet-stream'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ── SECURITY: 민감 정보 초기화 ──
+function clearSensitive(reason) {
+  const hadData = !!(currentFile ||
+    document.getElementById('password').value.length > 0 ||
+    document.getElementById('hintInput').value.length > 0);
+
+  document.getElementById('password').value = '';
+  document.getElementById('hintInput').value = '';
+  document.getElementById('hintWarn').style.display = 'none';
+  document.getElementById('hintInput').style.borderColor = '';
+  for (let i = 0; i < 5; i++) document.getElementById('s'+i).className = 'strength-seg';
+  document.getElementById('strengthLabel').textContent = '';
+  currentFile = null;
+  document.getElementById('dropDefault').style.display = 'block';
+  document.getElementById('dropSelected').style.display = 'none';
+  document.getElementById('dropZone').classList.remove('has-file');
+  document.getElementById('fileInput').value = '';
+  document.getElementById('hintDisplay').classList.remove('visible');
+  updateBtn();
+  if (hadData && reason) log(`보안: ${reason} — 입력 초기화됨`, 'err');
+}
+
+// 1. 탭 이동 시 초기화 (switchTab 내부에서 직접 처리)
+
+// 2. 윈도우 포커스 이탈
+let _filePickerActive = false;
+document.getElementById('fileInput').addEventListener('click', () => {
+  _filePickerActive = true;
+});
+window.addEventListener('focus', () => {
+  setTimeout(() => { _filePickerActive = false; }, 300);
+});
+
+window.addEventListener('blur', () => {
+  if (!_filePickerActive) clearSensitive('다른 창으로 이동');
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && !_filePickerActive) clearSensitive('페이지 비활성화');
+});
+
+// 3. 개발자 도구 감지 (크기 기반 + console 트릭 병행)
+let _devtoolsOpen = false;
+const _devCheck = () => {
+  const threshold = 160;
+  const widthDiff  = window.outerWidth  - window.innerWidth  > threshold;
+  const heightDiff = window.outerHeight - window.innerHeight > threshold;
+  const open = widthDiff || heightDiff;
+  if (open && !_devtoolsOpen) {
+    _devtoolsOpen = true;
+    clearSensitive('개발자 도구 감지');
+  }
+  if (!open) _devtoolsOpen = false;
+};
+setInterval(_devCheck, 800);
+
+// console getter 트릭 (Chromium 계열 추가 감지)
+(function() {
+  let _check = false;
+  const _obj = Object.defineProperty({}, 'id', {
+    get() { _check = true; return 0; }
+  });
+  const _orig = console.log;
+  setInterval(() => {
+    _check = false;
+    _orig.call(console, '%c', _obj);
+    if (_check && !_devtoolsOpen) {
+      _devtoolsOpen = true;
+      clearSensitive('개발자 도구 감지');
+    }
+  }, 1200);
+})();
+
+// 4. 우클릭 감지 + 차단
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  clearSensitive('우클릭 시도');
+});
+
+// 5. 10초 비활동 타이머
+let _idleTimer = null;
+const IDLE_MS = 10000;
+const _hasInput = () => {
+  return currentFile ||
+    document.getElementById('password').value.length > 0 ||
+    document.getElementById('hintInput').value.length > 0;
+};
+const _resetIdle = () => {
+  clearTimeout(_idleTimer);
+  if (_hasInput()) {
+    _idleTimer = setTimeout(() => {
+      if (_hasInput()) clearSensitive('10초 비활동');
+    }, IDLE_MS);
+  }
+};
+['mousemove','keydown','mousedown','touchstart','scroll','input','change'].forEach(ev =>
+  document.addEventListener(ev, _resetIdle, { passive: true })
+);
+</script>
+</body>
+</html>
