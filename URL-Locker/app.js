@@ -4,7 +4,10 @@
 //  URL 파라미터: ?hash=...&algorithm=argon2id&hint=...
 // ────────────────────────────────────────────────
 
-const FALLBACK_URL = 'https://youtu.be/EWjw8MSmKi4?t=0';
+const FALLBACK_URL         = 'https://youtu.be/EWjw8MSmKi4?t=0';
+// 모바일에서 앱으로 인터셉트돼 페이지가 안 바뀔 때 최종 착지점
+const FALLBACK_TIMEOUT_URL = 'https://example.com';
+const FALLBACK_TIMEOUT_MS  = 2500; // 2.5초 후에도 페이지가 살아있으면 강제 이동
 
 let _encryptedUrl  = '';
 let _savedHash     = null;
@@ -54,6 +57,13 @@ function _blastOff() {
     _blasting = true;
     history.replaceState(null, '', window.location.pathname);
     window.location.replace(FALLBACK_URL);
+
+    // 모바일에서 youtu.be 링크가 YouTube 앱으로 인터셉트되면
+    // 브라우저 페이지는 그대로 남아 있음.
+    // FALLBACK_TIMEOUT_MS 후에도 이 페이지가 살아있으면 최종 URL로 강제 이동.
+    setTimeout(() => {
+        window.location.replace(FALLBACK_TIMEOUT_URL);
+    }, FALLBACK_TIMEOUT_MS);
 }
 
 // ── 보안 리스너 ────────────────────────────────
@@ -190,6 +200,12 @@ async function handleDecrypt() {
         const decrypted = await decryptAES(_savedHash, key, algo);
         history.replaceState(null, '', window.location.pathname);
         window.location.replace(decrypted);
+
+        // 모바일에서 앱으로 인터셉트되면 브라우저 페이지가 그대로 남음.
+        // FALLBACK_TIMEOUT_MS 후에도 살아있으면 최종 URL로 강제 이동.
+        setTimeout(() => {
+            window.location.replace(FALLBACK_TIMEOUT_URL);
+        }, FALLBACK_TIMEOUT_MS);
     } catch (e) {
         _failCount++;
         if (_failCount >= 1) { _blastOff(); return; }
