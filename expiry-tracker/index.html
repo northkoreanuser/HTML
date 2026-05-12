@@ -229,7 +229,7 @@ button:disabled{opacity:.45;cursor:default}
 #cancel-edit-btn{flex-shrink:0;font-size:12px;font-family:inherit;padding:6px 10px;border-radius:var(--rs);border:1px solid var(--red);color:var(--red);background:var(--bg);cursor:pointer;white-space:nowrap}
 #cancel-edit-btn:active{background:#fdecea}
 </style>
-<script src="https://unpkg.com/dexie@4/dist/dexie.min.js"></script>
+<script src="dexie.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -291,9 +291,9 @@ button:disabled{opacity:.45;cursor:default}
       <button class="toggle-pill" id="tg-delete-mode" onclick="toggleCfgBool('deleteMode')">🗑 삭제모드</button>
       <button class="toggle-pill" id="tg-lookup-mode" onclick="toggleCfgBool('lookupMode')">🔍 조회모드</button>
     </div>
-    <div class="bc-row">
-      <input type="text" id="bc" maxlength="18" placeholder="바코드 13 또는 18자리" autocomplete="off" inputmode="numeric">
-    </div>
+    <form class="bc-row" id="bc-form" action="javascript:void(0)" onsubmit="bcFormSubmit();return false">
+      <input type="text" id="bc" maxlength="18" placeholder="바코드 13 또는 18자리" autocomplete="off" inputmode="numeric" enterkeyhint="done">
+    </form>
     <div class="memo-row">
       <input type="text" id="f-name" maxlength="40" placeholder="상품명 (비워도 됨)" autocomplete="off">
       <textarea id="f-memo" maxlength="400" placeholder="메모 (비워도 됨)" autocomplete="off" rows="1"></textarea>
@@ -423,8 +423,11 @@ function eanCheckDigit(d12){
   return(10-((so+se*3)%10))%10;
 }
 
+const _svgCache=new Map();
 function genBarcodeSVG(ean13,scale=1){
   if(!ean13||ean13.length!==13)return'';
+  const key=ean13+'_'+scale;
+  if(_svgCache.has(key))return _svgCache.get(key);
   const fd=ean13[0],lh=ean13.slice(1,7),rh=ean13.slice(7,13);
   let pat='101';
   const ps=EAN_PAR[fd];
@@ -436,7 +439,9 @@ function genBarcodeSVG(ean13,scale=1){
   const svgW=W*BW+20*scale,svgH=H+TH+2;
   let bars='';
   for(let i=0;i<W;i++)if(pat[i]==='1')bars+=`<rect x="${10*scale+i*BW}" y="2" width="${BW}" height="${H}" fill="#111"/>`;
-  return`<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">${bars}<text x="${svgW/2}" y="${svgH-1}" text-anchor="middle" font-family="monospace" font-size="${10*scale}" fill="#333">${ean13}</text></svg>`;
+  const result=`<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">${bars}<text x="${svgW/2}" y="${svgH-1}" text-anchor="middle" font-family="monospace" font-size="${10*scale}" fill="#333">${ean13}</text></svg>`;
+  _svgCache.set(key,result);
+  return result;
 }
 
 let _bcZoomEan13=null;
@@ -582,20 +587,18 @@ function toggleCfgBool(key){
   if(key==='deleteMode'&&cfg.deleteMode){cfg.tempMode=false;cfg.lookupMode=false;}
   if(key==='tempMode'&&cfg.tempMode){cfg.deleteMode=false;cfg.lookupMode=false;}
   if(key==='lookupMode'&&cfg.lookupMode){cfg.deleteMode=false;cfg.tempMode=false;}
-  _saveCfgLocal();applyToggleUI();
+  _saveCfgLocal();applyToggleUI();focusBc();
 }
 
-// ── 바코드 입력 Enter 처리 ──
-$('bc').addEventListener('keydown',function(e){
-  if(e.key!=='Enter')return;
-  e.preventDefault();
-  const raw=this.value.trim().replace(/\D/g,'');
+// ── 바코드 입력 Enter 처리 공통 함수 ──
+function _bcHandleEnter(input){
+  const raw=input.value.trim().replace(/\D/g,'');
   const len=raw.length;
-  if(this.value.trim()!==''&&raw===''){beep();showMsg('⚠️ 숫자만 입력할 수 있습니다. 입력값이 지워졌습니다.','error',3000);this.value='';return;}
-  if(len!==12&&len!==13&&len!==18){if(len>0)this.value='';return;}
+  if(input.value.trim()!==''&&raw===''){beep();showMsg('⚠️ 숫자만 입력할 수 있습니다. 입력값이 지워졌습니다.','error',3000);input.value='';return;}
+  if(len!==12&&len!==13&&len!==18){if(len>0){input.value='';showMsg('바코드는 12자리 이상 숫자여야 합니다.','error',3000);}return;}
   if(len===13||len===18){
     const chk=eanCheckDigit(raw.slice(0,12));
-    if(+raw[12]!==chk){showMsg(`체크디짓 불일치 — 입력값: ${raw[12]}, 계산값: ${chk} (바코드: ${raw})`,'error');this.value='';return;}
+    if(+raw[12]!==chk){showMsg(`체크디짓 불일치 — 입력값: ${raw[12]}, 계산값: ${chk} (바코드: ${raw})`,'error');input.value='';return;}
   }
   if(cfg.deleteMode||cfg.tempMode){submitAdd();return;}
   if(_isEditMode&&_editItemId){submitAdd();return;}
@@ -607,6 +610,23 @@ $('bc').addEventListener('keydown',function(e){
     if(tmpExp<=Date.now()){submitAdd();return;}
     if(cfg.enterFresh)submitAdd();
   } else if((len===12||len===13)&&cfg.enterGeneral)submitAdd();
+}
+function bcFormSubmit(){_bcHandleEnter($('bc'));}
+
+// ── 바코드 입력 Enter 처리 ──
+$('bc').addEventListener('keydown',function(e){
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  _bcHandleEnter(this);
+});
+// keyup 백업 — 일부 모바일 환경에서 keydown이 먹히지 않을 때
+let _bcEnterHandled=false;
+$('bc').addEventListener('keydown',function(e){if(e.key==='Enter')_bcEnterHandled=true;},{capture:true});
+$('bc').addEventListener('keyup',function(e){
+  if(e.key!=='Enter')return;
+  e.preventDefault();
+  if(_bcEnterHandled){_bcEnterHandled=false;return;}
+  _bcHandleEnter(this);
 });
 
 ['f-name','fy','fm','fd','fh','fmi','fs'].forEach(id=>{
@@ -635,18 +655,14 @@ async function loadItems(){
 }
 function saveItems(){db.transaction('rw',db.items,async()=>{await db.items.clear();if(items.length)await db.items.bulkPut(items);}).catch(e=>console.error('saveItems:',e));}
 async function saveItem(item){
-  try{
-    const others=await db.items.where('ean13').equals(item.ean13).toArray();
-    const stale=others.filter(r=>r.id!==item.id).map(r=>r.id);
-    if(stale.length)await db.items.bulkDelete(stale);
-    await db.items.put(item);
-  }catch(e){console.error('saveItem:',e);}
+  try{await db.items.put(item);}catch(e){console.error('saveItem:',e);}
 }
 function deleteItems(ids){db.items.bulkDelete(Array.isArray(ids)?ids:[ids]).catch(e=>console.error('deleteItems:',e));}
 
 // ── 상태 판단 ──
-function getDateStatus(exp_ts){
-  const diff=(exp_ts-Date.now())/86400000;
+function isActive(i){return(i.status||'active')==='active';}
+function getDateStatus(exp_ts,now){
+  const diff=(exp_ts-(now||Date.now()))/86400000;
   return diff<0?'expired':diff<=cfg.warnDays?'warning':'ok';
 }
 function getItemStatus(item){const s=item.status||'active';return(s==='temp'||s==='trash')?s:getDateStatus(item.exp_ts);}
@@ -771,7 +787,7 @@ function scheduleAlarmOnInteraction(){
 let _prevExpiredIds=new Set();
 function checkExpired(triggerAlarm=true){
   const now=Date.now();
-  const active=items.filter(i=>(i.status||'active')==='active');
+  const active=items.filter(isActive);
   const curExpIds=new Set(active.filter(i=>i.exp_ts<=now).map(i=>i.id));
   const hasExp=curExpIds.size>0;
   const newlyExp=[...curExpIds].filter(id=>!_prevExpiredIds.has(id));
@@ -793,9 +809,8 @@ function restartTimer(){if(_absTimer)clearTimeout(_absTimer);scheduleNextTick();
 function getNextAlarmMs(){
   const now=new Date(),curMin=now.getMinutes(),curSec=now.getSeconds(),curMs=now.getMilliseconds();
   const N=Math.max(1,Math.min(60,cfg.timerMin));
-  const slots=[];for(let m=0;m<60;m+=N)slots.push(m);
-  const nextMin=slots.find(m=>m>curMin);
-  const diffMs=nextMin!==undefined?((nextMin-curMin)*60-curSec)*1000-curMs:((60-curMin)*60-curSec)*1000-curMs;
+  const nextMin=Math.ceil((curMin+1)/N)*N;
+  const diffMs=nextMin<60?((nextMin-curMin)*60-curSec)*1000-curMs:((60-curMin)*60-curSec)*1000-curMs;
   return Math.max(500,diffMs);
 }
 function scheduleNextTick(){
@@ -835,13 +850,19 @@ let _page=1,_cdTimer=null;
 
 function render(){
   $('s-warn-label').textContent=cfg.warnDays+'일 이내';
-  const active=items.filter(i=>(i.status||'active')==='active');
-  const cExp=active.filter(i=>getDateStatus(i.exp_ts)==='expired').length;
-  const cWarn=active.filter(i=>getDateStatus(i.exp_ts)==='warning').length;
-  const cTemp=items.filter(i=>i.status==='temp').length;
-  const cTrash=items.filter(i=>i.status==='trash').length;
-  const cMem=items.filter(i=>i.marked).length;
-  const cTrM=items.filter(i=>i.trashMarked).length;
+  let cExp=0,cWarn=0,cTemp=0,cTrash=0,cMem=0,cTrM=0;
+  const active=[];
+  const _now=Date.now();
+  for(const i of items){
+    const s=i.status||'active';
+    if(s==='temp'){cTemp++;continue;}
+    if(s==='trash'){cTrash++;continue;}
+    active.push(i);
+    const diff=(i.exp_ts-_now)/86400000;
+    if(diff<0)cExp++;else if(diff<=cfg.warnDays)cWarn++;
+    if(i.marked)cMem++;
+    if(i.trashMarked)cTrM++;
+  }
 
   const upd={
     's-total':active.length,'s-exp':cExp,'s-warn':cWarn,'s-ok':active.length-cExp,
@@ -876,7 +897,7 @@ function render(){
     html+=`<div class="item-card row-${st}${mc}" data-id="${item.id}">
       ${nm?`<div class="item-name-tag">📦 ${nm}</div>`:''}
       <div class="item-top">
-        <div class="item-barcode" onclick="openBcZoom('${item.ean13}')">${genBarcodeSVG(item.ean13)}${item.fresh?'<span class="tag-fresh">신선식품</span>':''}${item.memo?'<span class="item-memo-badge">📝 메모</span>':''}</div>
+        <div class="item-barcode" data-action="openBcZoom" data-ean13="${item.ean13}">${genBarcodeSVG(item.ean13)}${item.fresh?'<span class="tag-fresh">신선식품</span>':''}${item.memo?'<span class="item-memo-badge">📝 메모</span>':''}</div>
         <div class="item-meta"><span class="badge" style="background:${col}22;color:${col};border:1px solid ${col}55">${lbl}</span><div class="item-added">${fmtDate(item.added_ts)} 등록</div></div>
       </div>
       <div class="item-exp">${fmtDt(item.exp_ts)}</div>
@@ -885,6 +906,8 @@ function render(){
     </div>`;
   }
   wrap.innerHTML=html+renderPageNav(totalPages);
+  _cdEls=wrap.querySelectorAll('[data-exp]');
+  _cdActive=active;
   startCdTimer();
 }
 
@@ -920,11 +943,12 @@ function fmtCountdown(diffMs){
 }
 function startCdTimer(){stopCdTimer();_cdTimer=setInterval(updateCountdowns,1000);}
 function stopCdTimer(){if(_cdTimer){clearInterval(_cdTimer);_cdTimer=null;}}
+let _cdEls=[],_cdActive=[];
 function updateCountdowns(){
   const now=Date.now();
   const fill=$('timer-bar-fill');
   if(fill){const span=_nextTickAt-_tickStartAt;fill.style.width=(span>0?Math.min(100,(now-_tickStartAt)/span*100):0)+'%';}
-  document.querySelectorAll('[data-exp]').forEach(el=>{
+  for(const el of _cdEls){
     const exp=+el.dataset.exp,diff=exp-now;
     if(el.classList.contains('item-countdown')){
       el.textContent=fmtCountdown(diff);
@@ -932,16 +956,16 @@ function updateCountdowns(){
     } else if(el.classList.contains('progress-fill')){
       el.style.width=(diff<=0?0:diff>=86400000?100:Math.max(0,Math.round((diff/86400000)*100)))+'%';
     }
-  });
-  const active=items.filter(i=>(i.status||'active')==='active');
-  const curExp=new Set(active.filter(i=>i.exp_ts<=now).map(i=>i.id));
-  const newlyExp=[...curExp].filter(id=>!_prevExpiredIds.has(id));
-  if(newlyExp.length){
-    _prevExpiredIds=curExp;
+  }
+  let hasNew=false;
+  const newIds=[];
+  for(const i of _cdActive){if(i.exp_ts<=now&&!_prevExpiredIds.has(i.id)){newIds.push(i.id);hasNew=true;}}
+  if(hasNew){
+    for(const i of _cdActive)if(i.exp_ts<=now)_prevExpiredIds.add(i.id);
     if(currentFilter!=='expired'&&currentFilter!=='temp'&&currentFilter!=='trash')setFilter('expired',$('f-expired'));
     else render();
     const played=alarm();if(!played)scheduleAlarmOnInteraction();
-    showMsg(`⚠️ ${newlyExp.length}건이 방금 만료됐습니다!`,'error',8000);
+    showMsg(`⚠️ ${newIds.length}건이 방금 만료됐습니다!`,'error',8000);
   }
 }
 
@@ -975,10 +999,10 @@ function renderBulkRow(shown){
 
 function rowActionsCard(item){
   const s=item.status||'active',id=item.id;
-  const mb=item.trashMarked?`<button class="act-btn del" onclick="toggleMark('${id}')">🔴 폐기</button>`:item.marked?`<button class="act-btn ok" onclick="toggleMark('${id}')">✅ 기억</button>`:`<button class="act-btn" onclick="toggleMark('${id}')">☐ 기억</button>`;
-  if(s==='active')return mb+`<button class="act-btn" onclick="fillForm('${id}')">수정</button><button class="act-btn temp" onclick="moveToTemp('${id}')">임시보관</button><button class="act-btn del" onclick="moveToTrash('${id}')">휴지통</button>`;
-  if(s==='temp')return mb+`<button class="act-btn" onclick="fillForm('${id}')">수정</button><button class="act-btn ok" onclick="restoreItem('${id}')">복원</button><button class="act-btn del" onclick="moveToTrash('${id}')">휴지통</button>`;
-  return mb+`<button class="act-btn" onclick="fillForm('${id}')">수정</button><button class="act-btn ok" onclick="restoreItem('${id}')">복원</button><button class="act-btn del" onclick="permanentDelete('${id}')">영구삭제</button>`;
+  const mb=item.trashMarked?`<button class="act-btn del" data-action="toggleMark" data-id="${id}">🔴 폐기</button>`:item.marked?`<button class="act-btn ok" data-action="toggleMark" data-id="${id}">✅ 기억</button>`:`<button class="act-btn" data-action="toggleMark" data-id="${id}">☐ 기억</button>`;
+  if(s==='active')return mb+`<button class="act-btn" data-action="fillForm" data-id="${id}">수정</button><button class="act-btn temp" data-action="moveToTemp" data-id="${id}">임시보관</button><button class="act-btn del" data-action="moveToTrash" data-id="${id}">휴지통</button>`;
+  if(s==='temp')return mb+`<button class="act-btn" data-action="fillForm" data-id="${id}">수정</button><button class="act-btn ok" data-action="restoreItem" data-id="${id}">복원</button><button class="act-btn del" data-action="moveToTrash" data-id="${id}">휴지통</button>`;
+  return mb+`<button class="act-btn" data-action="fillForm" data-id="${id}">수정</button><button class="act-btn ok" data-action="restoreItem" data-id="${id}">복원</button><button class="act-btn del" data-action="permanentDelete" data-id="${id}">영구삭제</button>`;
 }
 
 // ── 수정 모드 ──
@@ -1051,9 +1075,9 @@ function _gotoItemTab(item){
 function _getFilteredShown(tf){
   if(tf==='trash')return items.filter(i=>i.status==='trash');
   if(tf==='temp')return items.filter(i=>i.status==='temp');
-  if(tf==='ok')return items.filter(i=>(i.status||'active')==='active'&&getDateStatus(i.exp_ts)!=='expired');
-  if(tf==='all')return items.filter(i=>(i.status||'active')==='active');
-  return items.filter(i=>(i.status||'active')==='active'&&getDateStatus(i.exp_ts)===tf);
+  if(tf==='ok')return items.filter(i=>isActive(i)&&getDateStatus(i.exp_ts)!=='expired');
+  if(tf==='all')return items.filter(isActive);
+  return items.filter(i=>isActive(i)&&getDateStatus(i.exp_ts)===tf);
 }
 
 function setFilter(f,el){
@@ -1161,7 +1185,12 @@ function lookupBarcode(){
   requestAnimationFrame(()=>{
     highlightItem(item.id);
     showMsg(`✅ 바코드 [${item.ean13}] 조회됨 — 상태: ${STATUS_LABEL[getItemStatus(item)]}`,'notice',4000);
-    if(getItemStatus(item)==='expired')warnBeep();
+    const _diff6h=item.exp_ts-Date.now();
+    if(_diff6h<=6*3600*1000){
+      // 6시간 이내(또는 만료)이면 두 소리를 동시에 재생
+      const played=warnBeep();alarm();
+      if(!played)scheduleAlarmOnInteraction();
+    }
   });
 }
 
@@ -1197,7 +1226,7 @@ function clearForm(){
 
 function submitAdd(){
   const raw=$('bc').value.trim().replace(/\D/g,''),len=raw.length;
-  if(len<12){showMsg('바코드는 12자리 이상 숫자여야 합니다.','error');return;}
+  if(len<12){$('bc').value='';showMsg('바코드는 12자리 이상 숫자여야 합니다.','error');focusBc();return;}
 
   if(_isEditMode&&_editItemId){
     const idx=items.findIndex(i=>i.id===_editItemId);
@@ -1263,7 +1292,7 @@ function submitAdd(){
 }
 
 function _tagExpiredAndLocate(ean13){
-  const expiredItems=items.filter(i=>i.ean13===ean13&&(i.status||'active')!=='trash');
+  const expiredItems=items.filter(i=>i.ean13===ean13&&i.status!=='trash');
   if(!expiredItems.length)return;
   expiredItems.forEach(item=>{item.marked=false;item.trashMarked=true;saveItem(item);});
   const item=expiredItems[0];
@@ -1338,14 +1367,14 @@ function deleteByBarcode(raw,len){
   const ean13=len===18?raw.slice(0,13):len===12?raw+eanCheckDigit(raw):raw;
   const item=items.find(i=>i.ean13===ean13);
   if(!item){showMsg(`[삭제모드] 바코드 [${ean13}] — 등록된 항목 없음`,'warn',4000);clearForm();focusBc();return;}
-  if((item.status||'active')==='trash'){showMsg(`[삭제모드] 이미 휴지통에 있습니다 [${ean13}]`,'warn',4000);clearForm();focusBc();return;}
+  if(item.status==='trash'){showMsg(`[삭제모드] 이미 휴지통에 있습니다 [${ean13}]`,'warn',4000);clearForm();focusBc();return;}
   clearForm();changeStatus(item.id,'trash');
 }
 function tempByBarcode(raw,len){
   const ean13=len===18?raw.slice(0,13):len===12?raw+eanCheckDigit(raw):raw;
   const item=items.find(i=>i.ean13===ean13);
   if(!item){showMsg(`[임시모드] 바코드 [${ean13}] — 등록된 항목 없음`,'warn',4000);clearForm();focusBc();return;}
-  if((item.status||'active')==='temp'){showMsg(`[임시모드] 이미 임시보관에 있습니다 [${ean13}]`,'warn',4000);clearForm();focusBc();return;}
+  if(item.status==='temp'){showMsg(`[임시모드] 이미 임시보관에 있습니다 [${ean13}]`,'warn',4000);clearForm();focusBc();return;}
   clearForm();changeStatus(item.id,'temp');
 }
 
@@ -1389,6 +1418,27 @@ function initBattery(){
 // ── 헬퍼 ──
 function $(id){return document.getElementById(id);}
 
+// ── 이벤트 위임 — list-wrap ──
+// (스크립트가 body 끝에 위치하므로 DOM 파싱 완료 보장)
+(function(){
+  const listWrap=document.getElementById('list-wrap');
+  if(!listWrap)return;
+  listWrap.addEventListener('click',function(e){
+    const t=e.target.closest('[data-action]');
+    if(!t)return;
+    const action=t.dataset.action,id=t.dataset.id,ean13=t.dataset.ean13;
+    switch(action){
+      case 'openBcZoom': openBcZoom(ean13); break;
+      case 'toggleMark': toggleMark(id); break;
+      case 'fillForm': fillForm(id); break;
+      case 'moveToTemp': moveToTemp(id); break;
+      case 'moveToTrash': moveToTrash(id); break;
+      case 'restoreItem': restoreItem(id); break;
+      case 'permanentDelete': permanentDelete(id); break;
+    }
+  });
+})();
+
 // ── 초기화 ──
 (async function init(){
   (function(){
@@ -1405,7 +1455,7 @@ function $(id){return document.getElementById(id);}
     await migrateFromLocalStorage();await loadCfg();await loadItems();await loadNames();
   }catch(e){console.error('초기화 오류:',e);showMsg('⚠️ 데이터베이스 로드 오류. 페이지를 새로고침 해주세요.','error',0);return;}
   initBattery();
-  _prevExpiredIds=new Set(items.filter(i=>(i.status||'active')==='active'&&i.exp_ts<=Date.now()).map(i=>i.id));
+  _prevExpiredIds=new Set(items.filter(i=>isActive(i)&&i.exp_ts<=Date.now()).map(i=>i.id));
   render();checkExpired(true);restartTimer();
 })();
 </script>
