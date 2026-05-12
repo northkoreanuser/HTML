@@ -30,13 +30,15 @@
 
             <div class="field">
                 <label>🔗 URL</label>
-                <input type="url" id="urlInput" placeholder="https://example.com/" autocomplete="off">
+                <input type="url" id="urlInput" placeholder="https://example.com/" autocomplete="off"
+                       onkeydown="if(event.key==='Enter') handleEncrypt()">
             </div>
 
             <div class="field">
                 <label>🔑 KEY</label>
                 <div class="input-wrap">
-                    <input type="password" id="keyInput" class="has-toggle" placeholder="암호화 키 입력" autocomplete="new-password">
+                    <input type="password" id="keyInput" class="has-toggle" placeholder="암호화 키 입력" autocomplete="new-password"
+                           onkeydown="if(event.key==='Enter') handleEncrypt()">
                     <button class="toggle-vis" onclick="toggleVis('keyInput', this)" tabindex="-1">👁</button>
                 </div>
                 <div class="strength-bar" id="strengthBar">
@@ -48,7 +50,8 @@
 
             <div class="field">
                 <label>💡 HINT <span style="color:var(--text-dim);font-size:0.6rem;letter-spacing:0.06em;text-transform:none;margin-left:4px;">(선택사항 · 평문 저장)</span></label>
-                <input type="text" id="hintInput" placeholder="키 힌트 입력 (없으면 비워두세요)" autocomplete="off">
+                <input type="text" id="hintInput" placeholder="키 힌트 입력 (없으면 비워두세요)" autocomplete="off"
+                       onkeydown="if(event.key==='Enter') handleEncrypt()">
             </div>
 
             <!-- 알고리즘 선택 -->
@@ -102,7 +105,8 @@
                 <label>🔑 KEY</label>
                 <div class="input-wrap">
                     <input type="password" id="decryptKeyInput" class="has-toggle"
-                           placeholder="암호화에 사용한 KEY 입력" autocomplete="current-password">
+                           placeholder="암호화에 사용한 KEY 입력" autocomplete="current-password"
+                           onkeydown="if(event.key==='Enter') handleDecrypt()">
                     <button class="toggle-vis" onclick="toggleVis('decryptKeyInput', this)" tabindex="-1">👁</button>
                 </div>
             </div>
