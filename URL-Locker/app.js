@@ -97,11 +97,13 @@ async function handleEncrypt() {
 
     setEncryptLoading(true);
     try {
-        const hash = await encryptAES(url, key, algo);
-        const hint = document.getElementById('hintInput').value.trim();
-        const base = window.location.href.split('?')[0];
+        const hash  = await encryptAES(url, key, algo);
+        const hint  = document.getElementById('hintInput').value.trim();
+        const title = new URLSearchParams(window.location.search).get('title') || '';
+        const base  = window.location.href.split('?')[0];
         _encryptedUrl = `${base}?hash=${hash}&algorithm=${algo}`
-            + (hint ? `&hint=${encodeURIComponent(hint)}` : '');
+            + (hint  ? `&hint=${encodeURIComponent(hint)}`   : '')
+            + (title ? `&title=${encodeURIComponent(title)}` : '');
 
         document.getElementById('encryptSection').style.display = 'none';
         document.getElementById('resultSection').style.display  = 'block';
@@ -267,7 +269,8 @@ async function handleAutoEncrypt(params) {
     try {
         const hash = await encryptAES(autoUrl, autoPw, autoAlgo);
         _encryptedUrl = `${base}?hash=${hash}&algorithm=${autoAlgo}`
-            + (autoHint ? '&hint=' + encodeURIComponent(autoHint) : '');
+            + (autoHint  ? '&hint='  + encodeURIComponent(autoHint)  : '')
+            + (autoTitle ? '&title=' + encodeURIComponent(autoTitle) : '');
 
         spinEl.classList.remove('active');
         spinEl.style.display = 'none';
