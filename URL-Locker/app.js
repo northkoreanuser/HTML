@@ -4,9 +4,20 @@
 //  URL 파라미터: ?hash=...&algorithm=argon2id&hint=...
 // ────────────────────────────────────────────────
 
+const FALLBACK_URL         = 'https://youtu.be/EWjw8MSmKi4?t=0';
+const FALLBACK_TIMEOUT_URL = 'https://example.com';
+const FALLBACK_TIMEOUT_MS  = 2500;
+
 let _encryptedUrl = '';
 let _savedHash    = null;
 let _savedAlgo    = 'argon2id';
+
+// ── 폴백 (패스워드 틀릴 때만) ──────────────────
+function _blastOff() {
+    history.replaceState(null, '', window.location.pathname);
+    window.location.replace(FALLBACK_URL);
+    setTimeout(() => { window.location.replace(FALLBACK_TIMEOUT_URL); }, FALLBACK_TIMEOUT_MS);
+}
 
 // 알고리즘 메타 정보
 const ALGO_META = {
@@ -139,12 +150,8 @@ async function handleDecrypt() {
         const decrypted = await decryptAES(_savedHash, key, algo);
         window.location.replace(decrypted);
     } catch (e) {
-        keyInput.classList.add('error');
-        keyInput.classList.remove('shake');
-        void keyInput.offsetWidth;
-        keyInput.classList.add('shake');
-        keyInput.value = '';
-        setTimeout(() => keyInput.classList.remove('error'), 1500);
+        _blastOff();
+        return;
     }
     setDecryptLoading(false);
 }
