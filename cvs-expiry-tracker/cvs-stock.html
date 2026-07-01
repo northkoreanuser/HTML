@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>매대 채우기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700;800&family=Inter:wght@500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="dexie.min.js"></script>
+<style>
+:root{
+  --bg:#0e1116;--panel:#171b22;--panel-2:#1e232c;--row:#181d25;--row-alt:#1c212a;
+  --border:#2a3140;--border-soft:#232833;
+  --text:#f3f5f8;--sub:#8992a3;--sub-dim:#5c6577;
+  --need:#ff9f1c;--need-ink:#3a2400;
+  --pick:#22d3ee;--pick-ink:#003841;
+  --status-active:#5b8def;--done:#2ecc71;--error:#ff4d5e;--warn:#ffd23f;
+  --accent:var(--need);--accent-ink:var(--need-ink);
+  --r:14px;--rs:10px;
+  --mono:'JetBrains Mono',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
+  --sans:'Inter','Pretendard','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{background:var(--bg)}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s}
+body.mode-need{--accent:var(--need);--accent-ink:var(--need-ink)}
+body.mode-pick{--accent:var(--pick);--accent-ink:var(--pick-ink)}
+button{font-family:inherit;cursor:pointer;color:inherit}
+button:disabled{opacity:.35;cursor:default}
+input{font-family:inherit}
+*:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.wrap{max-width:600px;margin:0 auto;padding:0 0 60px}
+
+/* ── 헤더 ── */
+.topbar{position:sticky;top:0;z-index:100;background:rgba(14,17,22,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--border-soft);padding:14px 16px 12px}
+.topbar-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.topbar-row h1{font-size:15px;font-weight:800;letter-spacing:.02em;color:var(--sub);text-transform:uppercase}
+.reset-btn{font-size:12px;font-weight:600;padding:7px 12px;border-radius:20px;border:1px solid var(--border);background:var(--panel);color:var(--error)}
+.reset-btn:active{background:#2a1418}
+
+/* ── 모드 스위치 (핵심 UI) ── */
+.mode-switch{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 16px 0}
+.mode-btn{position:relative;padding:16px 10px;border-radius:var(--r);border:2px solid var(--border);background:var(--panel);display:flex;flex-direction:column;align-items:center;gap:4px;transition:border-color .15s,background .15s,transform .1s}
+.mode-btn:active{transform:scale(.98)}
+.mode-btn .m-ic{font-size:22px;line-height:1}
+.mode-btn .m-lbl{font-size:14px;font-weight:800;letter-spacing:.01em}
+.mode-btn .m-sub{font-size:10.5px;color:var(--sub);font-weight:500}
+.mode-btn.mode-a.active{border-color:var(--need);background:linear-gradient(180deg,#2a1c05,var(--panel));box-shadow:0 0 0 1px var(--need) inset,0 0 20px -4px rgba(255,159,28,.35)}
+.mode-btn.mode-a.active .m-lbl{color:var(--need)}
+.mode-btn.mode-b.active{border-color:var(--pick);background:linear-gradient(180deg,#052a30,var(--panel));box-shadow:0 0 0 1px var(--pick) inset,0 0 20px -4px rgba(34,211,238,.35)}
+.mode-btn.mode-b.active .m-lbl{color:var(--pick)}
+
+/* ── 스캔 패널 ── */
+.scan-panel{padding:14px 16px 0}
+.bc-row{display:flex;gap:8px}
+.bc-input{flex:1;font-family:var(--mono);font-size:18px;font-weight:600;letter-spacing:.02em;border:2px solid var(--border);border-radius:var(--rs);padding:14px 14px;background:var(--panel);color:var(--text)}
+.bc-input::placeholder{color:var(--sub-dim);font-weight:500;font-family:var(--sans)}
+.bc-input:focus{outline:none;border-color:var(--accent)}
+.bc-input.bc-shake{animation:shake .35s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.bc-submit{flex-shrink:0;font-size:14px;font-weight:800;border:none;border-radius:var(--rs);padding:0 20px;background:var(--accent);color:var(--accent-ink)}
+.bc-submit:active{filter:brightness(.9)}
+.mode-hint{font-size:12px;color:var(--sub);margin-top:9px;line-height:1.5}
+
+/* ── 메시지 ── */
+.msg{font-size:13px;font-weight:600;margin:12px 16px 0;padding:11px 13px;border-radius:var(--rs);border-left:3px solid;display:none}
+.msg.error{color:#ffb3ba;background:#2a1216;border-color:var(--error)}
+.msg.notice{color:#a9f0c4;background:#0f2318;border-color:var(--done)}
+.msg.warn{color:#ffe9a8;background:#2a2210;border-color:var(--warn)}
+.msg.hidden{display:none!important}
+
+/* ── 리스트 (명세서 스타일) ── */
+#list-wrap{padding:10px 16px 0;display:flex;flex-direction:column;gap:8px}
+.item-row{position:relative;background:var(--row);border:1px solid var(--border-soft);border-radius:var(--rs);padding:12px 12px 12px 16px;overflow:hidden;transition:opacity .3s}
+.item-row::before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--status-active)}
+.item-row.row-done{opacity:.5}
+.item-row.row-done::before{background:var(--done)}
+
+.item-line1{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.barcode-chip{flex:1;min-width:0;background:#eef0f2;border-radius:8px;padding:6px 8px 4px;line-height:0}
+.barcode-chip svg{display:block;width:100%;height:auto}
+
+.qty-line{display:flex;align-items:center;justify-content:center;gap:18px;margin-bottom:10px}
+.qty-btn{width:44px;height:44px;border-radius:10px;border:1px solid var(--border);background:var(--panel-2);font-size:20px;font-weight:700;color:var(--text);flex-shrink:0}
+.qty-btn:active{filter:brightness(1.3)}
+.qty-num{font-family:var(--mono);font-size:36px;font-weight:800;letter-spacing:.06em;min-width:100px;text-align:center;color:var(--text);tabular-nums:1}
+.qty-num.flash-dec{animation:flashDec .4s ease}
+.qty-num.flash-inc{animation:flashInc .4s ease}
+@keyframes flashDec{0%{color:var(--pick);transform:scale(1.12)}100%{color:var(--text);transform:scale(1)}}
+@keyframes flashInc{0%{color:var(--need);transform:scale(1.12)}100%{color:var(--text);transform:scale(1)}}
+
+.item-line3{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.item-meta{font-family:var(--mono);font-size:10.5px;color:var(--sub-dim)}
+.item-actions{display:flex;gap:6px}
+.mini-btn{font-size:11.5px;font-weight:700;padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);color:var(--sub)}
+.mini-btn:active{filter:brightness(1.3)}
+.mini-btn.adjust{border-color:rgba(255,159,28,.4);color:var(--need)}
+.mini-btn.del{border-color:rgba(255,77,94,.4);color:var(--error)}
+
+.empty{text-align:center;padding:56px 20px;color:var(--sub-dim);font-size:13.5px;line-height:1.7}
+.empty .e-ic{font-size:30px;display:block;margin-bottom:10px;opacity:.6}
+
+/* ── 모달 ── */
+#adjust-modal,#reset-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1150;align-items:center;justify-content:center;padding:24px}
+#adjust-modal.open,#reset-modal.open{display:flex}
+.modal-inner{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:22px 20px 20px;width:100%;max-width:360px;position:relative}
+.modal-inner h3{font-size:15px;font-weight:800;margin-bottom:6px;text-align:center}
+.modal-inner p.desc{font-size:12.5px;color:var(--sub);margin-bottom:18px;text-align:center;line-height:1.6}
+.modal-close{position:absolute;top:12px;right:14px;background:var(--panel-2);border:1px solid var(--border);width:28px;height:28px;border-radius:50%;font-size:13px;display:flex;align-items:center;justify-content:center;color:var(--sub)}
+.field-row{margin-bottom:13px}
+.field-row label{display:block;font-size:11.5px;font-weight:700;color:var(--sub);margin-bottom:5px;text-transform:uppercase;letter-spacing:.02em}
+.field-row input{width:100%;font-family:var(--mono);font-size:17px;font-weight:600;border:1.5px solid var(--border);border-radius:var(--rs);padding:11px 12px;background:var(--panel-2);color:var(--text)}
+.field-row input:focus{outline:none;border-color:var(--need)}
+.field-hint{font-size:11.5px;color:var(--sub);margin-top:12px;line-height:1.6;background:var(--panel-2);border-radius:var(--rs);padding:10px 11px;border:1px solid var(--border-soft)}
+.modal-btns{display:flex;gap:8px;margin-top:16px}
+.modal-btn{flex:1;padding:12px 8px;border-radius:var(--rs);border:none;font-size:14px;font-weight:800}
+.modal-btn.primary{background:var(--need);color:var(--need-ink)}
+.modal-btn.danger{background:var(--error);color:#2a0507}
+.modal-btn.ghost{background:var(--panel-2);color:var(--sub);border:1px solid var(--border)}
+</style>
+</head>
+<body class="mode-need">
+<div class="wrap">
+  <div class="topbar">
+    <div class="topbar-row">
+      <h1>매대 채우기 (<a href="index.html">유통기한 관리</a>)</h1>
+      <button class="reset-btn" onclick="openResetModal()">초기화</button>
+    </div>
+  </div>
+
+  <div class="mode-switch">
+    <button id="mode-need-btn" class="mode-btn mode-a active" onclick="setMode('need')">
+      <span class="m-ic">📥</span><span class="m-lbl">필요 수량</span><span class="m-sub">스캔 = 필요수량 +1</span>
+    </button>
+    <button id="mode-pick-btn" class="mode-btn mode-b" onclick="setMode('pick')">
+      <span class="m-ic">📤</span><span class="m-lbl">집은 수량</span><span class="m-sub">스캔 = 수량 −1</span>
+    </button>
+  </div>
+
+  <div class="scan-panel">
+    <div class="bc-row">
+      <input id="bc" class="bc-input" type="text" placeholder="바코드 스캔 대기 중…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button class="bc-submit" onclick="bcFormSubmit()">입력</button>
+    </div>
+    <div class="mode-hint" id="mode-hint">필요 수량 — 필요한 수량만큼 같은 바코드를 반복 스캔하세요.</div>
+  </div>
+
+  <div id="msg-box" class="msg hidden"></div>
+
+  <div id="list-wrap"></div>
+</div>
+
+<!-- 재고 조율 모달 -->
+<div id="adjust-modal">
+  <div class="modal-inner" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeAdjustModal()">✕</button>
+    <h3>재고 조율</h3>
+    <p class="desc" id="adjust-desc"></p>
+    <div class="field-row">
+      <label>진열공간(적재 위치) 현재 수량</label>
+      <input id="adj-display" type="number" inputmode="numeric" min="0" placeholder="예: 2">
+    </div>
+    <div class="field-row">
+      <label>매장 총 재고 (진열공간 + 창고)</label>
+      <input id="adj-total" type="number" inputmode="numeric" min="0" placeholder="예: 3">
+    </div>
+    <div class="field-hint">가져올 수 있는 개수 = 총재고 − 진열공간. 필요수량이 그보다 크면 그 값으로 줄고, 0이면 리스트에서 삭제됩니다.</div>
+    <div class="modal-btns">
+      <button class="modal-btn ghost" onclick="closeAdjustModal()">취소</button>
+      <button class="modal-btn primary" onclick="submitAdjust()">적용</button>
+    </div>
+  </div>
+</div>
+
+<!-- 초기화 모달 -->
+<div id="reset-modal">
+  <div class="modal-inner" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeResetModal()">✕</button>
+    <h3>전체 초기화</h3>
+    <p class="desc">현재 목록의 모든 항목이 삭제됩니다. 세션 전용 도구라 새로고침해도 데이터는 저장되지 않습니다.</p>
+    <div class="modal-btns">
+      <button class="modal-btn ghost" onclick="closeResetModal()">취소</button>
+      <button class="modal-btn danger" onclick="doReset()">전체 삭제</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── 사운드 ──
+let _actx=null;
+function _ctx(){try{_actx=_actx||new (window.AudioContext||window.webkitAudioContext)();if(_actx.state==='suspended')_actx.resume();return _actx;}catch(e){return null;}}
+function scanBeep(){try{const ctx=_ctx();if(!ctx)return;const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=880;const t=ctx.currentTime;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.6,t+.01);g.gain.linearRampToValueAtTime(0,t+.09);o.connect(g);g.connect(ctx.destination);o.start(t);o.stop(t+.1);}catch(e){}}
+function errorBeep(){try{const ctx=_ctx();if(!ctx)return;const t=ctx.currentTime;[0,.12].forEach(off=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type='sawtooth';o.frequency.value=220;g.gain.setValueAtTime(0,t+off);g.gain.linearRampToValueAtTime(.6,t+off+.01);g.gain.linearRampToValueAtTime(0,t+off+.1);o.connect(g);g.connect(ctx.destination);o.start(t+off);o.stop(t+off+.11);});if(navigator.vibrate)navigator.vibrate([80,40,80]);}catch(e){}}
+function completeBeep(){try{const ctx=_ctx();if(!ctx)return;const t=ctx.currentTime;[660,880,1100].forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=f;const off=i*.08;g.gain.setValueAtTime(0,t+off);g.gain.linearRampToValueAtTime(.6,t+off+.01);g.gain.linearRampToValueAtTime(0,t+off+.09);o.connect(g);g.connect(ctx.destination);o.start(t+off);o.stop(t+off+.1);});if(navigator.vibrate)navigator.vibrate([60,30,60,30,120]);}catch(e){}}
+
+// ── 바코드 유효성 검사 ──
+function isValidBarcode(barcode) {
+    if (!barcode || typeof barcode !== 'string') return false;
+    
+    // 공백 제거
+    const clean = barcode.trim();
+    if (clean.length === 0) return false;
+    
+    // EAN-13 (13자리 숫자)
+    if (/^\d{13}$/.test(clean)) {
+        return validateEAN13(clean);
+    }
+    
+    // EAN-8 (8자리 숫자)
+    if (/^\d{8}$/.test(clean)) {
+        return validateEAN8(clean);
+    }
+    
+    // UPC-A (12자리 숫자)
+    if (/^\d{12}$/.test(clean)) {
+        return validateUPC(clean);
+    }
+    
+    // 그 외: 최소 4자리 이상의 영숫자 (Code128, QR 등)
+    return clean.length >= 4 && /^[A-Za-z0-9\-_]+$/.test(clean);
+}
+
+// EAN-13 체크디짓 검사
+function validateEAN13(code) {
+    if (code.length !== 13) return false;
+    let sum = 0;
+    for (let i = 0; i < 12; i++) {
+        const digit = parseInt(code[i]);
+        if (isNaN(digit)) return false;
+        sum += digit * (i % 2 === 0 ? 1 : 3);
+    }
+    const checkDigit = (10 - (sum % 10)) % 10;
+    return parseInt(code[12]) === checkDigit;
+}
+
+// EAN-8 체크디짓 검사
+function validateEAN8(code) {
+    if (code.length !== 8) return false;
+    let sum = 0;
+    for (let i = 0; i < 7; i++) {
+        const digit = parseInt(code[i]);
+        if (isNaN(digit)) return false;
+        const weight = i % 2 === 0 ? 3 : 1;
+        sum += digit * weight;
+    }
+    const checkDigit = (10 - (sum % 10)) % 10;
+    return parseInt(code[7]) === checkDigit;
+}
+
+// UPC-A 체크디짓 검사
+function validateUPC(code) {
+    if (code.length !== 12) return false;
+    let sum = 0;
+    for (let i = 0; i < 11; i++) {
+        const digit = parseInt(code[i]);
+        if (isNaN(digit)) return false;
+        sum += digit * (i % 2 === 0 ? 3 : 1);
+    }
+    const checkDigit = (10 - (sum % 10)) % 10;
+    return parseInt(code[11]) === checkDigit;
+}
+
+// ── EAN-13 시각화 ──
+const EAN_L={'0':'0001101','1':'0011001','2':'0010011','3':'0111101','4':'0100011','5':'0110001','6':'0101111','7':'0111011','8':'0110111','9':'0001011'};
+const EAN_G={'0':'0100111','1':'0110011','2':'0011011','3':'0100001','4':'0011101','5':'0111001','6':'0000101','7':'0010001','8':'0001001','9':'0010111'};
+const EAN_R={'0':'1110010','1':'1100110','2':'1101100','3':'1000010','4':'1011100','5':'1001110','6':'1010000','7':'1000100','8':'1001000','9':'1110100'};
+const EAN_PAR={'0':'LLLLLL','1':'LLGLGG','2':'LLGGLG','3':'LLGGGL','4':'LGLLGG','5':'LGGLLG','6':'LGGGLL','7':'LGLGLG','8':'LGLGGL','9':'LGGLGL'};
+const EAN_MAPS={L:EAN_L,G:EAN_G,R:EAN_R};
+const _svgCache=new Map();
+
+function eanCheckDigit(d12){
+  let so=0,se=0;
+  for(let i=0;i<12;i++){const v=+d12[i];i%2===0?so+=v:se+=v;}
+  return(10-((so+se*3)%10))%10;
+}
+
+function genEanSVG(ean13,scale=1){
+  const key='ean_'+ean13+'_'+scale;
+  if(_svgCache.has(key))return _svgCache.get(key);
+  const fd=ean13[0],lh=ean13.slice(1,7),rh=ean13.slice(7,13);
+  let pat='101';
+  const ps=EAN_PAR[fd];
+  for(let i=0;i<6;i++)pat+=EAN_MAPS[ps[i]][lh[i]];
+  pat+='01010';
+  for(let i=0;i<6;i++)pat+=EAN_R[rh[i]];
+  pat+='101';
+  const BW=1.7*scale,H=42*scale,TH=13*scale,W=pat.length;
+  const svgW=W*BW+20*scale,svgH=H+TH+2;
+  let bars='';
+  for(let i=0;i<W;i++)if(pat[i]==='1')bars+=`<rect x="${10*scale+i*BW}" y="2" width="${BW}" height="${H}" fill="#111"/>`;
+  const result=`<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">${bars}<text x="${svgW/2}" y="${svgH-1}" text-anchor="middle" font-family="monospace" font-size="${10*scale}" fill="#333">${ean13}</text></svg>`;
+  _svgCache.set(key,result);
+  return result;
+}
+
+function hashStr(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return h>>>0;}
+function genGenericBarcodeSVG(code,scale=1){
+  const key='gen_'+code+'_'+scale;
+  if(_svgCache.has(key))return _svgCache.get(key);
+  let state=hashStr(code)||1;
+  function next(){state=(state*1103515245+12345)&0x7fffffff;return state;}
+  const n=Math.max(28,Math.min(50,code.length*3));
+  const BW=1.5*scale,H=42*scale,TH=13*scale;
+  let x=10*scale,bars='';
+  for(let i=0;i<n;i++){
+    const w=1+(next()%3);
+    if(i%2===0)bars+=`<rect x="${x}" y="2" width="${w*BW}" height="${H}" fill="#111"/>`;
+    x+=w*BW;
+  }
+  const svgW=x+10*scale,svgH=H+TH+2;
+  const result=`<svg width="${svgW}" height="${svgH}" viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg">${bars}<text x="${svgW/2}" y="${svgH-1}" text-anchor="middle" font-family="monospace" font-size="${10*scale}" fill="#333">${code}</text></svg>`;
+  _svgCache.set(key,result);
+  return result;
+}
+
+function renderBarcodeVisual(code){
+  let ean=null;
+  if(/^\d{13}$/.test(code))ean=code;
+  else if(/^\d{12}$/.test(code))ean=code+eanCheckDigit(code);
+  const svg=ean?genEanSVG(ean,1):genGenericBarcodeSVG(code,1);
+  return `<div class="barcode-chip">${svg}</div>`;
+}
+
+// ── 저장소 (Dexie/IndexedDB) ──
+const db=new Dexie('매대채우기DB');
+db.version(1).stores({items:'id, barcode, addedTs',cfg:'key'});
+
+function saveItemsToDb(){
+  db.transaction('rw',db.items,async()=>{
+    await db.items.clear();
+    if(items.length)await db.items.bulkPut(items);
+  }).catch(e=>console.error('저장 오류:',e));
+}
+function saveCfgToDb(){
+  db.cfg.put({key:'main',value:{mode}}).catch(e=>console.error('설정 저장 오류:',e));
+}
+async function loadFromDb(){
+  const rows=await db.items.toArray();
+  items=rows;
+  const cfgRow=await db.cfg.get('main');
+  if(cfgRow&&cfgRow.value){
+    mode=cfgRow.value.mode||'need';
+  }
+}
+
+// ── 상태 ──
+let items=[];
+let mode='need';
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function $(id){return document.getElementById(id);}
+
+function showMsg(text,type,ms=3200){
+  const box=$('msg-box');
+  box.textContent=text;box.className='msg '+type;
+  clearTimeout(showMsg._t);
+  if(ms>0)showMsg._t=setTimeout(()=>{box.className='msg hidden';},ms);
+}
+
+function setMode(m){
+  mode=m;
+  document.body.classList.toggle('mode-need',m==='need');
+  document.body.classList.toggle('mode-pick',m==='pick');
+  $('mode-need-btn').classList.toggle('active',m==='need');
+  $('mode-pick-btn').classList.toggle('active',m==='pick');
+  $('mode-hint').textContent=m==='need'
+    ? '필요 수량 — 필요한 수량만큼 같은 바코드를 반복 스캔하세요.'
+    : '집은 수량 — 창고에서 실제로 집으면서 스캔하면 수량이 1씩 줄어듭니다.';
+  saveCfgToDb();
+  focusBc();
+}
+
+function focusBc(){const el=$('bc');if(el)el.focus();}
+function shakeBc(){const el=$('bc');el.classList.remove('bc-shake');void el.offsetWidth;el.classList.add('bc-shake');}
+function bcFormSubmit(){handleBarcodeEnter($('bc'));}
+
+// ── 바코드 입력 처리 ──
+function handleBarcodeEnter(input) {
+    const raw = input.value.trim();
+    input.value = '';
+    
+    if (!raw) {
+        focusBc();
+        return;
+    }
+    
+    if (!isValidBarcode(raw)) {
+        errorBeep();
+        shakeBc();
+        showMsg(`❌ 유효하지 않은 바코드입니다: "${raw}"`, 'error', 3000);
+        focusBc();
+        return;
+    }
+    
+    if (mode === 'need') {
+        addOrIncrement(raw);
+    } else {
+        decrementByBarcode(raw);
+    }
+    focusBc();
+}
+
+$('bc').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        handleBarcodeEnter(this);
+    }
+});
+
+function addOrIncrement(barcode){
+  let it=items.find(i=>i.barcode===barcode);
+  if(it){
+    it.qty++;
+    it._flash='inc';
+    scanBeep();
+    showMsg(`[요청] ${barcode} — 필요수량 ${it.qty}개`,'notice',2000);
+  }else{
+    it={id:uid(),barcode,qty:1,addedTs:Date.now()};
+    items.push(it);
+    scanBeep();
+    showMsg(`[요청] ${barcode} — 새 품목 등록 (필요수량 1개)`,'notice',2000);
+  }
+  render();
+}
+
+function decrementByBarcode(barcode){
+  const it=items.find(i=>i.barcode===barcode);
+  if(!it){
+    showMsg(`[피킹] ${barcode} — 리스트에 없는 바코드입니다`,'error',3000);
+    errorBeep();
+    shakeBc();
+    return;
+  }
+  
+  it.qty--;
+  it._flash='dec';
+  
+  if(it.qty <= 0){
+    // 완료 시 자동 삭제
+    items = items.filter(x => x.id !== it.id);
+    completeBeep();
+    showMsg(`[완료] ${barcode} — 수량 0개, 리스트에서 삭제됨`,'notice',3000);
+  }else{
+    scanBeep();
+    showMsg(`[피킹] ${barcode} — 남은 수량 ${it.qty}개`,'notice',1800);
+  }
+  render();
+}
+
+function bumpQty(id,delta){
+  const it=items.find(i=>i.id===id);
+  if(!it) return;
+  
+  const newQty = it.qty + delta;
+  if(newQty < 0) return;
+  
+  it.qty = newQty;
+  it._flash = delta>0 ? 'inc' : 'dec';
+  
+  if(it.qty === 0){
+    // 완료 시 자동 삭제
+    items = items.filter(x => x.id !== id);
+    completeBeep();
+    showMsg(`[완료] ${it.barcode} — 수량 0개, 리스트에서 삭제됨`,'notice',3000);
+  }
+  render();
+}
+
+function deleteItem(id){
+  const it = items.find(i => i.id === id);
+  if(it) {
+    items = items.filter(i => i.id !== id);
+    render();
+    showMsg(`[삭제] ${it.barcode} — 항목이 삭제되었습니다`,'notice',2000);
+  }
+}
+
+let _pendingAdjustId=null;
+function openAdjust(id){
+  _pendingAdjustId=id;
+  const it=items.find(i=>i.id===id);
+  if(!it) return;
+  $('adjust-desc').innerHTML=`<strong>${it.barcode}</strong> — 현재 필요수량 <strong>${it.qty}개</strong>`;
+  $('adj-display').value='';
+  $('adj-total').value='';
+  $('adjust-modal').classList.add('open');
+  setTimeout(()=>$('adj-display').focus(),50);
+}
+function closeAdjustModal(){
+  $('adjust-modal').classList.remove('open');
+  _pendingAdjustId=null;
+}
+function submitAdjust(){
+  if(!_pendingAdjustId) return;
+  const it=items.find(i=>i.id===_pendingAdjustId);
+  if(!it) return;
+  
+  const display=+$('adj-display').value;
+  const total=+$('adj-total').value;
+  
+  if($('adj-display').value==='' || $('adj-total').value==='' || isNaN(display) || isNaN(total) || display<0 || total<0){
+    showMsg('진열공간 수량과 총 재고를 모두 입력해주세요','error');
+    return;
+  }
+  
+  const available=total-display;
+  const newQty=Math.min(it.qty, Math.max(available, 0));
+  closeAdjustModal();
+  
+  if(newQty <= 0){
+    items = items.filter(x => x.id !== it.id);
+    showMsg(`${it.barcode} — 가져올 재고가 없어 리스트에서 삭제되었습니다`,'warn',4000);
+  }else{
+    it.qty=newQty;
+    showMsg(`${it.barcode} — 필요수량이 ${newQty}개로 조정되었습니다`,'notice',3200);
+  }
+  render();
+}
+
+function openResetModal(){$('reset-modal').classList.add('open');}
+function closeResetModal(){$('reset-modal').classList.remove('open');}
+function doReset(){items=[];closeResetModal();render();focusBc();showMsg('전체 초기화되었습니다','notice');}
+
+function fmtTime(ts){const d=new Date(ts);return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');}
+function padQty(n){return String(n).padStart(3,'0');}
+
+function render(){
+  saveItemsToDb();
+  const shown=items.slice();
+  shown.sort((a,b)=>a.addedTs-b.addedTs);
+
+  const wrap=$('list-wrap');
+  if(shown.length===0){
+    wrap.innerHTML='<div class="empty"><span class="e-ic">▤</span>등록된 품목이 없습니다.<br>바코드를 스캔해서 시작하세요.</div>';
+    return;
+  }
+  
+  wrap.innerHTML=shown.map(it=>{
+    const flashCls=it._flash==='dec'?'flash-dec':it._flash==='inc'?'flash-inc':'';
+    delete it._flash;
+    return `
+    <div class="item-row" data-id="${it.id}">
+      <div class="item-line1">
+        ${renderBarcodeVisual(it.barcode)}
+      </div>
+      <div class="qty-line">
+        <button class="qty-btn" onclick="bumpQty('${it.id}',-1)" ${it.qty<=0?'disabled':''}>−</button>
+        <div class="qty-num ${flashCls}">${padQty(it.qty)}</div>
+        <button class="qty-btn" onclick="bumpQty('${it.id}',1)">＋</button>
+      </div>
+      <div class="item-line3">
+        <div class="item-meta">등록 ${fmtTime(it.addedTs)}</div>
+        <div class="item-actions">
+          <button class="mini-btn adjust" onclick="openAdjust('${it.id}')">재고 조율</button>
+          <button class="mini-btn del" onclick="deleteItem('${it.id}')">삭제</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+$('adjust-modal').addEventListener('click',closeAdjustModal);
+$('reset-modal').addEventListener('click',closeResetModal);
+
+(async function init(){
+  try{
+    await loadFromDb();
+  }catch(e){
+    console.error('초기화 오류:',e);
+    showMsg('⚠️ 저장소 불러오기 실패 — 임시 상태로 시작합니다','error',0);
+  }
+  document.body.classList.toggle('mode-need',mode==='need');
+  document.body.classList.toggle('mode-pick',mode==='pick');
+  $('mode-need-btn').classList.toggle('active',mode==='need');
+  $('mode-pick-btn').classList.toggle('active',mode==='pick');
+  $('mode-hint').textContent=mode==='need'
+    ? '필요 수량 — 필요한 수량만큼 같은 바코드를 반복 스캔하세요.'
+    : '집은 수량 — 창고에서 실제로 집으면서 스캔하면 수량이 1씩 줄어듭니다.';
+  render();
+  focusBc();
+})();
+</script>
+</body>
+</html>
