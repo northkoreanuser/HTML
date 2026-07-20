@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>바코드/QR 테스트 시트</title>
+<style>
+*{font-family:'Apple SD Gothic Neo','Malgun Gothic','NanumGothic','Noto Sans KR',sans-serif;box-sizing:border-box;}
+body{padding:16px;margin:0;background:#fff;color:#222;}
+button,input,select{font-family:inherit;}
+.modeBtn{font-size:13px;padding:5px 14px;border:none;background:#fff;cursor:pointer;color:#666;}
+.modeBtn.active{background:#333;color:#fff;font-weight:600;}
+@media print{.no-print{display:none!important;}body{padding:8px;}}
+</style>
+</head>
+<body>
+
+<div style="padding:0.5rem 0;">
+  <div class="no-print" style="display:flex;align-items:center;gap:8px;margin-bottom:1.2rem;flex-wrap:wrap;">
+    <div id="modeToggle" style="display:flex;border:1px solid #ccc;border-radius:4px;overflow:hidden;">
+      <button id="modeBarcodeBtn" class="modeBtn active" data-mode="barcode">바코드</button>
+      <button id="modeQrBtn" class="modeBtn" data-mode="qr">QR코드</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <label style="font-size:13px;color:#666;">개수</label>
+      <input type="number" id="countInput" value="200" min="10" max="500" style="width:70px;font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;">
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;">
+      <label style="font-size:13px;color:#666;">열</label>
+      <select id="colsInput" style="font-size:13px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;">
+        <option value="2">2열</option>
+        <option value="3">3열</option>
+        <option value="4" selected>4열</option>
+        <option value="5">5열</option>
+        <option value="6">6열</option>
+      </select>
+    </div>
+    <button id="genBtn" style="font-size:13px;padding:5px 12px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;cursor:pointer;">새로 생성</button>
+    <button id="htmlBtn" style="font-size:13px;padding:5px 12px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;cursor:pointer;">HTML 저장</button>
+    <button id="printBtn" style="font-size:13px;padding:5px 12px;border:1px solid #ccc;border-radius:4px;background:#f5f5f5;cursor:pointer;">인쇄</button>
+    <span id="statusText" style="font-size:12px;color:#888;margin-left:auto;"></span>
+  </div>
+
+  <div style="border:0.5px solid #ccc;border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+    <span id="headerTitle" style="font-size:13px;font-weight:500;">바코드 리더기 입력 테스트 시트</span>
+    <span id="headerDate" style="font-size:12px;color:#888;"></span>
+  </div>
+
+  <div id="tableWrap" style="overflow-x:auto;"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script>
+var currentMode='barcode'; // 'barcode' | 'qr'
+var currentCodes=[];
+
+/* ---------- 데이터 생성 ---------- */
+function calcCheck(d){
+  var o=0,e=0;
+  for(var i=0;i<12;i++) i%2===0?(o+=d[i]):(e+=d[i]);
+  return (10-((o+e*3)%10))%10;
+}
+function randomEAN13(){
+  var d=Array.from({length:12},function(){return Math.floor(Math.random()*10);});
+  d.push(calcCheck(d));
+  return d.join('');
+}
+function randomQRData(){
+  var chars='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var s='';
+  for(var i=0;i<10;i++) s+=chars.charAt(Math.floor(Math.random()*chars.length));
+  return 'SKU-'+s;
+}
+function randomCode(){
+  return currentMode==='barcode' ? randomEAN13() : randomQRData();
+}
+
+/* ---------- 바코드 렌더 (SVG 문자열) ---------- */
+function makeBarcodeSVGString(code){
+  var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  try{
+    JsBarcode(svg,code,{
+      format:'EAN13',width:1.1,height:34,
+      displayValue:true,fontSize:7,margin:1,
+      background:'#ffffff',lineColor:'#000000',textMargin:1,
+    });
+    svg.setAttribute('xmlns','http://www.w3.org/2000/svg');
+    svg.setAttribute('style','width:100%;height:auto;display:block;');
+    return (new XMLSerializer()).serializeToString(svg);
+  }catch(e){
+    return '<span style="font-size:8px;font-family:monospace;color:#888;">'+code+'</span>';
+  }
+}
+
+/* ---------- QR 렌더 (data URL) ---------- */
+function makeQRDataURL(code,size){
+  var tempDiv=document.createElement('div');
+  tempDiv.style.cssText='position:absolute;left:-9999px;top:-9999px;';
+  document.body.appendChild(tempDiv);
+  var dataURL='';
+  try{
+    new QRCode(tempDiv,{
+      text:code,width:size,height:size,
+      correctLevel:QRCode.CorrectLevel.M
+    });
+    var canvas=tempDiv.querySelector('canvas');
+    if(canvas) dataURL=canvas.toDataURL('image/png');
+  }catch(e){}
+  document.body.removeChild(tempDiv);
+  return dataURL;
+}
+
+/* ---------- 화면 표시용 테이블 ---------- */
+function renderTable(codes){
+  var cols=parseInt(document.getElementById('colsInput').value);
+  var wrap=document.getElementById('tableWrap');
+  wrap.innerHTML='';
+  document.getElementById('statusText').textContent='생성 중...';
+
+  var table=document.createElement('table');
+  table.style.cssText='border-collapse:collapse;width:100%;table-layout:fixed;';
+
+  var thead=document.createElement('thead');
+  var hrow=document.createElement('tr');
+  var cornerTh=document.createElement('th');
+  cornerTh.style.cssText='width:30px;padding:4px 2px;font-size:10px;color:#888;border:0.5px solid #ccc;background:#f9f9f9;text-align:center;';
+  cornerTh.textContent='↓행 열→';
+  hrow.appendChild(cornerTh);
+  for(var c=1;c<=cols;c++){
+    var th=document.createElement('th');
+    th.style.cssText='padding:4px;font-size:11px;font-weight:500;border:0.5px solid #ccc;background:#f5f5f5;text-align:center;color:#444;';
+    th.textContent=c+'열';
+    hrow.appendChild(th);
+  }
+  thead.appendChild(hrow);
+  table.appendChild(thead);
+
+  var tbody=document.createElement('tbody');
+  var totalRows=Math.ceil(codes.length/cols);
+  for(var r=0;r<totalRows;r++){
+    var tr=document.createElement('tr');
+    var rowTh=document.createElement('th');
+    rowTh.style.cssText='padding:4px 2px;font-size:10px;font-weight:500;border:0.5px solid #ccc;background:#f5f5f5;text-align:center;color:#444;';
+    rowTh.textContent=(r+1)+'행';
+    tr.appendChild(rowTh);
+    for(var ci=0;ci<cols;ci++){
+      var idx=r*cols+ci;
+      var td=document.createElement('td');
+      td.style.cssText='border:0.5px solid #ccc;padding:4px 2px;text-align:center;vertical-align:middle;background:#fff;';
+      if(idx<codes.length){
+        var code=codes[idx];
+        var seqNum=document.createElement('div');
+        seqNum.style.cssText='font-size:8px;color:#aaa;font-family:monospace;margin-bottom:1px;';
+        seqNum.textContent='#'+String(idx+1).padStart(3,'0');
+        td.appendChild(seqNum);
+
+        if(currentMode==='barcode'){
+          var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+          svg.style.cssText='width:100%;height:auto;display:block;';
+          td.appendChild(svg);
+          try{
+            JsBarcode(svg,code,{
+              format:'EAN13',width:1.1,height:34,
+              displayValue:true,fontSize:7,margin:1,
+              background:'#ffffff',lineColor:'#000000',textMargin:1,
+            });
+          }catch(e){
+            svg.remove();
+            var fb=document.createElement('span');
+            fb.style.cssText='font-size:8px;font-family:monospace;color:#888;';
+            fb.textContent=code;
+            td.appendChild(fb);
+          }
+        } else {
+          var dataURL=makeQRDataURL(code,120);
+          if(dataURL){
+            var img=document.createElement('img');
+            img.src=dataURL;
+            img.style.cssText='width:100%;max-width:70px;height:auto;display:block;margin:0 auto;';
+            td.appendChild(img);
+          } else {
+            var fb2=document.createElement('span');
+            fb2.style.cssText='font-size:8px;font-family:monospace;color:#888;';
+            fb2.textContent=code;
+            td.appendChild(fb2);
+          }
+          var label=document.createElement('div');
+          label.style.cssText='font-size:7px;color:#999;font-family:monospace;margin-top:1px;word-break:break-all;';
+          label.textContent=code;
+          td.appendChild(label);
+        }
+      } else {
+        td.style.background='#fafafa';
+      }
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  document.getElementById('statusText').textContent=codes.length+'개 생성됨 ('+(currentMode==='barcode'?'바코드':'QR코드')+')';
+}
+
+function generate(){
+  var count=Math.min(500,Math.max(10,parseInt(document.getElementById('countInput').value)||200));
+  currentCodes=Array.from({length:count},randomCode);
+  renderTable(currentCodes);
+}
+
+/* ---------- HTML 내보내기 (완전 독립 파일, 외부 스크립트 의존 없음) ---------- */
+function exportHTML(){
+  var cols=parseInt(document.getElementById('colsInput').value);
+  var dateStr=document.getElementById('headerDate').textContent;
+  var codes=currentCodes;
+  var totalRows=Math.ceil(codes.length/cols);
+  var isQr=currentMode==='qr';
+
+  document.getElementById('statusText').textContent='내보내기 준비 중...';
+
+  var hCells='<th style="width:30px;padding:4px 2px;font-size:10px;color:#888;border:0.5px solid #ccc;background:#f9f9f9;text-align:center;">↓행 열→</th>';
+  for(var c=1;c<=cols;c++){
+    hCells+='<th style="padding:4px;font-size:11px;font-weight:500;border:0.5px solid #ccc;background:#f5f5f5;text-align:center;color:#444;">'+c+'열</th>';
+  }
+
+  var bodyRows='';
+  for(var r=0;r<totalRows;r++){
+    var cells='<th style="padding:4px 2px;font-size:10px;font-weight:500;border:0.5px solid #ccc;background:#f5f5f5;text-align:center;color:#444;">'+(r+1)+'행</th>';
+    for(var ci=0;ci<cols;ci++){
+      var idx=r*cols+ci;
+      if(idx<codes.length){
+        var code=codes[idx];
+        var seq='#'+String(idx+1).padStart(3,'0');
+        var media;
+        if(isQr){
+          var dataURL=makeQRDataURL(code,120);
+          media='<img src="'+dataURL+'" style="width:100%;max-width:70px;height:auto;display:block;margin:0 auto;">'
+            +'<div style="font-size:7px;color:#999;font-family:monospace;margin-top:1px;word-break:break-all;">'+code+'</div>';
+        } else {
+          media=makeBarcodeSVGString(code);
+        }
+        cells+='<td style="border:0.5px solid #ccc;padding:4px 2px;text-align:center;vertical-align:middle;background:#fff;">'
+          +'<div style="font-size:8px;color:#aaa;font-family:monospace;margin-bottom:1px;">'+seq+'</div>'
+          +media+'</td>';
+      } else {
+        cells+='<td style="border:0.5px solid #ccc;padding:4px 2px;background:#fafafa;"></td>';
+      }
+    }
+    bodyRows+='<tr>'+cells+'</tr>';
+  }
+
+  var titleText=isQr?'QR코드 입력 테스트 시트':'바코드 리더기 입력 테스트 시트';
+
+  var html='<!DOCTYPE html>\n<html lang="ko">\n<head>\n'
+    +'<meta charset="UTF-8">\n'
+    +'<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">\n'
+    +'<meta name="viewport" content="width=device-width,initial-scale=1">\n'
+    +'<title>테스트 시트</title>\n'
+    +'<style>\n'
+    +'*{font-family:\'Apple SD Gothic Neo\',\'Malgun Gothic\',\'NanumGothic\',\'Noto Sans KR\',sans-serif;box-sizing:border-box;}\n'
+    +'body{padding:16px;margin:0;background:#fff;color:#222;}\n'
+    +'table{border-collapse:collapse;width:100%;table-layout:fixed;}\n'
+    +'th,td{border:0.5px solid #ccc;padding:4px 2px;text-align:center;vertical-align:middle;}\n'
+    +'@media print{body{padding:8px;}}\n'
+    +'</style>\n</head>\n<body>\n'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;border:0.5px solid #ccc;border-radius:6px;padding:10px 14px;margin-bottom:12px;">'
+    +'<span style="font-size:13px;font-weight:500;">'+titleText+'</span>'
+    +'<small style="font-size:12px;color:#888;">'+dateStr+'</small></div>\n'
+    +'<div style="overflow-x:auto;"><table>'
+    +'<thead><tr>'+hCells+'</tr></thead>'
+    +'<tbody>'+bodyRows+'</tbody>'
+    +'</table></div>\n'
+    +'</body>\n</html>';
+
+  var blob=new Blob(['\uFEFF'+html],{type:'text/html;charset=utf-8'});
+  var a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(isQr?'qr_sheet_':'barcode_sheet_')+Date.now()+'.html';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+  document.getElementById('statusText').textContent='HTML 저장 완료';
+}
+
+function setMode(mode){
+  currentMode=mode;
+  document.getElementById('modeBarcodeBtn').classList.toggle('active',mode==='barcode');
+  document.getElementById('modeQrBtn').classList.toggle('active',mode==='qr');
+  document.getElementById('headerTitle').textContent = mode==='barcode' ? '바코드 리더기 입력 테스트 시트' : 'QR코드 입력 테스트 시트';
+  generate();
+}
+
+document.getElementById('genBtn').addEventListener('click',generate);
+document.getElementById('htmlBtn').addEventListener('click',exportHTML);
+document.getElementById('printBtn').addEventListener('click',function(){window.print();});
+document.getElementById('colsInput').addEventListener('change',function(){if(currentCodes.length)renderTable(currentCodes);});
+document.getElementById('modeBarcodeBtn').addEventListener('click',function(){setMode('barcode');});
+document.getElementById('modeQrBtn').addEventListener('click',function(){setMode('qr');});
+document.getElementById('headerDate').textContent=new Date().toLocaleDateString('ko-KR');
+generate();
+</script>
+</body>
+</html>
