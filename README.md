@@ -22,8 +22,6 @@
 
 [URL-Locker](https://northkoreanuser.github.io/HTML/URL-Locker/?lock=1)
 
-[VAULT.enc](https://northkoreanuser.github.io/HTML/VAULT.enc)
-
 [HTML Editor](https://northkoreanuser.github.io/HTML/HTML%20Editor)
 
 </br></br>
@@ -31,6 +29,8 @@
 [AES-256 File Encryption](https://northkoreanuser.github.io/HTML/AES-256%20File%20Encryption)
 
 [Fɪʟᴇ Vᴀᴜʟᴛ](https://northkoreanuser.github.io/HTML/ect/ect/F%C9%AA%CA%9F%E1%B4%87%20V%E1%B4%80%E1%B4%9C%CA%9F%E1%B4%9B.html)
+
+[VAULT.enc](https://northkoreanuser.github.io/HTML/VAULT.enc)
 
 [Text Encryptor](https://northkoreanuser.github.io/HTML/Text%20Encryptor/)
 
