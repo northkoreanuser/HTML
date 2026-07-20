@@ -27,3 +27,7 @@
 [HTML Editor](https://northkoreanuser.github.io/HTML/HTML%20Editor)
 
 [AES-256 File Encryption](https://northkoreanuser.github.io/HTML/AES-256%20File%20Encryption)
+
+[Text Encryptor](https://northkoreanuser.github.io/HTML/Text%20Encryptor/)
+
+[Codebook Generator](https://northkoreanuser.github.io/HTML/Text%20Encryptor/Codebook%20Generator/Offline%20Version%202/)
