@@ -1,3 +1,171 @@
-<a href="intent://arvr.google.com/scene-viewer/1.0?file=https://example.com/model.glb&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;S.browser_fallback_url=https://example.com/fallback.html;end;">
-  Google Lens
-</a>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lens 공유 테스트</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #111;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  h1 { font-size: 18px; margin: 12px 0; }
+  #video, #canvas, #preview {
+    width: 100%;
+    max-width: 480px;
+    border-radius: 12px;
+    background: #000;
+  }
+  #canvas, #preview { display: none; }
+  .btns {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+    width: 100%;
+    max-width: 480px;
+  }
+  button {
+    flex: 1;
+    padding: 14px;
+    font-size: 16px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  #captureBtn { background: #4285f4; color: #fff; }
+  #shareBtn { background: #34a853; color: #fff; }
+  #retryBtn { background: #555; color: #fff; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  #status {
+    margin-top: 14px;
+    font-size: 13px;
+    color: #aaa;
+    text-align: center;
+    max-width: 480px;
+  }
+</style>
+</head>
+<body>
+
+<h1>📷 촬영 후 Google Lens로 공유</h1>
+
+<video id="video" autoplay playsinline muted></video>
+<canvas id="canvas"></canvas>
+<img id="preview" alt="촬영된 이미지 미리보기">
+
+<div class="btns">
+  <button id="captureBtn">촬영</button>
+  <button id="retryBtn" style="display:none;">다시 찍기</button>
+  <button id="shareBtn" style="display:none;">공유하기</button>
+</div>
+
+<div id="status">카메라 권한을 허용해주세요.</div>
+
+<script>
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const preview = document.getElementById('preview');
+const captureBtn = document.getElementById('captureBtn');
+const retryBtn = document.getElementById('retryBtn');
+const shareBtn = document.getElementById('shareBtn');
+const statusEl = document.getElementById('status');
+
+let stream = null;
+let capturedBlob = null;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+    video.srcObject = stream;
+    statusEl.textContent = '준비 완료. 촬영 버튼을 누르세요.';
+  } catch (err) {
+    statusEl.textContent = '카메라 접근 실패: ' + err.message;
+  }
+}
+
+captureBtn.addEventListener('click', () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  canvas.toBlob((blob) => {
+    capturedBlob = blob;
+    preview.src = URL.createObjectURL(blob);
+
+    video.style.display = 'none';
+    preview.style.display = 'block';
+    captureBtn.style.display = 'none';
+    retryBtn.style.display = 'block';
+    shareBtn.style.display = 'block';
+
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+    }
+
+    checkShareSupport();
+  }, 'image/jpeg', 0.92);
+});
+
+retryBtn.addEventListener('click', () => {
+  video.style.display = 'block';
+  preview.style.display = 'none';
+  captureBtn.style.display = 'block';
+  retryBtn.style.display = 'none';
+  shareBtn.style.display = 'none';
+  statusEl.textContent = '준비 완료. 촬영 버튼을 누르세요.';
+  startCamera();
+});
+
+function checkShareSupport() {
+  if (!navigator.canShare) {
+    statusEl.textContent = '이 브라우저는 이미지 공유를 지원하지 않습니다. (Chrome/Android 권장)';
+    shareBtn.disabled = true;
+    return;
+  }
+  const testFile = new File([capturedBlob], 'photo.jpg', { type: 'image/jpeg' });
+  if (!navigator.canShare({ files: [testFile] })) {
+    statusEl.textContent = '이 브라우저는 파일 공유를 지원하지 않습니다.';
+    shareBtn.disabled = true;
+    return;
+  }
+  statusEl.textContent = '공유하기를 누르면 시스템 공유창이 뜹니다. 거기서 "Google" 또는 "렌즈"를 선택하세요.';
+}
+
+shareBtn.addEventListener('click', async () => {
+  if (!capturedBlob) return;
+
+  const file = new File([capturedBlob], 'photo.jpg', { type: 'image/jpeg' });
+
+  try {
+    await navigator.share({
+      files: [file],
+      title: '이미지 검색',
+      text: '이 이미지를 검색합니다'
+    });
+    statusEl.textContent = '공유되었습니다.';
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      statusEl.textContent = '공유가 취소되었습니다.';
+    } else {
+      statusEl.textContent = '공유 실패: ' + err.message;
+    }
+  }
+});
+
+startCamera();
+</script>
+
+</body>
+</html>
