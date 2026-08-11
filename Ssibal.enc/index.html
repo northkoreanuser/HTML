@@ -1,0 +1,1346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SSIBAL — Argon2id + AES-256-GCM</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0b0d;
+    --bg2: #111318;
+    --bg3: #181b22;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --accent: #00e5a0;
+    --accent2: #00b87a;
+    --accent-dim: rgba(0,229,160,0.08);
+    --accent-glow: rgba(0,229,160,0.15);
+    --red: #ff4d6a;
+    --red-dim: rgba(255,77,106,0.08);
+    --text: #e8eaf0;
+    --text2: #8b909e;
+    --text3: #555a68;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem 4rem;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    width: 100%;
+    max-width: 720px;
+    margin-bottom: 3rem;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .logo {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 2rem;
+    letter-spacing: -0.03em;
+    color: var(--accent);
+  }
+  .logo span { color: var(--text3); font-weight: 400; }
+  .badge-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-end;
+    padding-top: 4px;
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    background: var(--bg2);
+  }
+  .badge.green { border-color: var(--accent2); color: var(--accent); background: var(--accent-dim); }
+
+  /* ── MAIN CARD ── */
+  .card {
+    width: 100%;
+    max-width: 720px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-header {
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg3);
+  }
+  .card-header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .card-header .dot.off { background: var(--text3); }
+  .card-title {
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text2);
+  }
+  .card-body { padding: 1.5rem; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 1.75rem;
+  }
+  .tab {
+    flex: 1;
+    padding: 9px;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-align: center;
+    border: none;
+    background: transparent;
+    color: var(--text3);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active {
+    background: var(--bg3);
+    color: var(--accent);
+    border: 1px solid var(--border2);
+  }
+
+  /* ── DROP ZONE ── */
+  .drop-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: 10px;
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 1.5rem;
+    position: relative;
+    background: var(--bg);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent2);
+    background: var(--accent-dim);
+  }
+  .drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 2rem; margin-bottom: 0.75rem; color: var(--accent); }
+  .drop-zone .drop-label {
+    font-size: 0.85rem;
+    color: var(--text2);
+    margin-bottom: 0.25rem;
+  }
+  .drop-zone .drop-sub { font-size: 0.72rem; color: var(--text3); }
+  .drop-zone.has-file { border-color: var(--accent2); border-style: solid; background: var(--accent-dim); }
+  .file-info {
+    display: flex; align-items: center; gap: 12px; text-align: left;
+  }
+  .file-icon { font-size: 1.8rem; color: var(--accent); }
+  .file-name { font-size: 0.85rem; color: var(--text); font-weight: 500; word-break: break-all; }
+  .file-size { font-size: 0.72rem; color: var(--text3); margin-top: 2px; }
+
+  /* ── FIELDS ── */
+  .field { margin-bottom: 1.25rem; }
+  .field-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+  .field-label .hint { color: var(--accent2); font-size: 0.68rem; text-transform: none; letter-spacing: 0; }
+
+  input[type="password"], input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 7px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="password"]:focus, input[type="text"]:focus {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 3px var(--accent-glow);
+  }
+
+  /* ── PARAMS ── */
+  .params-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .param-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .param-label { font-size: 0.65rem; color: var(--text3); letter-spacing: 0.07em; text-transform: uppercase; margin-bottom: 4px; }
+  .param-val { font-size: 1rem; font-weight: 500; color: var(--accent); }
+  .param-val span { font-size: 0.65rem; color: var(--text3); font-weight: 400; }
+
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--border2);
+    border-radius: 2px;
+    outline: none;
+    margin-top: 8px;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+  }
+
+  /* ── STRENGTH BAR ── */
+  .strength-row { display: flex; gap: 3px; margin-top: 6px; }
+  .strength-seg {
+    flex: 1; height: 3px; border-radius: 2px;
+    background: var(--border); transition: background 0.2s;
+  }
+  .strength-seg.on { background: var(--accent); }
+  .strength-seg.mid { background: #f0a500; }
+  .strength-seg.low { background: var(--red); }
+
+  /* ── BUTTON ── */
+  .btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+  .btn:hover { background: #00ffb0; transform: translateY(-1px); }
+  .btn:active { transform: translateY(0); }
+  .btn:disabled { background: var(--bg3); color: var(--text3); cursor: not-allowed; transform: none; }
+  .btn.red { background: var(--red); color: #fff; }
+  .btn.red:hover { background: #ff6b84; }
+
+  /* ── PROGRESS ── */
+  .progress-wrap {
+    display: none;
+    margin-bottom: 1.5rem;
+  }
+  .progress-wrap.visible { display: block; }
+  .progress-track {
+    width: 100%;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.3s;
+  }
+  .progress-label {
+    font-size: 0.72rem;
+    color: var(--text3);
+    display: flex;
+    justify-content: space-between;
+  }
+  .progress-label .status { color: var(--accent2); }
+
+  /* ── LOG ── */
+  .log {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem;
+    font-size: 0.72rem;
+    color: var(--text3);
+    line-height: 1.8;
+    max-height: 160px;
+    overflow-y: auto;
+    margin-top: 1.5rem;
+    display: none;
+  }
+  .log.visible { display: block; }
+  .log .l-time { color: var(--text3); }
+  .log .l-ok { color: var(--accent); }
+  .log .l-err { color: var(--red); }
+  .log .l-info { color: #4fc3f7; }
+
+  /* ── FORMAT SPEC ── */
+  .spec-card {
+    width: 100%; max-width: 720px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .spec-body { padding: 1.25rem 1.5rem; }
+  .spec-row {
+    display: grid;
+    grid-template-columns: 80px 80px 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem;
+  }
+  .spec-row:last-child { border-bottom: none; }
+  .spec-bytes { color: var(--accent); font-weight: 500; }
+  .spec-field { color: var(--text2); }
+  .spec-desc { color: var(--text3); }
+
+  /* ── HINT BOX ── */
+  .hint-box {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-left: 3px solid var(--accent2);
+    border-radius: 7px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.6;
+    margin-bottom: 1.25rem;
+    display: none;
+  }
+  .hint-box.visible { display: block; }
+  .hint-box .hint-tag {
+    font-size: 0.65rem; letter-spacing: 0.07em; text-transform: uppercase;
+    color: var(--accent2); margin-bottom: 4px;
+  }
+  .hint-box .hint-content { color: var(--text2); }
+  .hint-box .hint-empty { color: var(--text3); font-style: italic; }
+
+  /* ── PROCESSING OVERLAY ── */
+  .proc-overlay {
+    display: none;
+    position: fixed; inset: 0; z-index: 999;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background: rgba(10,11,13,0.7);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .proc-overlay.visible { display: flex; }
+  .proc-spinner {
+    width: 48px; height: 48px;
+    border: 3px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .proc-label {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    text-align: center;
+  }
+  .proc-sub {
+    font-size: 0.72rem;
+    color: var(--text3);
+    margin-top: 4px;
+    text-align: center;
+  }
+  .proc-elapsed {
+    font-size: 0.72rem;
+    color: var(--text3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── SCROLLBAR ── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="logo">SSIBAL<span>.enc</span></div>
+    <div style="font-size:0.72rem; color:var(--text3); margin-top:4px;">파일 암호화 / 복호화 도구</div>
+  </div>
+  <div class="badge-row">
+    <div class="badge green">Argon2id · libsodium.js</div>
+    <div class="badge">Web Worker · UI 논블로킹</div>
+    <div class="badge">AES-256-GCM · 봉투암호화</div>
+    <div class="badge">4MB 청크 스트리밍</div>
+    <div class="badge">로컬 처리 · 서버 전송 없음</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="dot"></div>
+    <div class="dot off"></div>
+    <div class="dot off"></div>
+    <div class="card-title" style="margin-left:8px">암호화 / 복호화</div>
+  </div>
+  <div class="card-body">
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('encrypt')">🔒 암호화 ENCRYPT</button>
+      <button class="tab" onclick="switchTab('decrypt')">🔓 복호화 DECRYPT</button>
+    </div>
+
+    <!-- DROP ZONE -->
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" onchange="handleFileSelect(this.files[0])">
+      <div id="dropDefault">
+        <div class="drop-icon">⬆</div>
+        <div class="drop-label">파일을 드래그하거나 클릭하여 선택</div>
+        <div class="drop-sub">모든 파일 형식 지원 · 4MB 청크 스트리밍 (브라우저 메모리 한도 내)</div>
+      </div>
+      <div id="dropSelected" style="display:none">
+        <div class="file-info">
+          <div class="file-icon">📄</div>
+          <div>
+            <div class="file-name" id="fileName">—</div>
+            <div class="file-size" id="fileSize">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PASSWORD -->
+    <div class="field">
+      <div class="field-label">
+        <span>비밀번호</span>
+        <span class="hint" id="strengthLabel"></span>
+      </div>
+      <input type="password" id="password" placeholder="강력한 비밀번호 입력..." oninput="checkStrength(this.value)">
+      <div class="strength-row" id="strengthBar">
+        <div class="strength-seg" id="s0"></div>
+        <div class="strength-seg" id="s1"></div>
+        <div class="strength-seg" id="s2"></div>
+        <div class="strength-seg" id="s3"></div>
+        <div class="strength-seg" id="s4"></div>
+      </div>
+    </div>
+
+    <!-- HINT (encrypt: input / decrypt: display) -->
+    <div class="field" id="hintInputSection">
+      <div class="field-label">
+        <span>힌트 (선택사항)</span>
+        <span class="hint">파일에 평문 저장됨 — 민감 정보 금지</span>
+      </div>
+      <input type="text" id="hintInput" placeholder="비밀번호 힌트 입력... (최대 255자)" oninput="updateBtn()">
+      <div id="hintWarn" style="display:none; font-size:0.72rem; color:var(--red); margin-top:5px;">⚠ 힌트가 비밀번호와 동일합니다 — 변경하세요</div>
+    </div>
+    <div class="hint-box" id="hintDisplay">
+      <div class="hint-tag">💡 파일에 저장된 힌트</div>
+      <div id="hintContent"></div>
+    </div>
+
+    <!-- ARGON2 PARAMS (encrypt only) -->
+    <div id="paramsSection">
+      <div class="field-label" style="margin-bottom:10px">
+        <span>Argon2id 파라미터 (libsodium crypto_pwhash 호환)</span>
+        <span class="hint">높을수록 느리지만 안전</span>
+      </div>
+      <div class="params-grid" style="grid-template-columns: repeat(2, 1fr);">
+        <div class="param-block">
+          <div class="param-label">메모리 (memlimit)</div>
+          <div class="param-val" id="memVal">65536 <span>KiB</span></div>
+          <input type="range" id="memSlider" min="0" max="3" step="1" value="1" oninput="onMemSliderChange()">
+        </div>
+        <div class="param-block">
+          <div class="param-label">반복 횟수 (opslimit)</div>
+          <div class="param-val" id="iterVal">3 <span>iter</span></div>
+          <input type="range" id="iterSlider" min="1" max="10" step="1" value="3" oninput="updateParams()">
+        </div>
+      </div>
+      <div style="font-size:0.68rem; color:var(--text3); margin-top:-4px; margin-bottom:1rem;">
+        병렬성(lanes)은 libsodium crypto_pwhash 사양상 항상 1로 고정되며 파일에 저장되지 않습니다.
+      </div>
+    </div>
+
+    <!-- PROGRESS -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-label">
+        <span id="progressStatus" class="status">대기 중...</span>
+        <span id="progressPct">0%</span>
+      </div>
+    </div>
+
+    <!-- ACTION BUTTON -->
+    <button class="btn" id="actionBtn" onclick="run()" disabled>
+      <span id="btnIcon">🔒</span>
+      <span id="btnText">파일과 비밀번호를 선택하세요</span>
+    </button>
+
+    <!-- LOG -->
+    <div class="log" id="logBox"></div>
+
+  </div>
+</div>
+
+<!-- FORMAT SPEC -->
+<div class="spec-card">
+  <div class="card-header">
+    <div class="dot off"></div>
+    <div class="card-title" style="margin-left:8px">파일 포맷 명세 (.Ssibal · SSIBALV2, AHK/nykenc 완전 호환)</div>
+  </div>
+  <div class="spec-body">
+    <div class="spec-row" style="border-bottom:1px solid var(--border2); padding-bottom:10px; margin-bottom:4px">
+      <div style="color:var(--text3); font-size:0.65rem; text-transform:uppercase; letter-spacing:.07em">필드</div>
+      <div style="color:var(--text3); font-size:0.65rem; text-transform:uppercase; letter-spacing:.07em">크기</div>
+      <div style="color:var(--text3); font-size:0.65rem; text-transform:uppercase; letter-spacing:.07em">설명</div>
+    </div>
+    <div class="spec-row"><div class="spec-bytes">magic</div><div class="spec-field">8 B</div><div class="spec-desc">ASCII <code style="color:var(--accent)">"SSIBALV2"</code></div></div>
+    <div class="spec-row"><div class="spec-bytes">hint_len</div><div class="spec-field">2 B</div><div class="spec-desc">힌트 길이 (uint16 LE)</div></div>
+    <div class="spec-row"><div class="spec-bytes">hint</div><div class="spec-field">N B</div><div class="spec-desc">힌트 UTF-8 — <b style="color:var(--red)">평문 그대로 저장</b> (원본 AHK 포맷과 동일, 암호화 안 됨)</div></div>
+    <div class="spec-row"><div class="spec-bytes">salt</div><div class="spec-field">16 B</div><div class="spec-desc">Argon2id 솔트 (CSPRNG)</div></div>
+    <div class="spec-row"><div class="spec-bytes">opslimit</div><div class="spec-field">4 B</div><div class="spec-desc">Argon2id 반복 횟수 (uint32 LE)</div></div>
+    <div class="spec-row"><div class="spec-bytes">memlimit</div><div class="spec-field">8 B</div><div class="spec-desc">Argon2id 메모리, 바이트 단위 (int64 LE)</div></div>
+    <div class="spec-row"><div class="spec-bytes">wrap_nonce</div><div class="spec-field">12 B</div><div class="spec-desc">FEK 래핑용 AES-256-GCM 논스</div></div>
+    <div class="spec-row"><div class="spec-bytes">wrapped_key_len</div><div class="spec-field">2 B</div><div class="spec-desc">래핑된 FEK 길이 (uint16 LE, 보통 48 = 32+16)</div></div>
+    <div class="spec-row"><div class="spec-bytes">wrapped_key</div><div class="spec-field">48 B</div><div class="spec-desc">KEK=Argon2id(pw,salt)로 AES-256-GCM 래핑된 FEK. AAD = magic‖salt‖opslimit‖memlimit</div></div>
+    <div class="spec-row"><div class="spec-bytes">chunk_count</div><div class="spec-field">8 B</div><div class="spec-desc">청크 개수 (int64 LE)</div></div>
+    <div class="spec-row"><div class="spec-bytes">chunk[i].nonce</div><div class="spec-field">12 B</div><div class="spec-desc">청크별 AES-256-GCM 논스 (매 청크 새로 생성)</div></div>
+    <div class="spec-row"><div class="spec-bytes">chunk[i].ct_len</div><div class="spec-field">4 B</div><div class="spec-desc">암호문 길이, GCM 태그 16B 포함 (uint32 LE)</div></div>
+    <div class="spec-row"><div class="spec-bytes">chunk[i].ct</div><div class="spec-field">ct_len B</div><div class="spec-desc">FEK로 암호화된 4MB 이하 청크. AAD = chunk_index(int64 LE, 8B)‖is_last(1B)</div></div>
+    <div class="spec-row" style="border-top:1px solid var(--border2); margin-top:6px; padding-top:10px;">
+      <div style="grid-column: 1 / -1; color:var(--text3);">
+        봉투 암호화(envelope encryption): 파일 본문은 매번 새로 생성되는 랜덤 256비트 FEK로 암호화되고, FEK 자체는 비밀번호에서 Argon2id로 유도한 KEK로 래핑됩니다.
+        청크 AAD에 인덱스+is_last 플래그를 묶어 재배열·치환·절단(truncation) 공격을 막고, 래핑 AAD에 헤더(magic+salt+파라미터)를 묶어 다운그레이드 공격을 막습니다.
+        모든 정수는 리틀 엔디안이며, AES-256-GCM은 표준 NIST 방식(암호문 뒤에 16B 태그)이라 Web Crypto와 libsodium 간 바이트 단위로 상호 호환됩니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROCESSING OVERLAY -->
+<div class="proc-overlay" id="procOverlay">
+  <div class="proc-spinner"></div>
+  <div>
+    <div class="proc-label" id="procLabel">처리 중...</div>
+    <div class="proc-sub" id="procSub"></div>
+  </div>
+  <div class="proc-elapsed" id="procElapsed">0.0s</div>
+</div>
+
+<script>
+// ── Argon2id 계산용 Web Worker ──
+// crypto_pwhash는 수백 ms~수 초가 걸리는 동기 연산이라 메인 스레드에서 돌리면
+// 그 동안 UI(스피너, 경과시간, 진행바)가 전부 멈춘다. Worker로 격리해서
+// 메인 스레드는 항상 응답 가능한 상태로 유지한다. 단일 파일 유지를 위해
+// 워커 스크립트는 Blob URL로 인라인 생성한다.
+const PWHASH_WORKER_SRC = `
+importScripts('https://cdn.jsdelivr.net/gh/jedisct1/libsodium.js@0.8.4/dist/browsers-sumo/sodium.js');
+
+const readyPromise = (typeof sodium !== 'undefined')
+  ? sodium.ready
+  : Promise.reject(new Error('libsodium 로드 실패'));
+
+self.onmessage = async function(ev) {
+  const { id, password, salt, opslimit, memlimit, keyLen } = ev.data;
+  try {
+    await readyPromise;
+    const key = sodium.crypto_pwhash(
+      keyLen, password, new Uint8Array(salt), opslimit, memlimit,
+      sodium.crypto_pwhash_ALG_ARGON2ID13
+    );
+    const buf = key.buffer.slice(key.byteOffset, key.byteOffset + key.byteLength);
+    self.postMessage({ id, ok: true, key: buf }, [buf]);
+  } catch (e) {
+    self.postMessage({ id, ok: false, error: (e && e.message) ? e.message : String(e) });
+  }
+};
+`;
+
+let _pwhashWorker = null;
+let _pwhashReqId = 0;
+const _pwhashPending = new Map();
+
+function getPwhashWorker() {
+  if (_pwhashWorker) return _pwhashWorker;
+  const blob = new Blob([PWHASH_WORKER_SRC], { type: 'application/javascript' });
+  _pwhashWorker = new Worker(URL.createObjectURL(blob));
+  _pwhashWorker.onmessage = (ev) => {
+    const { id, ok, key, error } = ev.data;
+    const pending = _pwhashPending.get(id);
+    if (!pending) return;
+    _pwhashPending.delete(id);
+    if (ok) pending.resolve(new Uint8Array(key));
+    else pending.reject(new Error(error || 'Argon2id 워커 오류'));
+  };
+  _pwhashWorker.onerror = (ev) => {
+    // 워커 스크립트 로드/실행 자체가 실패한 경우 — 대기 중인 요청 전부 reject
+    const err = new Error('Argon2id 워커 오류: ' + (ev.message || '알 수 없는 오류 (CSP 또는 네트워크 문제일 수 있음)'));
+    for (const [, pending] of _pwhashPending) pending.reject(err);
+    _pwhashPending.clear();
+  };
+  return _pwhashWorker;
+}
+
+// ── SSIBALV2 포맷 상수 (AES_FileEncryptV2.ahk / nykenc와 동일) ──
+const SSB2_MAGIC_BYTES = new TextEncoder().encode('SSIBALV2'); // 8 bytes
+const SSB2_CHUNK_SIZE  = 4 * 1024 * 1024; // 4MB
+const SSB2_SALTBYTES   = 16;
+const SSB2_NONCEBYTES  = 12;
+const SSB2_ABYTES      = 16;
+const SSB2_KEYBYTES    = 32;
+
+// ── STATE ──
+let currentFile = null;
+let currentTab = 'encrypt';
+const MEM_PRESETS = [16384, 65536, 262144, 1048576]; // KiB: 16MB, 64MB, 256MB, 1GB
+
+// ── TAB ──
+function switchTab(tab) {
+  if (tab !== currentTab) clearSensitive('탭 전환');
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0) === (tab==='encrypt')));
+  document.getElementById('paramsSection').style.display = tab === 'encrypt' ? 'block' : 'none';
+  document.getElementById('hintInputSection').style.display = tab === 'encrypt' ? 'block' : 'none';
+  document.getElementById('hintDisplay').classList.remove('visible');
+  document.getElementById('btnIcon').textContent = tab === 'encrypt' ? '🔒' : '🔓';
+  updateBtn();
+  clearLog();
+}
+
+// ── FILE ──
+async function handleFileSelect(file) {
+  if (!file) return;
+
+  // 탭에 상관없이 우선 SSIBALV2 헤더인지 가볍게 미리 확인 (앞부분 몇 바이트만 읽음)
+  let info = null;
+  try { info = await ssb2PeekHeader(file); } catch (e) { info = null; }
+
+  if (currentTab === 'encrypt' && info) {
+    // 암호화 모드에서 이미 암호화된(.Ssibal) 파일을 선택한 경우 → 복호화 탭으로 자동 전환 후 로드
+    switchTab('decrypt'); // 내부적으로 기존 입력값 초기화 + 로그 초기화까지 처리됨
+    log('암호화된 파일 감지됨 — 복호화 탭으로 자동 전환', 'info');
+  }
+
+  loadFileIntoUI(file, info);
+}
+
+function loadFileIntoUI(file, info) {
+  currentFile = file;
+  document.getElementById('dropDefault').style.display = 'none';
+  document.getElementById('dropSelected').style.display = 'block';
+  document.getElementById('fileName').textContent = file.name;
+  document.getElementById('fileSize').textContent = formatBytes(file.size);
+  document.getElementById('dropZone').classList.add('has-file');
+  document.getElementById('hintDisplay').classList.remove('visible');
+
+  if (currentTab === 'decrypt' && info) {
+    const hintBox = document.getElementById('hintDisplay');
+    const hintContent = document.getElementById('hintContent');
+    if (info.hint) {
+      hintContent.innerHTML = `<span class="hint-content">${escapeHtml(info.hint)}</span>`;
+    } else {
+      hintContent.innerHTML = `<span class="hint-empty">힌트 없음</span>`;
+    }
+    hintBox.classList.add('visible');
+  }
+  updateBtn();
+}
+
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+});
+
+// ── PARAMS ──
+// 병렬성(lanes)은 libsodium crypto_pwhash 사양상 항상 1로 고정 (파일에 저장 안 함)
+function updateParams() {
+  const m = MEM_PRESETS[document.getElementById('memSlider').value];
+  const t = parseInt(document.getElementById('iterSlider').value);
+  document.getElementById('memVal').innerHTML = formatKiB(m) + ' <span>KiB</span>';
+  document.getElementById('iterVal').innerHTML = t + ' <span>iter</span>';
+}
+updateParams();
+// 페이지 로드 시 현재 선택된(기본) 메모리 프리셋으로 미리 힙을 워밍업해 둔다.
+warmupPwhash(getParams().memlimit);
+
+// opslimit = 반복 횟수(iterations), memlimit = 바이트 단위 메모리 (libsodium crypto_pwhash 규격)
+function getParams() {
+  const memKiB = MEM_PRESETS[document.getElementById('memSlider').value];
+  return {
+    opslimit: parseInt(document.getElementById('iterSlider').value),
+    memlimit: memKiB * 1024
+  };
+}
+
+// ── WASM 힙 워밍업 ──
+// libsodium.js(WASM sumo 빌드)는 초기 힙이 작게 잡혀 있고, crypto_pwhash가
+// memlimit만큼의 메모리를 요구하면 그 시점에 힙을 growth(재할당+복사)해야 한다.
+// 이 growth 비용 때문에 같은 프리셋이라도 "처음 계산할 때"와 "그 이후"의 소요
+// 시간이 크게 널뛴다. 그래서 메모리 프리셋을 고를 때(그리고 페이지 로드 시
+// 기본 프리셋에 대해) 더미 비밀번호/솔트로 미리 한 번 crypto_pwhash를
+// 백그라운드로 돌려서 힙을 목표 크기까지 미리 키워 둔다.
+// opslimit=1(최소 반복)로 실행해 워밍업 자체는 최대한 가볍게 끝낸다.
+// 실제 암호화/복호화 요청은 같은 Worker 큐에 순서대로 들어가므로 워밍업이
+// 끝난 뒤 정상적으로 처리되며, 힙이 이미 커져 있어 편차 없이 더 빠르게 끝난다.
+const _warmedMemlimits = new Set();
+const _warmingMemlimits = new Set();
+
+async function warmupPwhash(memlimitBytes) {
+  if (_warmedMemlimits.has(memlimitBytes) || _warmingMemlimits.has(memlimitBytes)) return;
+  _warmingMemlimits.add(memlimitBytes);
+  try {
+    const dummySalt = new Uint8Array(SSB2_SALTBYTES); // 실제 연산과 무관한 더미 값, 결과는 버려짐
+    await deriveKEK('__warmup__', dummySalt, 1, memlimitBytes);
+    _warmedMemlimits.add(memlimitBytes);
+  } catch (e) {
+    // 워밍업 실패는 조용히 무시 — 실제 버튼 클릭 시 정상 오류 처리 경로를 그대로 탄다
+    console.warn('WASM 힙 워밍업 실패(무시됨):', e);
+  } finally {
+    _warmingMemlimits.delete(memlimitBytes);
+  }
+}
+
+function onMemSliderChange() {
+  updateParams();
+  warmupPwhash(getParams().memlimit);
+}
+
+// ── PASSWORD STRENGTH ──
+function checkStrength(pw) {
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (pw.length >= 14) score++;
+  if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+  const labels = ['매우 약함', '약함', '보통', '강함', '매우 강함'];
+  const colors = ['low','low','mid','on','on'];
+  document.getElementById('strengthLabel').textContent = pw ? labels[Math.min(score,4)] : '';
+
+  for (let i = 0; i < 5; i++) {
+    const seg = document.getElementById('s'+i);
+    seg.className = 'strength-seg' + (i < score ? ' '+colors[Math.min(score-1,4)] : '');
+  }
+  updateBtn();
+}
+
+function updateBtn() {
+  const btn = document.getElementById('actionBtn');
+  const pw = document.getElementById('password').value;
+  const hint = document.getElementById('hintInput').value;
+  const hintSameAsPw = currentTab === 'encrypt' && hint.length > 0 && hint === pw;
+
+  document.getElementById('hintWarn').style.display = hintSameAsPw ? 'block' : 'none';
+  document.getElementById('hintInput').style.borderColor = hintSameAsPw ? 'var(--red)' : '';
+
+  const ready = currentFile && pw.length >= 1 && !hintSameAsPw;
+  btn.disabled = !ready;
+  if (hintSameAsPw) {
+    document.getElementById('btnText').textContent = '힌트를 비밀번호와 다르게 설정하세요';
+  } else if (!ready) {
+    document.getElementById('btnText').textContent = currentFile ? '비밀번호를 입력하세요' : '파일과 비밀번호를 선택하세요';
+  } else {
+    document.getElementById('btnText').textContent = currentTab === 'encrypt' ? '암호화 시작' : '복호화 시작';
+  }
+}
+
+// ── LOG ──
+function log(msg, type='info') {
+  const box = document.getElementById('logBox');
+  box.classList.add('visible');
+  const t = new Date().toLocaleTimeString('ko-KR', {hour12:false});
+  box.innerHTML += `<div><span class="l-time">[${t}]</span> <span class="l-${type}">${msg}</span></div>`;
+  box.scrollTop = box.scrollHeight;
+}
+function clearLog() {
+  const box = document.getElementById('logBox');
+  box.classList.remove('visible');
+  box.innerHTML = '';
+}
+
+// ── PROGRESS ──
+function setProgress(pct, status) {
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressStatus').textContent = status;
+  document.getElementById('progressPct').textContent = Math.round(pct) + '%';
+}
+function hideProgress() {
+  document.getElementById('progressWrap').classList.remove('visible');
+}
+
+// ── OVERLAY ──
+let _elapsedTimer = null;
+function showOverlay(label, sub) {
+  document.getElementById('procLabel').textContent = label;
+  document.getElementById('procSub').textContent = sub || '';
+  document.getElementById('procElapsed').textContent = '0.0s';
+  document.getElementById('procOverlay').classList.add('visible');
+  const start = Date.now();
+  _elapsedTimer = setInterval(() => {
+    document.getElementById('procElapsed').textContent = ((Date.now() - start) / 1000).toFixed(1) + 's';
+  }, 100);
+}
+function updateOverlay(label) {
+  document.getElementById('procLabel').textContent = label;
+}
+function hideOverlay() {
+  clearInterval(_elapsedTimer);
+  document.getElementById('procOverlay').classList.remove('visible');
+}
+
+// ── 암호화/복호화 공용: Argon2id 파라미터 표시 문구 ──
+function argon2SubText(opslimit, memlimit) {
+  return `mem=${formatKiB(memlimit/1024)}KiB · ops=${opslimit} · lanes=1`;
+}
+
+// ── 암호화/복호화 공용: 프로그레스+오버레이 갱신하며 Argon2id KEK 유도 실행 ──
+// (원래 복호화 쪽에만 있던 진행률/오버레이/경과시간 처리를 그대로 함수화하여 암호화에서도 동일하게 사용)
+async function deriveKEKWithProgress(pw, salt, opslimit, memlimit, progressPct, progressLabel) {
+  setProgress(progressPct, progressLabel);
+  updateOverlay('Argon2id 키 유도 중...');
+  return await deriveKEK(pw, salt, opslimit, memlimit);
+}
+
+// ── ENTER KEY ──
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const btn = document.getElementById('actionBtn');
+    if (!btn.disabled) run();
+  }
+});
+
+// ── MAIN ──
+async function run() {
+  if (currentTab === 'encrypt') await encrypt();
+  else await decrypt();
+}
+
+// ── Argon2id KEK 유도 (Web Worker에서 libsodium.js crypto_pwhash 실행, parallelism 항상 1) ──
+// AHK 쪽 libsodium.dll과 동일한 libsodium 구현체(WASM 포팅)를 사용하므로
+// opslimit/memlimit/salt가 같으면 바이트 단위로 100% 동일한 결과가 나온다.
+// 계산은 Worker에서 수행되어 메인 스레드(UI)를 블로킹하지 않는다.
+function deriveKEK(password, salt, opslimit, memlimitBytes) {
+  return new Promise((resolve, reject) => {
+    let worker;
+    try {
+      worker = getPwhashWorker();
+    } catch (e) {
+      reject(new Error(`Argon2id 워커 생성 실패: ${e.message || e}`));
+      return;
+    }
+    const id = ++_pwhashReqId;
+    _pwhashPending.set(id, { resolve, reject });
+    // salt는 encrypt()/decrypt()에서 이후에도 사용되므로 복사본을 만들어 전송
+    // (transfer 시 원본 버퍼가 detach되는 것을 방지)
+    const saltCopy = salt.slice();
+    worker.postMessage(
+      { id, password, salt: saltCopy.buffer, opslimit, memlimit: memlimitBytes, keyLen: SSB2_KEYBYTES },
+      [saltCopy.buffer]
+    );
+  });
+}
+
+// ── ENCRYPT (SSIBALV2, 봉투 암호화 + 4MB 청크 스트리밍) ──
+async function encrypt() {
+  const pw = document.getElementById('password').value;
+  const hint = document.getElementById('hintInput').value;
+  if (hint.length > 0 && hint === pw) {
+    log('힌트가 비밀번호와 동일합니다. 변경 후 다시 시도하세요.', 'err');
+    return;
+  }
+  const { opslimit, memlimit } = getParams();
+  const btn = document.getElementById('actionBtn');
+  btn.disabled = true;
+  clearLog();
+  showOverlay('파일 분석 중...', currentFile ? currentFile.name : '');
+
+  try {
+    const file = currentFile;
+    const fileSize = file.size;
+    const chunkCount = fileSize <= 0 ? 1 : Math.ceil(fileSize / SSB2_CHUNK_SIZE);
+    log(`파일: ${file.name} (${formatBytes(fileSize)}) · 청크 ${chunkCount}개`, 'info');
+    setProgress(2, '준비 중...');
+
+    // ── FEK(파일 암호화 키) 생성 ──
+    const fek = crypto.getRandomValues(new Uint8Array(SSB2_KEYBYTES));
+
+    // ── salt 생성 + Argon2id로 KEK 유도 ──
+    const salt = crypto.getRandomValues(new Uint8Array(SSB2_SALTBYTES));
+    log(`솔트 생성: ${toHex(salt)}`, 'info');
+    log(`Argon2id KDF 시작 (mem=${formatKiB(memlimit/1024)}KiB, ops=${opslimit}, lanes=1)...`, 'info');
+    document.getElementById('procSub').textContent = argon2SubText(opslimit, memlimit);
+
+    const kekBytes = await deriveKEKWithProgress(pw, salt, opslimit, memlimit, 5, 'Argon2id 키 유도 중...');
+    log(`KEK 유도 완료`, 'ok');
+    setProgress(15, 'FEK 래핑 중...');
+    updateOverlay('FEK 래핑 중...');
+
+    const kekKey = await crypto.subtle.importKey('raw', kekBytes, {name:'AES-GCM'}, false, ['encrypt']);
+
+    // ── 래핑 AAD = magic ‖ salt ‖ opslimit ‖ memlimit ──
+    const wrapAad = concat([SSB2_MAGIC_BYTES, salt, uint32LE(opslimit), int64LE(memlimit)]);
+    const wrapNonce = crypto.getRandomValues(new Uint8Array(SSB2_NONCEBYTES));
+    const wrappedBuf = new Uint8Array(await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: wrapNonce, additionalData: wrapAad, tagLength: 128 },
+      kekKey, fek
+    ));
+
+    // ── 힌트: 평문 UTF-8로 헤더에 그대로 저장 (원본 AHK 포맷과 동일) ──
+    const hintBytes = new TextEncoder().encode(hint).slice(0, 65535);
+
+    const header = concat([
+      SSB2_MAGIC_BYTES,
+      uint16LE(hintBytes.length),
+      hintBytes,
+      salt,
+      uint32LE(opslimit),
+      int64LE(memlimit),
+      wrapNonce,
+      uint16LE(wrappedBuf.length),
+      wrappedBuf,
+      int64LE(chunkCount)
+    ]);
+
+    log(`헤더 작성 완료 (${header.byteLength} bytes)`, 'info');
+    setProgress(20, 'AES-256-GCM 청크 암호화 중...');
+    updateOverlay('AES-256-GCM 청크 암호화 중...');
+
+    const fekKey = await crypto.subtle.importKey('raw', fek, {name:'AES-GCM'}, false, ['encrypt']);
+
+    const parts = [header];
+    let offset = 0;
+    for (let idx = 0; idx < chunkCount; idx++) {
+      const end = Math.min(offset + SSB2_CHUNK_SIZE, fileSize);
+      const chunkBuf = new Uint8Array(await file.slice(offset, end).arrayBuffer());
+      offset = end;
+
+      const chunkNonce = crypto.getRandomValues(new Uint8Array(SSB2_NONCEBYTES));
+      const isLast = (idx === chunkCount - 1) ? 1 : 0;
+      const idxAad = concat([int64LE(idx), new Uint8Array([isLast])]);
+
+      const ctBuf = new Uint8Array(await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv: chunkNonce, additionalData: idxAad, tagLength: 128 },
+        fekKey, chunkBuf
+      ));
+
+      parts.push(chunkNonce, uint32LE(ctBuf.length), ctBuf);
+
+      if (idx % 4 === 0 || idx === chunkCount - 1) {
+        const pct = 20 + (idx + 1) / chunkCount * 70;
+        setProgress(pct, `청크 암호화 중... (${idx+1}/${chunkCount})`);
+        await new Promise(r => setTimeout(r, 0)); // UI 응답성 유지
+      }
+    }
+
+    setProgress(92, '파일 조립 중...');
+    const blob = new Blob(parts, {type: 'application/octet-stream'});
+    log(`암호화 완료 · 전체 크기: ${formatBytes(blob.size)}`, 'ok');
+    if (hint) log(`힌트 저장됨(평문): "${hint}"`, 'info');
+
+    setProgress(97, '다운로드 준비 중...');
+    downloadBlob(blob, file.name + '.Ssibal');
+    setProgress(100, '암호화 완료!');
+    log(`✓ 암호화 완료 → ${file.name}.Ssibal`, 'ok');
+
+    // 보안: 암호화 완료 후 민감 정보 즉시 초기화
+    document.getElementById('password').value = '';
+    document.getElementById('hintInput').value = '';
+    document.getElementById('hintWarn').style.display = 'none';
+    document.getElementById('hintInput').style.borderColor = '';
+    for (let i = 0; i < 5; i++) document.getElementById('s'+i).className = 'strength-seg';
+    document.getElementById('strengthLabel').textContent = '';
+    currentFile = null;
+    document.getElementById('dropDefault').style.display = 'block';
+    document.getElementById('dropSelected').style.display = 'none';
+    document.getElementById('dropZone').classList.remove('has-file');
+    document.getElementById('fileInput').value = '';
+
+  } catch(e) {
+    log(`오류: ${e.message}`, 'err');
+    setProgress(0, '오류 발생');
+    console.error(e);
+  } finally {
+    hideOverlay();
+    btn.disabled = false;
+    updateBtn();
+  }
+}
+
+// ── 헤더만 미리 읽기 (매직+힌트, 복호화 전 프리뷰용) ──
+async function ssb2PeekHeader(file) {
+  if (file.size < 10) return null;
+  const head = new Uint8Array(await file.slice(0, 10).arrayBuffer());
+  for (let i = 0; i < 8; i++) {
+    if (head[i] !== SSB2_MAGIC_BYTES[i]) return null;
+  }
+  const hintLen = readUint16LE(head, 8);
+  if (hintLen === 0) return { hint: '' };
+  if (file.size < 10 + hintLen) return null;
+  const hintBuf = new Uint8Array(await file.slice(10, 10 + hintLen).arrayBuffer());
+  return { hint: new TextDecoder().decode(hintBuf) };
+}
+
+// ── DECRYPT (SSIBALV2, 봉투 복호화 + 청크 스트리밍) ──
+async function decrypt() {
+  const pw = document.getElementById('password').value;
+  const btn = document.getElementById('actionBtn');
+  btn.disabled = true;
+  clearLog();
+  showOverlay('파일 분석 중...', currentFile ? currentFile.name : '');
+
+  try {
+    const file = currentFile;
+    log(`파일 읽는 중: ${file.name}`, 'info');
+    setProgress(2, '헤더 파싱 중...');
+    updateOverlay('헤더 파싱 중...');
+
+    let offset = 0;
+    const readBytes = async (n) => {
+      const buf = new Uint8Array(await file.slice(offset, offset + n).arrayBuffer());
+      if (buf.length < n) throw new Error('파일이 손상되었거나 너무 짧습니다 (헤더 파싱 실패)');
+      offset += n;
+      return buf;
+    };
+
+    const magic = await readBytes(8);
+    for (let i = 0; i < 8; i++) {
+      if (magic[i] !== SSB2_MAGIC_BYTES[i]) throw new Error('유효하지 않은 파일 (SSIBALV2 매직 헤더 불일치)');
+    }
+
+    const hintLen = readUint16LE(await readBytes(2), 0);
+    let hint = '';
+    if (hintLen > 0) hint = new TextDecoder().decode(await readBytes(hintLen));
+
+    const salt = await readBytes(SSB2_SALTBYTES);
+    const opslimit = readUint32LE(await readBytes(4), 0);
+    const memlimit = Number(readInt64LE(await readBytes(8), 0));
+    const wrapNonce = await readBytes(SSB2_NONCEBYTES);
+    const wrappedLen = readUint16LE(await readBytes(2), 0);
+    const wrapped = await readBytes(wrappedLen);
+    const chunkCount = Number(readInt64LE(await readBytes(8), 0));
+
+    log(`Argon2id 파라미터: mem=${formatKiB(memlimit/1024)}KiB, ops=${opslimit}, lanes=1`, 'info');
+    if (hint) log(`힌트: "${hint}"`, 'info');
+    log(`솔트: ${toHex(salt)}`, 'info');
+    log(`청크 ${chunkCount}개`, 'info');
+
+    const hintBox = document.getElementById('hintDisplay');
+    const hintContent = document.getElementById('hintContent');
+    hintContent.innerHTML = hint
+      ? `<span class="hint-content">${escapeHtml(hint)}</span>`
+      : `<span class="hint-empty">힌트 없음</span>`;
+    hintBox.classList.add('visible');
+
+    log(`Argon2id KDF 재현 중...`, 'info');
+    document.getElementById('procSub').textContent = argon2SubText(opslimit, memlimit);
+
+    const kekBytes = await deriveKEKWithProgress(pw, salt, opslimit, memlimit, 8, 'Argon2id 키 유도 중...');
+    log(`KEK 유도 완료`, 'ok');
+    setProgress(18, 'FEK 언래핑 중...');
+    updateOverlay('FEK 언래핑 중...');
+
+    const kekKey = await crypto.subtle.importKey('raw', kekBytes, {name:'AES-GCM'}, false, ['decrypt']);
+    const wrapAad = concat([SSB2_MAGIC_BYTES, salt, uint32LE(opslimit), int64LE(memlimit)]);
+
+    let fek;
+    try {
+      fek = new Uint8Array(await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: wrapNonce, additionalData: wrapAad, tagLength: 128 },
+        kekKey, wrapped
+      ));
+    } catch(e) {
+      throw new Error('복호화 실패 — 비밀번호가 틀렸거나 파일이 손상/변조되었습니다');
+    }
+    log(`FEK 언래핑 성공 ✓`, 'ok');
+    setProgress(25, 'AES-256-GCM 청크 복호화 중...');
+    updateOverlay('AES-256-GCM 청크 복호화 중...');
+
+    const fekKey = await crypto.subtle.importKey('raw', fek, {name:'AES-GCM'}, false, ['decrypt']);
+
+    const parts = [];
+    for (let idx = 0; idx < chunkCount; idx++) {
+      const chunkNonce = await readBytes(SSB2_NONCEBYTES);
+      const ctLen = readUint32LE(await readBytes(4), 0);
+      if (ctLen < SSB2_ABYTES) throw new Error(`청크 ${idx} 길이 값이 손상되었습니다.`);
+      const ctBuf = await readBytes(ctLen);
+
+      const isLast = (idx === chunkCount - 1) ? 1 : 0;
+      const idxAad = concat([int64LE(idx), new Uint8Array([isLast])]);
+
+      let ptBuf;
+      try {
+        ptBuf = new Uint8Array(await crypto.subtle.decrypt(
+          { name: 'AES-GCM', iv: chunkNonce, additionalData: idxAad, tagLength: 128 },
+          fekKey, ctBuf
+        ));
+      } catch(e) {
+        throw new Error(`청크 ${idx} 복호화 실패 (비밀번호 오류 또는 손상/변조 가능성)`);
+      }
+      parts.push(ptBuf);
+
+      if (idx % 4 === 0 || idx === chunkCount - 1) {
+        const pct = 25 + (idx + 1) / chunkCount * 65;
+        setProgress(pct, `청크 복호화 중... (${idx+1}/${chunkCount})`);
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    log(`인증 태그 검증 성공 ✓ (전체 ${chunkCount}청크)`, 'ok');
+    setProgress(92, '파일 조립 중...');
+    const blob = new Blob(parts);
+    log(`복호화 완료 (${formatBytes(blob.size)})`, 'ok');
+    setProgress(97, '다운로드 준비 중...');
+
+    let outName = file.name;
+    if (outName.toLowerCase().endsWith('.ssibal')) outName = outName.slice(0, -7);
+    else outName += '_dec';
+
+    downloadBlob(blob, outName);
+    setProgress(100, '복호화 완료!');
+    log(`✓ 복호화 완료 → ${outName}`, 'ok');
+
+  } catch(e) {
+    log(`오류: ${e.message}`, 'err');
+    setProgress(0, '오류 발생');
+    console.error(e);
+  } finally {
+    hideOverlay();
+    btn.disabled = false;
+    updateBtn();
+  }
+}
+
+// ── UTILS ──
+function concat(arrays) {
+  const total = arrays.reduce((s, a) => s + a.byteLength, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const a of arrays) { out.set(new Uint8Array(a.buffer || a), off); off += a.byteLength; }
+  return out;
+}
+
+function uint16LE(n) {
+  const b = new Uint8Array(2);
+  new DataView(b.buffer).setUint16(0, n, true);
+  return b;
+}
+function uint32LE(n) {
+  const b = new Uint8Array(4);
+  new DataView(b.buffer).setUint32(0, n, true);
+  return b;
+}
+function int64LE(n) {
+  const b = new Uint8Array(8);
+  new DataView(b.buffer).setBigInt64(0, BigInt(n), true);
+  return b;
+}
+function readUint16LE(buf, off) {
+  return new DataView(buf.buffer, buf.byteOffset + off, 2).getUint16(0, true);
+}
+function readUint32LE(buf, off) {
+  return new DataView(buf.buffer, buf.byteOffset + off, 4).getUint32(0, true);
+}
+function readInt64LE(buf, off) {
+  return new DataView(buf.buffer, buf.byteOffset + off, 8).getBigInt64(0, true);
+}
+
+function toHex(arr) {
+  return Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function formatBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n/1024).toFixed(1) + ' KB';
+  if (n < 1073741824) return (n/1048576).toFixed(2) + ' MB';
+  return (n/1073741824).toFixed(2) + ' GB';
+}
+
+function formatKiB(kib) {
+  if (kib >= 1048576) return (kib/1048576).toFixed(0) + 'G';
+  if (kib >= 1024) return (kib/1024).toFixed(0) + 'M';
+  return kib;
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ── SECURITY: 민감 정보 초기화 ──
+function clearSensitive(reason) {
+  const hadData = !!(currentFile ||
+    document.getElementById('password').value.length > 0 ||
+    document.getElementById('hintInput').value.length > 0);
+
+  document.getElementById('password').value = '';
+  document.getElementById('hintInput').value = '';
+  document.getElementById('hintWarn').style.display = 'none';
+  document.getElementById('hintInput').style.borderColor = '';
+  for (let i = 0; i < 5; i++) document.getElementById('s'+i).className = 'strength-seg';
+  document.getElementById('strengthLabel').textContent = '';
+  currentFile = null;
+  document.getElementById('dropDefault').style.display = 'block';
+  document.getElementById('dropSelected').style.display = 'none';
+  document.getElementById('dropZone').classList.remove('has-file');
+  document.getElementById('fileInput').value = '';
+  document.getElementById('hintDisplay').classList.remove('visible');
+  updateBtn();
+  if (hadData && reason) log(`보안: ${reason} — 입력 초기화됨`, 'err');
+}
+
+// 1. 탭 이동 시 초기화 (switchTab 내부에서 직접 처리)
+
+// 2. 윈도우 포커스 이탈
+// 파일 선택 창 열림: click → _filePickerActive=true → blur/visibilitychange 차단
+// 파일 선택 창 닫힘: 반드시 window focus 이벤트가 발생 → 그때 즉시 해제
+// setTimeout 없음: 타이밍 레이스 원천 차단
+let _filePickerActive = false;
+
+document.getElementById('fileInput').addEventListener('click', () => {
+  _filePickerActive = true;
+});
+
+window.addEventListener('focus', () => {
+  // 파일 선택 창(OS 네이티브)이 닫히면 반드시 window focus가 옴.
+  // 이 시점에서 즉시 해제 → 이후 발생하는 blur는 진짜 알트탭.
+  _filePickerActive = false;
+});
+
+window.addEventListener('blur', () => {
+  if (!_filePickerActive) clearSensitive('다른 창으로 이동');
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && !_filePickerActive) clearSensitive('페이지 비활성화');
+});
+
+// 3. 개발자 도구 감지 (크기 기반 + console 트릭 병행)
+let _devtoolsOpen = false;
+const _devCheck = () => {
+  const threshold = 160;
+  const widthDiff  = window.outerWidth  - window.innerWidth  > threshold;
+  const heightDiff = window.outerHeight - window.innerHeight > threshold;
+  const open = widthDiff || heightDiff;
+  if (open && !_devtoolsOpen) {
+    _devtoolsOpen = true;
+    clearSensitive('개발자 도구 감지');
+  }
+  if (!open) _devtoolsOpen = false;
+};
+setInterval(_devCheck, 800);
+
+// console getter 트릭 (Chromium 계열 추가 감지)
+(function() {
+  let _check = false;
+  const _obj = Object.defineProperty({}, 'id', {
+    get() { _check = true; return 0; }
+  });
+  const _orig = console.log;
+  setInterval(() => {
+    _check = false;
+    _orig.call(console, '%c', _obj);
+    if (_check && !_devtoolsOpen) {
+      _devtoolsOpen = true;
+      clearSensitive('개발자 도구 감지');
+    }
+  }, 1200);
+})();
+
+// 4. 우클릭 감지 + 차단
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  clearSensitive('우클릭 시도');
+});
+
+// 5. 10초 비활동 타이머
+let _idleTimer = null;
+const IDLE_MS = 10000;
+const _hasInput = () => {
+  return currentFile ||
+    document.getElementById('password').value.length > 0 ||
+    document.getElementById('hintInput').value.length > 0;
+};
+const _resetIdle = () => {
+  clearTimeout(_idleTimer);
+  if (_hasInput() && !_filePickerActive) {
+    _idleTimer = setTimeout(() => {
+      // 타이머 만료 시점에도 파일 선택 창이 열려있으면 재예약
+      if (_hasInput()) {
+        if (_filePickerActive) { _resetIdle(); return; }
+        clearSensitive('10초 비활동');
+      }
+    }, IDLE_MS);
+  }
+};
+['mousemove','keydown','mousedown','touchstart','scroll','input','change'].forEach(ev =>
+  document.addEventListener(ev, _resetIdle, { passive: true })
+);
+</script>
+</body>
+</html>
