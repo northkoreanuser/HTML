@@ -1,4 +1,4 @@
-#NoTrayIcon
+﻿#NoTrayIcon
 #SingleInstance Off
 SplitPath A_ScriptName,,,,A_FileName
 IfEqual A_IsCompiled,,Run Compiler\Ahk2Exe.exe /in "%A_ScriptFullPath%" /icon Compiler\ico.ico,,UseErrorLevel
