@@ -37,3 +37,10 @@
 [Text Encryptor](https://northkoreanuser.github.io/HTML/Text%20Encryptor/)
 
 [Codebook Generator](https://northkoreanuser.github.io/HTML/Text%20Encryptor/Codebook%20Generator/Offline%20Version%202/)
+</br></br>
+
+[VAULT.enc](https://northkoreanuser.github.io/HTML/Ssibal.enc/)
+
+[Text Encryptor](https://northkoreanuser.github.io/HTML/Ssibal_Text.enc/)
+
+[Codebook Generator](https://northkoreanuser.github.io/HTML/Text%20Encryptor/Codebook%20Generator/Offline%20Version%202/)
